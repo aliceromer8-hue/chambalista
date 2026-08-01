@@ -1,0 +1,86 @@
+:root {
+  --papel: #FCFBF8;
+  --papel-2: #F3F0E9;
+  --tinta: #14161C;
+  --lapiz: #6C6960;
+  --pluma: #1B45C4;
+  --pluma-suave: #E4E9FA;
+  --marcador: #FFD84D;
+  --linea: #DDD8CD;
+  --verde: #1E7A4C;
+  --serif: "Times New Roman", Times, serif;
+  --sans: ui-sans-serif, "Segoe UI", system-ui, -apple-system, Roboto, Arial, sans-serif;
+  --mono: ui-monospace, Consolas, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --papel: #101217; --papel-2: #171A21; --tinta: #EEEAE1;
+    --lapiz: #9B968C; --pluma: #8AA6FF; --pluma-suave: #1B2440;
+    --linea: #282D37; --verde: #5CC98D;
+  }
+}
+
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--papel); color: var(--tinta); font-family: var(--sans); line-height: 1.6; -webkit-font-smoothing: antialiased; }
+.ancho { max-width: 720px; margin: 0 auto; padding: 0 20px; }
+.oculto { display: none !important; }
+.centro { text-align: center; }
+.detalle { font-size: .85rem; color: var(--lapiz); }
+
+.cabecera { border-bottom: 1px solid var(--linea); }
+.cabecera .ancho { display: flex; align-items: center; gap: 12px; height: 56px; }
+.logo { display: flex; align-items: center; gap: 8px; font-family: var(--serif); font-weight: 700; font-size: 1.05rem; }
+.cabecera .detalle { margin-left: auto; }
+@media (max-width: 560px) { .cabecera .detalle { display: none; } }
+
+h1 { font-family: var(--serif); font-size: clamp(1.9rem, 5.5vw, 2.7rem); line-height: 1.08; margin: 0 0 14px; text-wrap: balance; }
+h2 { font-family: var(--serif); font-size: 1.2rem; margin: 0 0 8px; }
+.intro { padding: 46px 0 8px; }
+.bajada { color: var(--lapiz); max-width: 52ch; margin: 0; }
+.marca { background: linear-gradient(transparent 62%, var(--marcador) 62%); padding: 0 2px; }
+@media (prefers-color-scheme: dark) { .marca { background: linear-gradient(transparent 62%, rgba(255,216,77,.3) 62%); } }
+
+.paso { padding: 26px 0; }
+
+.zona { border: 2px dashed var(--linea); border-radius: 6px; background: var(--papel-2); padding: 40px 20px; text-align: center; transition: border-color .15s, background .15s; }
+.zona.activa { border-color: var(--pluma); background: var(--pluma-suave); }
+.zona .grande { font-size: 1.1rem; font-weight: 600; margin: 0 0 6px; }
+.zona p { margin: 0; }
+.enlace { background: none; border: none; color: var(--pluma); font: inherit; text-decoration: underline; cursor: pointer; padding: 0; }
+
+.boton { padding: 12px 22px; border-radius: 5px; font: inherit; font-weight: 600; font-size: .94rem; cursor: pointer; border: 1px solid transparent; }
+.boton.principal { background: var(--pluma); color: #fff; }
+.boton.principal:disabled { opacity: .45; cursor: not-allowed; }
+.boton.secundario { background: transparent; border-color: var(--linea); color: var(--tinta); }
+.boton.texto { background: none; border: none; color: var(--lapiz); text-decoration: underline; }
+.ancho-total { width: 100%; margin-top: 14px; }
+
+.cabecera-resultado { display: flex; align-items: center; justify-content: space-between; gap: 14px; flex-wrap: wrap; }
+.acciones { margin-top: 18px; }
+
+details { border: 1px solid var(--linea); border-radius: 6px; padding: 14px 16px; background: var(--papel-2); }
+summary { cursor: pointer; font-weight: 600; font-size: .92rem; }
+.pastilla { font-family: var(--mono); font-size: .68rem; text-transform: uppercase; letter-spacing: .06em; background: var(--linea); color: var(--lapiz); border-radius: 99px; padding: 2px 9px; margin-left: 6px; }
+.pastilla.ok { background: var(--pluma-suave); color: var(--pluma); }
+.fila-clave { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 10px; }
+.fila-clave input { flex: 1; min-width: 200px; padding: 10px 13px; border: 1px solid var(--linea); border-radius: 5px; font: inherit; background: var(--papel); color: var(--tinta); }
+.fila-clave input:focus { outline: 2px solid var(--pluma); border-color: transparent; }
+details ol { margin: 10px 0; padding-left: 20px; }
+
+.privacidad { padding: 30px 0 10px; border-top: 1px solid var(--linea); }
+.privacidad ul { margin: 0; padding-left: 20px; color: var(--lapiz); font-size: .9rem; }
+.privacidad li { margin: 6px 0; }
+
+footer { padding: 30px 0 60px; color: var(--lapiz); font-size: .84rem; border-top: 1px solid var(--linea); margin-top: 30px; }
+
+/* ---- vista previa del CV, con el formato real ---- */
+.cv-preview { font-family: var(--serif); background: var(--papel); border: 1px solid var(--linea); border-radius: 5px; padding: 26px 30px; margin: 16px 0; max-height: 520px; overflow-y: auto; }
+.cv-preview h1 { text-align: center; font-size: 1.4rem; font-weight: 700; margin: 0 0 3px; }
+.cv-preview .cv-contacto { text-align: center; font-size: .76rem; color: var(--lapiz); margin: 0 0 8px; padding-bottom: 8px; border-bottom: 1px solid currentColor; }
+.cv-preview h2 { font-size: .85rem; text-transform: uppercase; margin: 14px 0 6px; padding-bottom: 3px; border-bottom: 1px solid currentColor; }
+.cv-preview p { margin: 2px 0; font-size: .85rem; }
+.cv-preview ul { margin: 3px 0 4px 18px; padding: 0; }
+.cv-preview li { font-size: .85rem; margin: 2px 0; }
+.cv-preview .cv-fila { display: flex; justify-content: space-between; gap: 14px; }
+.cv-preview .cv-fila .der { text-align: right; white-space: nowrap; }
+a:focus-visible, button:focus-visible { outline: 2px solid var(--pluma); outline-offset: 2px; }

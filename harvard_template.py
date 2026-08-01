@@ -314,6 +314,16 @@ def generar_docx(perfil, carpeta_salida, sufijo=None):
                 p = _p(doc, despues=1)
                 _run(p, linea)
 
+    if carpeta_salida is None:
+        # Modo web: sin escribir en disco.
+        import io
+
+        buffer = io.BytesIO()
+        doc.save(buffer)
+        buffer.seek(0)
+        slug = re.sub(r"[^\w]+", "-", d["nombre"] or "candidato").strip("-")
+        return buffer, f"CV-{slug}-Harvard.docx"
+
     carpeta = Path(carpeta_salida)
     carpeta.mkdir(exist_ok=True)
     slug = re.sub(r"[^\w]+", "-", d["nombre"] or "candidato").strip("-")
@@ -328,6 +338,11 @@ def generar_docx(perfil, carpeta_salida, sufijo=None):
 # ---------------------------------------------------------------------------
 # Vista previa en HTML
 # ---------------------------------------------------------------------------
+
+def documento_en_memoria(perfil):
+    """(buffer, nombre) del .docx sin tocar el disco. Para la versión web."""
+    return generar_docx(perfil, None)
+
 
 def render_html(perfil):
     """Réplica del .docx en HTML, para revisarlo sin abrir el Word."""

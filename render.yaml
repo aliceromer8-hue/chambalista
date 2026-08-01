@@ -1,0 +1,28 @@
+# Despliegue en Render, capa gratuita (sin tarjeta).
+#
+# Es la única de las tres grandes (Render / Railway / Fly) que en 2026
+# sigue teniendo capa gratuita sin pedir tarjeta. Railway pasó a crédito
+# de prueba de 5 USD y Fly quitó el free tier a las cuentas nuevas.
+# El plan Hobby de Vercel prohíbe el uso comercial, así que no sirve si
+# el proyecto va a monetizarse.
+#
+# Ojo: en el plan free el servicio se duerme tras 15 minutos sin visitas
+# y la primera carga tarda ~30 s en despertar. Es aceptable para empezar.
+
+services:
+  - type: web
+    name: chamba-lista
+    runtime: python
+    plan: free
+    region: oregon
+    buildCommand: pip install -r requirements-web.txt
+    startCommand: gunicorn app_web:app --bind 0.0.0.0:$PORT --workers 1 --threads 4 --timeout 120
+    envVars:
+      - key: PYTHON_VERSION
+        value: "3.12"
+      - key: LIMITE_PETICIONES
+        value: "20"
+      - key: VENTANA_SEGUNDOS
+        value: "3600"
+      # No se define GEMINI_API_KEY: la clave la pone cada usuario desde
+      # su navegador y viaja solo en la petición.

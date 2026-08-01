@@ -115,6 +115,39 @@ def detectar_datos_faltantes(texto):
     return faltantes
 
 
+def extraer_texto_de_memoria(contenido, extension):
+    """Igual que `extraer_texto` pero sobre bytes, sin escribir en disco.
+
+    La versión web procesa los CV en memoria: no debe dejar archivos de
+    otras personas en el servidor.
+    """
+    import io
+
+    flujo = io.BytesIO(contenido)
+    ext = extension.lower()
+    if ext == ".pdf":
+        import pdfplumber
+        with pdfplumber.open(flujo) as pdf:
+            return "\n".join(p.extract_text() or "" for p in pdf.pages)
+    if ext in (".docx", ".doc"):
+        from docx import Document
+        doc = Document(flujo)
+        partes = [p.text for p in doc.paragraphs]
+        for tabla in doc.tables:
+            for fila in tabla.rows:
+                partes.extend(celda.text for celda in fila.cells)
+        return "\n".join(partes)
+    if ext == ".txt":
+        return contenido.decode("utf-8", errors="ignore")
+    raise ValueError(f"Formato no soportado: {ext}")
+
+
+def parsear_cv_desde_memoria(contenido, extension):
+    """Parseo completo sobre bytes. Misma lógica que `parsear_cv`."""
+    texto = extraer_texto_de_memoria(contenido, extension)
+    return _parsear_texto(texto)
+
+
 def parsear_cv(ruta):
     """Parsea el CV y devuelve un dict con los campos del perfil.
 
@@ -124,7 +157,11 @@ def parsear_cv(ruta):
     sección no se detectaban igual. El modelo lee el contenido y no
     depende del formato. Si no hay modelo o falla, se usan las reglas.
     """
-    texto = extraer_texto(ruta)
+    return _parsear_texto(extraer_texto(ruta))
+
+
+def _parsear_texto(texto):
+    """Núcleo compartido: del texto crudo al perfil estructurado."""
     lineas = [l.rstrip() for l in texto.splitlines()]
 
     try:
