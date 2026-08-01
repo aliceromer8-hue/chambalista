@@ -80,6 +80,29 @@ def _entrada(valor):
     return {"organizacion": str(valor).strip(), "lugar": "", "cargo": "", "fechas": "", "logros": []}
 
 
+def _secciones_extra(perfil):
+    """Secciones que la persona creó a mano, con su propio título."""
+    salida = []
+    for s in perfil.get("secciones_extra") or []:
+        if not isinstance(s, dict):
+            continue
+        titulo = str(s.get("titulo") or "").strip()
+        lineas = s.get("lineas") or []
+        if isinstance(lineas, str):
+            lineas = [l for l in lineas.splitlines() if l.strip()]
+        limpias = []
+        for l in lineas:
+            if isinstance(l, dict):
+                limpias.append(" · ".join(filter(None, [
+                    l.get("organizacion", ""), l.get("cargo", ""), l.get("fechas", "")])))
+                limpias.extend(f"- {x}" for x in (l.get("logros") or []))
+            elif str(l).strip():
+                limpias.append(str(l).strip())
+        if titulo and limpias:
+            salida.append({"titulo": titulo, "lineas": limpias})
+    return salida
+
+
 def normalizar(perfil):
     """Deja el perfil en el modelo estructurado que espera el generador.
 
@@ -132,6 +155,8 @@ def normalizar(perfil):
             datos[destino] = normalizar({"competencias": lineas})["competencias"]
         else:
             datos[destino] = [str(l).strip() for l in lineas if str(l).strip()]
+
+    datos["secciones_extra"] = _secciones_extra(perfil)
     return datos
 
 
@@ -314,6 +339,17 @@ def generar_docx(perfil, carpeta_salida, sufijo=None):
                 p = _p(doc, despues=1)
                 _run(p, linea)
 
+    # Secciones que la persona añadió, al final y con su propio título.
+    for extra in d.get("secciones_extra") or []:
+        _titulo_seccion(doc, extra["titulo"])
+        vinetas = [l for l in extra["lineas"] if l.startswith("- ")]
+        sueltas = [l for l in extra["lineas"] if not l.startswith("- ")]
+        for linea in sueltas:
+            p = _p(doc, despues=1)
+            _run(p, linea)
+        if vinetas:
+            _vinetas(doc, vinetas)
+
     if carpeta_salida is None:
         # Modo web: sin escribir en disco.
         import io
@@ -402,6 +438,15 @@ def render_html(perfil):
         else:
             for linea in contenido:
                 out.append(f"<p>{esc(linea)}</p>")
+
+    for extra in d.get("secciones_extra") or []:
+        out.append(f"<h2>{esc(extra['titulo'].upper())}</h2>")
+        vinetas = [l[2:] for l in extra["lineas"] if l.startswith("- ")]
+        for linea in extra["lineas"]:
+            if not linea.startswith("- "):
+                out.append(f"<p>{esc(linea)}</p>")
+        if vinetas:
+            out.append("<ul>" + "".join(f"<li>{esc(v)}</li>" for v in vinetas) + "</ul>")
 
     out.append("</div>")
     return "".join(out)

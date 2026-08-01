@@ -64,8 +64,10 @@ $("#btn-subir").addEventListener("click", async () => {
     const json = await resp.json();
     if (!resp.ok) throw new Error(json.error);
     estado.perfil = json.perfil;
-    pintarPerfil();
+    // Directo al resultado: no hay pantalla intermedia que enumere lo
+    // que se "detectó". Se convierte y se muestra.
     irAPaso(2);
+    await convertirYMostrar();
   } catch (e) {
     alert(`Ups: ${e.message}`);
   } finally {
@@ -84,89 +86,126 @@ const NOMBRES_SECCION = {
   certificaciones: "Certificaciones y logros",
 };
 
-function pintarPerfil() {
-  const p = estado.perfil;
-  $("#campo-nombre").value = p.nombre || "";
-  $("#campo-email").value = p.contacto.email || "";
-  $("#campo-telefono").value = p.contacto.telefono || "";
-  $("#campo-linkedin").value = p.contacto.linkedin || "";
+// Secciones del CV donde se puede añadir contenido.
+const SECCIONES_CV = [
+  ["perfil", "Perfil profesional"],
+  ["competencias", "Competencias clave"],
+  ["experiencia", "Experiencia profesional"],
+  ["liderazgo", "Liderazgo y voluntariado"],
+  ["educacion", "Educación"],
+  ["certificaciones", "Certificaciones"],
+  ["proyectos", "Proyectos"],
+  ["logros", "Logros destacados"],
+];
 
-  const cont = $("#resumen-secciones");
-  cont.innerHTML = "";
-  const claves = Object.keys(p.secciones);
-  if (!claves.length) {
-    cont.innerHTML = `<div class="seccion-resumen">No se detectaron secciones automáticamente — el CV Harvard se generará con el texto disponible, revísalo al descargarlo.</div>`;
-  }
-  for (const clave of claves) {
-    const div = document.createElement("div");
-    div.className = "seccion-resumen";
-    div.innerHTML = `<strong>${NOMBRES_SECCION[clave] || clave}</strong> — ${p.secciones[clave].length} línea(s) detectada(s)`;
-    cont.appendChild(div);
-  }
+// Genera el CV y muestra el resultado. No se enumera lo que se
+// "detectó": eso es ruido interno. La persona ve su CV convertido y
+// juzga por sí misma.
+async function convertirYMostrar() {
+  const nota = $("#nota-conversion");
+  nota.textContent = "Convirtiendo tu CV…";
+  $("#preview-cv").innerHTML = "";
 
-  const alerta = $("#alerta-faltantes");
-  if (p.datos_faltantes?.length) {
-    alerta.classList.remove("oculto");
-    alerta.innerHTML =
-      `<strong>Mini-alerta 💡:</strong> estos datos no aparecen en tu CV y algunos portales los piden. No los completaremos por ti — tenlos a la mano para llenarlos tú en el portal:` +
-      `<ul>${p.datos_faltantes.map((d) => `<li>${d.etiqueta}</li>`).join("")}</ul>`;
-  } else {
-    alerta.classList.add("oculto");
-  }
+  const resp = await fetch("/api/cv/generar", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(estado.perfil),
+  });
+  const json = await resp.json();
+  if (!resp.ok) throw new Error(json.error);
+
+  estado.cvGenerado = json.archivo;
+  const enlace = $("#enlace-descarga");
+  enlace.href = json.descarga;
+  enlace.classList.remove("oculto");
+
+  const prev = await fetch("/api/cv/preview", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(estado.perfil),
+  });
+  const pj = await prev.json();
+  $("#preview-cv").innerHTML = pj.html || "";
+
+  nota.textContent = estado.perfil.analizado_con === "ia"
+    ? "Leído con IA y reescrito al formato Harvard. Revísalo."
+    : "Reescrito al formato Harvard. Revísalo.";
+
+  pintarContacto();
+  pintarSelectorSecciones();
 }
 
-$("#btn-generar").addEventListener("click", async () => {
-  const boton = $("#btn-generar");
-  boton.disabled = true;
-  boton.textContent = "Generando…";
-  try {
-    estado.perfil.nombre = $("#campo-nombre").value.trim();
-    estado.perfil.contacto.email = $("#campo-email").value.trim();
-    estado.perfil.contacto.telefono = $("#campo-telefono").value.trim();
-    estado.perfil.contacto.linkedin = $("#campo-linkedin").value.trim();
+function pintarContacto() {
+  const p = estado.perfil;
+  const c = p.contacto || {};
+  $("#campo-nombre").value = p.nombre || "";
+  $("#campo-ubicacion").value = c.ubicacion || "";
+  $("#campo-email").value = c.email || "";
+  $("#campo-telefono").value = c.telefono || "";
+  $("#campo-linkedin").value = c.linkedin || "";
+}
 
-    const resp = await fetch("/api/cv/generar", {
+function pintarSelectorSecciones() {
+  const sel = $("#seccion-destino");
+  sel.innerHTML = SECCIONES_CV
+    .map(([id, nombre]) => `<option value="${id}">${nombre}</option>`)
+    .join("") + `<option value="__nueva__">➕ Una sección nueva…</option>`;
+}
+
+$("#seccion-destino").addEventListener("change", (e) => {
+  $("#titulo-seccion").classList.toggle("oculto", e.target.value !== "__nueva__");
+});
+
+$("#btn-agregar").addEventListener("click", async () => {
+  const texto = $("#texto-agregar").value.trim();
+  if (!texto) return;
+  const destino = $("#seccion-destino").value;
+  const boton = $("#btn-agregar");
+  boton.disabled = true;
+  boton.textContent = "Agregando…";
+
+  try {
+    const resp = await fetch("/api/cv/agregar", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(estado.perfil),
+      body: JSON.stringify({
+        perfil: estado.perfil,
+        seccion: destino,
+        titulo_nuevo: $("#titulo-seccion").value.trim(),
+        texto,
+      }),
     });
     const json = await resp.json();
     if (!resp.ok) throw new Error(json.error);
-    estado.cvGenerado = json.archivo;
-    const enlace = $("#enlace-descarga");
-    enlace.classList.remove("oculto");
-    enlace.innerHTML = `✅ ¡Listo! <a href="${json.descarga}">Descargar ${json.archivo}</a>`;
-
-    // Vista previa: revisar el contenido sin tener que abrir el Word.
-    try {
-      const prev = await fetch("/api/cv/preview", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(estado.perfil),
-      });
-      const pj = await prev.json();
-      if (prev.ok && pj.html) {
-        $("#preview-cv").innerHTML =
-          `<p class="detalle">Así quedó tu CV. Revísalo y, si algo está mal, corrige arriba y vuelve a generar.</p>` +
-          pj.html +
-          `<div class="acciones"><button class="primario" id="btn-a-paso3">Está bien, continuar →</button></div>`;
-        $("#btn-a-paso3").addEventListener("click", async () => {
-          await cargarOpciones();
-          irAPaso(3);
-        });
-        return; // no saltar de paso: que lo vea primero
-      }
-    } catch {
-      /* si el preview falla, se sigue al paso 3 sin bloquear */
-    }
-    await cargarOpciones();
-    irAPaso(3);
+    estado.perfil = json.perfil;
+    $("#texto-agregar").value = "";
+    $("#titulo-seccion").value = "";
+    await convertirYMostrar();
   } catch (e) {
-    alert(`Ups: ${e.message}`);
+    alert(`No se pudo agregar: ${e.message}`);
   } finally {
     boton.disabled = false;
-    boton.textContent = "Generar CV Harvard (.docx)";
+    boton.textContent = "Agregar al CV";
   }
+});
+
+$("#btn-actualizar-contacto").addEventListener("click", async () => {
+  estado.perfil.nombre = $("#campo-nombre").value.trim();
+  estado.perfil.contacto = estado.perfil.contacto || {};
+  estado.perfil.contacto.ubicacion = $("#campo-ubicacion").value.trim();
+  estado.perfil.contacto.email = $("#campo-email").value.trim();
+  estado.perfil.contacto.telefono = $("#campo-telefono").value.trim();
+  estado.perfil.contacto.linkedin = $("#campo-linkedin").value.trim();
+  try {
+    await convertirYMostrar();
+  } catch (e) {
+    alert(`Ups: ${e.message}`);
+  }
+});
+
+$("#btn-a-paso3").addEventListener("click", async () => {
+  await cargarOpciones();
+  irAPaso(3);
 });
 
 // ---------- paso 3: búsqueda libre ----------

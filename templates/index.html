@@ -35,24 +35,50 @@
       </div>
     </section>
 
-    <!-- PASO 2: revisar datos y generar Harvard -->
+    <!-- PASO 2: el CV ya convertido -->
     <section class="panel oculto" id="paso-2">
-      <h2>Revisa lo que encontramos</h2>
-      <p>Corrige lo que haga falta: <strong>nunca inventamos contenido</strong>, solo reordenamos lo que tu CV ya dice.</p>
-      <form id="form-perfil">
-        <label>Nombre completo <input type="text" id="campo-nombre"></label>
-        <label>Email <input type="email" id="campo-email"></label>
-        <label>Teléfono <input type="text" id="campo-telefono"></label>
-        <label>LinkedIn <input type="text" id="campo-linkedin"></label>
-      </form>
-      <div id="resumen-secciones"></div>
-      <div class="alerta info oculto" id="alerta-faltantes"></div>
-      <div class="acciones">
-        <button class="secundario" data-volver="1">← Volver</button>
-        <button class="primario" id="btn-generar">Generar CV Harvard (.docx)</button>
+      <div class="cabecera-cv">
+        <div>
+          <h2>Tu CV en formato Harvard</h2>
+          <p class="detalle" id="nota-conversion"></p>
+        </div>
+        <a class="primario boton-descarga oculto" id="enlace-descarga" download>Descargar .docx</a>
       </div>
-      <p class="detalle oculto" id="enlace-descarga"></p>
+
       <div id="preview-cv"></div>
+
+      <!-- Agregar contenido: solo si la persona quiere -->
+      <details id="agregar">
+        <summary>¿Falta algo? Agrégalo</summary>
+        <p class="detalle">Escríbelo como quieras. Se añade tal cual: no se inventa nada por ti.</p>
+        <div class="fila-agregar">
+          <select id="seccion-destino"></select>
+          <input type="text" id="titulo-seccion" class="oculto" placeholder="Nombre de la sección nueva">
+        </div>
+        <textarea id="texto-agregar" rows="4" placeholder="Ej.: Voluntariado en Cruz Roja, 2024 — Apoyé en campañas de donación."></textarea>
+        <div class="acciones">
+          <button class="secundario" id="btn-agregar">Agregar al CV</button>
+        </div>
+      </details>
+
+      <details id="editar-contacto">
+        <summary>Corregir nombre o datos de contacto</summary>
+        <form id="form-perfil">
+          <label>Nombre completo <input type="text" id="campo-nombre"></label>
+          <label>Ciudad <input type="text" id="campo-ubicacion"></label>
+          <label>Email <input type="email" id="campo-email"></label>
+          <label>Teléfono <input type="text" id="campo-telefono"></label>
+          <label>LinkedIn <input type="text" id="campo-linkedin"></label>
+        </form>
+        <div class="acciones">
+          <button class="secundario" id="btn-actualizar-contacto">Actualizar</button>
+        </div>
+      </details>
+
+      <div class="acciones">
+        <button class="secundario" data-volver="1">← Subir otro CV</button>
+        <button class="primario" id="btn-a-paso3">Buscar trabajo con este CV →</button>
+      </div>
     </section>
 
     <!-- PASO 3: búsqueda libre -->

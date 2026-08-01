@@ -422,6 +422,66 @@ def analizar_cv(texto_crudo):
     return perfil
 
 
+INSTRUCCIONES_ANADIDO_ENTRADA = """Recibes un texto que una persona escribió para añadir a su CV, y lo devuelves estructurado.
+
+Devuelve ÚNICAMENTE un objeto JSON válido, sin explicaciones ni bloques de código:
+
+{"entradas": [{"organizacion": "", "lugar": "", "cargo": "", "fechas": "", "logros": ["", ""]}]}
+
+REGLAS:
+1. PROHIBIDO inventar. Solo reorganiza lo que la persona escribió. Si no menciona el lugar o las fechas, deja esos campos vacíos.
+2. Los logros van como frases sueltas, sin el guion inicial, empezando por un verbo en pasado cuando el texto lo permita.
+3. Si el texto describe varias experiencias, devuelve una entrada por cada una.
+4. Mantén los acentos y el sentido original. Puedes mejorar la redacción, nunca los hechos."""
+
+
+INSTRUCCIONES_ANADIDO_LINEAS = """Recibes un texto que una persona escribió para añadir a su CV, y lo devuelves limpio.
+
+Devuelve ÚNICAMENTE un objeto JSON válido, sin explicaciones ni bloques de código:
+
+{"lineas": ["línea 1", "línea 2"]}
+
+REGLAS:
+1. PROHIBIDO inventar. Solo reorganiza y pule lo que la persona escribió.
+2. Una línea por idea. Sin viñetas ni guiones al inicio.
+3. Mantén los acentos y el sentido original."""
+
+
+def estructurar_anadido(texto, como_entrada):
+    """Da forma al contenido que la persona añade a mano.
+
+    `como_entrada` distingue las secciones con encabezado de dos líneas
+    (experiencia, educación) de las que son texto suelto.
+    Devuelve una lista, o None si no hay modelo o falla.
+    """
+    instrucciones = INSTRUCCIONES_ANADIDO_ENTRADA if como_entrada else INSTRUCCIONES_ANADIDO_LINEAS
+    datos = _extraer_json(_llamar(f"Texto de la persona:\n\n{texto[:3000]}", instrucciones))
+    if not isinstance(datos, dict):
+        return None
+
+    if como_entrada:
+        entradas = []
+        for e in datos.get("entradas") or []:
+            if not isinstance(e, dict):
+                continue
+            logros = e.get("logros") or []
+            if isinstance(logros, str):
+                logros = [l for l in logros.splitlines() if l.strip()]
+            entradas.append({
+                "organizacion": str(e.get("organizacion") or "").strip(),
+                "lugar": str(e.get("lugar") or "").strip(),
+                "cargo": str(e.get("cargo") or "").strip(),
+                "fechas": str(e.get("fechas") or "").strip(),
+                "logros": [re.sub(r"^\s*[-•·]\s*", "", str(l)).strip() for l in logros if str(l).strip()],
+            })
+        return entradas or None
+
+    lineas = datos.get("lineas") or []
+    if isinstance(lineas, str):
+        lineas = [l for l in lineas.splitlines() if l.strip()]
+    return [str(l).strip() for l in lineas if str(l).strip()] or None
+
+
 INSTRUCCIONES_ADAPTACION = """Adaptas un CV a una vacante concreta para que la persona destaque, SIN mentir.
 
 Devuelve ÚNICAMENTE un objeto JSON válido, sin explicaciones ni bloques de código:

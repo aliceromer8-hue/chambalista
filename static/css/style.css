@@ -234,6 +234,29 @@ th { color: var(--lila); }
 .item-lote details { margin-top: 4px; }
 .item-lote details ul { margin: 5px 0 0 18px; padding: 0; font-size: .84rem; color: var(--gris); }
 
+/* ---------- paso 2: el CV ya convertido ---------- */
+.cabecera-cv { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; flex-wrap: wrap; }
+.cabecera-cv h2 { margin: 0 0 3px; }
+.boton-descarga { text-decoration: none; display: inline-block; padding: 11px 20px; border-radius: 10px; }
+
+#agregar, #editar-contacto {
+  border: 1px solid var(--borde); border-radius: 10px;
+  padding: 13px 16px; margin: 12px 0; background: #fff;
+}
+#agregar summary, #editar-contacto summary { cursor: pointer; font-weight: 600; font-size: .92rem; color: var(--lila); }
+.fila-agregar { display: flex; gap: 8px; flex-wrap: wrap; margin: 10px 0 8px; }
+.fila-agregar select, .fila-agregar input {
+  flex: 1; min-width: 180px; padding: 10px 12px;
+  border: 1px solid var(--borde); border-radius: 8px; font: inherit;
+}
+#texto-agregar {
+  width: 100%; padding: 11px 13px; border: 1px solid var(--borde);
+  border-radius: 8px; font: inherit; font-size: .92rem; resize: vertical;
+}
+#texto-agregar:focus, .fila-agregar select:focus, .fila-agregar input:focus {
+  outline: 2px solid var(--rosa); border-color: transparent;
+}
+
 /* ---------- buscador libre ---------- */
 .campo-grande { display: block; margin: 12px 0; }
 .campo-grande input {

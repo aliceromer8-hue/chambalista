@@ -366,6 +366,59 @@ def borrar_datos_personales():
     return jsonify({"borrado": datos_personales.borrar()})
 
 
+@app.post("/api/cv/agregar")
+def agregar_al_cv():
+    """Añade contenido que la persona escribió, a la sección que eligió.
+
+    Si hay IA, se le pide que lo estructure con la forma que espera el
+    generador (organización, cargo, fechas, logros). Si no, entra como
+    texto tal cual. En ningún caso se inventa nada: solo se coloca lo que
+    ella escribió donde ella dijo.
+    """
+    datos = request.get_json(silent=True) or {}
+    perfil = datos.get("perfil") or {}
+    seccion = (datos.get("seccion") or "").strip()
+    texto = (datos.get("texto") or "").strip()
+    titulo_nuevo = (datos.get("titulo_nuevo") or "").strip()
+
+    if not texto:
+        return jsonify({"error": "Escribe lo que quieres agregar."}), 400
+    if seccion == "__nueva__" and not titulo_nuevo:
+        return jsonify({"error": "Ponle nombre a la sección nueva."}), 400
+
+    import redactor_ia
+    from harvard_template import SECCIONES, a_secciones_planas
+
+    con_entradas = {c for c, _t, tipo in SECCIONES if tipo == "entradas"}
+    destino = seccion if seccion != "__nueva__" else "extra"
+
+    nuevo = None
+    if redactor_ia.disponible():
+        try:
+            nuevo = redactor_ia.estructurar_anadido(texto, destino in con_entradas)
+        except Exception:
+            nuevo = None
+
+    if nuevo is None:
+        # Sin IA: cada línea entra tal cual.
+        lineas = [l.strip() for l in texto.splitlines() if l.strip()]
+        nuevo = [{"organizacion": lineas[0], "cargo": "", "lugar": "", "fechas": "",
+                  "logros": lineas[1:]}] if destino in con_entradas and lineas else lineas
+
+    if seccion == "__nueva__":
+        # Las secciones a medida se guardan aparte y se pintan al final.
+        extras = perfil.setdefault("secciones_extra", [])
+        extras.append({"titulo": titulo_nuevo, "lineas": nuevo if isinstance(nuevo, list) else [str(nuevo)]})
+    else:
+        actual = perfil.get(destino)
+        if not isinstance(actual, list):
+            actual = []
+        perfil[destino] = actual + (nuevo if isinstance(nuevo, list) else [nuevo])
+
+    perfil["secciones"] = a_secciones_planas(perfil)
+    return jsonify({"perfil": perfil})
+
+
 @app.post("/api/cv/preview")
 def preview_cv():
     """Vista previa en HTML del CV Harvard, antes de descargarlo."""
