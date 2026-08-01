@@ -184,10 +184,28 @@ def _run(p, texto, *, pt=PT_CUERPO, negrita=False, cursiva=False):
     return r
 
 
+def _linea_divisoria(doc):
+    """Párrafo vacío con borde inferior: la línea que separa secciones.
+
+    El CV original NO pone el borde en el párrafo del título, sino en un
+    párrafo vacío justo debajo (`bottom, single, sz=8, space=2`). Son 9 en
+    total: uno tras la línea de contacto y uno tras cada título.
+    """
+    p = _p(doc, despues=2)
+    pPr = p._p.get_or_add_pPr()
+    pBdr = pPr.makeelement(qn("w:pBdr"), {})
+    pBdr.append(pPr.makeelement(qn("w:bottom"), {
+        qn("w:val"): "single", qn("w:sz"): "8",
+        qn("w:space"): "2", qn("w:color"): "000000",
+    }))
+    pPr.append(pBdr)
+    return p
+
+
 def _titulo_seccion(doc, texto):
-    # Sin borde inferior: el CV original no lleva línea divisoria.
-    p = _p(doc, antes=9, despues=3)
+    p = _p(doc, antes=9, despues=1)
     _run(p, texto.upper(), pt=PT_SECCION, negrita=True)
+    _linea_divisoria(doc)
 
 
 def _encabezado_entrada(doc, entrada):
@@ -242,9 +260,10 @@ def generar_docx(perfil, carpeta_salida, sufijo=None):
 
     partes = [d["contacto"][k] for k in ("ubicacion", "email", "telefono", "linkedin") if d["contacto"][k]]
     if partes:
-        p = _p(doc, despues=4)
+        p = _p(doc, despues=2)
         p.alignment = WD_ALIGN_PARAGRAPH.CENTER
         _run(p, "  ·  ".join(partes), pt=PT_CONTACTO)
+        _linea_divisoria(doc)
 
     # Secciones.
     for clave, titulo, tipo in SECCIONES:

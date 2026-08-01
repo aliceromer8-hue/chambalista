@@ -190,13 +190,17 @@ th { color: var(--lila); }
 }
 .cv-preview h1 { text-align: center; font-size: 1.35rem; margin: 0 0 4px; }
 .cv-preview .cv-contacto { text-align: center; font-size: .82rem; margin: 0 0 14px; color: #333; }
-/* Sin línea divisoria: el CV original no la lleva. */
+/* Línea divisoria bajo el título, como el .docx (que la pone en un
+   párrafo vacío con borde inferior justo debajo del título). */
 .cv-preview h2 {
   font-size: .88rem;
   text-transform: uppercase;
   letter-spacing: .02em;
-  margin: 14px 0 4px;
+  margin: 14px 0 6px;
+  padding-bottom: 3px;
+  border-bottom: 1px solid currentColor;
 }
+.cv-preview .cv-contacto { border-bottom: 1px solid currentColor; padding-bottom: 8px; }
 .cv-preview p { margin: 2px 0; font-size: .86rem; }
 .cv-preview p.just { text-align: justify; }
 .cv-preview ul { margin: 3px 0 4px 20px; padding: 0; }
