@@ -432,6 +432,24 @@ def adaptar_cv():
 # Postulación en lote
 # ---------------------------------------------------------------------------
 
+def _registrar_item(item):
+    """Anota una vacante del lote en el tracker, con su desenlace."""
+    vacante = item.get("vacante") or {}
+    tracker = _leer_tracker()
+    tracker.append({
+        "id": uuid.uuid4().hex[:8],
+        "fecha": datetime.now().isoformat(timespec="seconds"),
+        "portal": vacante.get("portal", "Computrabajo"),
+        "empresa": item.get("empresa", ""),
+        "puesto": item.get("titulo", ""),
+        "url": item.get("url", ""),
+        "cv": item.get("cv", ""),
+        "estado": item.get("estado", ""),
+        "datos_pendientes": [item["motivo"]] if item.get("motivo") else [],
+    })
+    _guardar_tracker(tracker)
+
+
 @app.get("/api/lote/consentimiento")
 def lote_consentimiento():
     """Casillas de riesgo que exige el modo automático."""
@@ -470,7 +488,7 @@ def lote_preparar():
 
     hilo = threading.Thread(
         target=lote.preparar,
-        args=(vacantes, perfil, extras, modo, _cv_adaptado, llamar, aprobacion),
+        args=(vacantes, perfil, extras, modo, _cv_adaptado, llamar, aprobacion, _registrar_item),
         daemon=True,
     )
     hilo.start()
@@ -502,23 +520,8 @@ def lote_enviar():
     def llamar(metodo, *args):
         return worker().llamar(metodo, *args, timeout=240)
 
-    def registrar(item):
-        tracker = _leer_tracker()
-        tracker.append({
-            "id": uuid.uuid4().hex[:8],
-            "fecha": datetime.now().isoformat(timespec="seconds"),
-            "portal": "Computrabajo",
-            "empresa": item.get("empresa", ""),
-            "puesto": item.get("titulo", ""),
-            "url": item.get("url", ""),
-            "cv": item.get("cv", ""),
-            "estado": item.get("estado", ""),
-            "datos_pendientes": [item["motivo"]] if item.get("motivo") else [],
-        })
-        _guardar_tracker(tracker)
-
     hilo = threading.Thread(
-        target=lote.enviar_aprobadas, args=(ids, llamar, registrar), daemon=True
+        target=lote.enviar_aprobadas, args=(ids, llamar, _registrar_item), daemon=True
     )
     hilo.start()
     return jsonify({"iniciado": True, "total": len(ids)})

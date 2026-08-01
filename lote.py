@@ -118,11 +118,13 @@ def _pregunta_de_aceptacion(preguntas):
     return None
 
 
-def preparar(vacantes, perfil, extras, modo, generar_cv, worker_llamar, aprobacion=None):
+def preparar(vacantes, perfil, extras, modo, generar_cv, worker_llamar,
+             aprobacion=None, registrar=None):
     """Prepara (y en modo automático envía) el lote. Bloquea: usar en hilo.
 
     `generar_cv(perfil, vacante)` -> (nombre_archivo, ruta, cambios)
     `worker_llamar(metodo, *args)` -> resultado del navegador
+    `registrar(item)` -> anota la postulación en el tracker
     """
     if modo == "automatico" and not _consentimiento_completo(aprobacion):
         with ESTADO.lock:
@@ -151,8 +153,17 @@ def preparar(vacantes, perfil, extras, modo, generar_cv, worker_llamar, aprobaci
             item["motivo"] = f"Error al preparar: {e}"
 
         # En modo automático se envía en cuanto está lista, salvo bloqueo.
-        if modo == "automatico" and item["estado"] == "preparada":
-            _enviar_una(item, worker_llamar)
+        if modo == "automatico":
+            if item["estado"] == "preparada":
+                _enviar_una(item, worker_llamar)
+            # Se registra TODO en el tracker, enviada u omitida, con el
+            # motivo: en modo automático la persona no ve pasar cada una,
+            # así que el tracker es su único registro de lo que ocurrió.
+            if registrar:
+                try:
+                    registrar(item)
+                except Exception:
+                    pass
 
         with ESTADO.lock:
             ESTADO.hechas = indice + 1
@@ -175,8 +186,24 @@ def preparar(vacantes, perfil, extras, modo, generar_cv, worker_llamar, aprobaci
 
 def _preparar_una(item, perfil, extras, generar_cv, worker_llamar):
     vacante = item["vacante"]
+    # El perfil que se usó queda guardado en el item: `enviar_aprobadas`
+    # tiene que volver a abrir el formulario más tarde y necesita los
+    # mismos datos para rellenarlo igual.
+    item["perfil_usado"] = perfil
 
-    # 1. CV adaptado a esta vacante.
+    # 1. Traer la descripción completa de la oferta. El listado solo da
+    #    título, empresa y lugar; sin la descripción, adaptar el CV a la
+    #    vacante no tendría con qué trabajar.
+    if not vacante.get("descripcion") and vacante.get("url"):
+        try:
+            detalle = worker_llamar("detalle", vacante["url"])
+            if isinstance(detalle, dict):
+                vacante = {**vacante, **{k: v for k, v in detalle.items() if v}}
+                item["vacante"] = vacante
+        except Exception:
+            pass   # sin descripción se adapta con lo que haya
+
+    # 2. CV adaptado a esta vacante.
     try:
         nombre, ruta, cambios = generar_cv(perfil, vacante)
         item["cv"] = nombre
@@ -186,7 +213,7 @@ def _preparar_una(item, perfil, extras, generar_cv, worker_llamar):
         item["motivo"] = f"CV sin adaptar ({e}); se usa el CV base."
         ruta = None
 
-    # 2. Abrir la oferta y llenar el formulario (sin enviar).
+    # 3. Abrir la oferta y llenar el formulario (sin enviar).
     reporte = worker_llamar("preparar_postulacion", vacante.get("url", ""), perfil, ruta)
     if not isinstance(reporte, dict):
         item["estado"] = "fallida"
@@ -263,6 +290,8 @@ def enviar_aprobadas(ids_aprobadas, worker_llamar, registrar):
     for n, item in enumerate(seleccion, 1):
         if ESTADO.cancelado:
             break
+        # Se reabre con el MISMO perfil que se usó al preparar, para que
+        # el formulario quede exactamente igual que lo que ella revisó.
         reporte = worker_llamar("preparar_postulacion", item["vacante"].get("url", ""),
                                 item.get("perfil_usado") or {}, None)
         if isinstance(reporte, dict) and reporte.get("captcha"):
