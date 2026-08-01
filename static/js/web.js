@@ -93,6 +93,7 @@ $("#procesar").addEventListener("click", async () => {
     const pj = await prev.json();
     $("#preview").innerHTML = pj.html || "";
 
+    $("#estado").textContent = "";
     $("#zona-1").classList.add("oculto");
     $("#zona-2").classList.remove("oculto");
     window.scrollTo({ top: 0, behavior: "smooth" });
