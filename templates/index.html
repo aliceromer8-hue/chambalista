@@ -1,0 +1,197 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Chamba Lista — tu CV en formato Harvard y postulaciones con revisión</title>
+  <link rel="stylesheet" href="/static/css/style.css">
+</head>
+<body>
+  <header class="cabecera">
+    <h1>Chamba Lista ✨</h1>
+    <p>Sube tu CV, lo convertimos a formato Harvard y te acompañamos a postular — siempre con tu revisión antes de cada envío.</p>
+  </header>
+
+  <nav class="pasos" id="barra-pasos">
+    <span class="paso activo" data-paso="1">1 · Sube tu CV</span>
+    <span class="paso" data-paso="2">2 · Revisa y genera</span>
+    <span class="paso" data-paso="3">3 · ¿Qué buscas?</span>
+    <span class="paso" data-paso="4">4 · Vacantes</span>
+    <span class="paso" data-paso="5">5 · Postula</span>
+  </nav>
+
+  <main>
+    <!-- PASO 1: subir CV -->
+    <section class="panel" id="paso-1">
+      <h2>Sube tu CV</h2>
+      <p>Acepta PDF o Word. Tu archivo se procesa y <strong>se elimina del servidor de inmediato</strong>: solo se conserva el CV Harvard que generemos.</p>
+      <div class="zona-subida" id="zona-subida">
+        <input type="file" id="input-cv" accept=".pdf,.docx,.doc,.txt" hidden>
+        <p>📄 Arrastra tu CV aquí o <button class="enlace" id="btn-elegir">elige un archivo</button></p>
+        <p class="detalle" id="nombre-archivo"></p>
+      </div>
+      <div class="acciones">
+        <button class="primario" id="btn-subir" disabled>Procesar mi CV</button>
+      </div>
+    </section>
+
+    <!-- PASO 2: revisar datos y generar Harvard -->
+    <section class="panel oculto" id="paso-2">
+      <h2>Revisa lo que encontramos</h2>
+      <p>Corrige lo que haga falta: <strong>nunca inventamos contenido</strong>, solo reordenamos lo que tu CV ya dice.</p>
+      <form id="form-perfil">
+        <label>Nombre completo <input type="text" id="campo-nombre"></label>
+        <label>Email <input type="email" id="campo-email"></label>
+        <label>Teléfono <input type="text" id="campo-telefono"></label>
+        <label>LinkedIn <input type="text" id="campo-linkedin"></label>
+      </form>
+      <div id="resumen-secciones"></div>
+      <div class="alerta info oculto" id="alerta-faltantes"></div>
+      <div class="acciones">
+        <button class="secundario" data-volver="1">← Volver</button>
+        <button class="primario" id="btn-generar">Generar CV Harvard (.docx)</button>
+      </div>
+      <p class="detalle oculto" id="enlace-descarga"></p>
+      <div id="preview-cv"></div>
+    </section>
+
+    <!-- PASO 3: búsqueda libre -->
+    <section class="panel oculto" id="paso-3">
+      <h2>¿Qué puesto buscas?</h2>
+      <p class="detalle">Escribe el puesto tal como lo buscarías tú. Cualquier rubro: enfermería, derecho, cocina, sistemas, ventas…</p>
+
+      <label class="campo-grande">
+        <input type="text" id="campo-puesto" list="sugerencias-puesto" autocomplete="off"
+               placeholder="Ej.: practicante de derecho, cajero, diseñador gráfico">
+        <datalist id="sugerencias-puesto"></datalist>
+      </label>
+      <div class="chips" id="chips-sugerencias"></div>
+
+      <h3>Nivel</h3>
+      <div class="opciones" id="opciones-nivel"></div>
+
+      <h3>Ciudad <span class="detalle">(opcional — vacío busca en todo el país)</span></h3>
+      <label class="campo-grande">
+        <input type="text" id="campo-ciudad" list="sugerencias-ciudad" autocomplete="off"
+               placeholder="Ej.: Lima, Arequipa, Trujillo">
+        <datalist id="sugerencias-ciudad"></datalist>
+      </label>
+
+      <h3>¿Dónde buscamos?</h3>
+      <div id="opciones-portales"></div>
+
+      <div class="acciones">
+        <button class="secundario" data-volver="2">← Volver</button>
+        <button class="primario" id="btn-a-portales" disabled>Continuar →</button>
+      </div>
+    </section>
+
+    <!-- PASO 3b: datos que los portales piden y no están en el CV -->
+    <section class="panel oculto" id="paso-datos">
+      <h2>Datos para llenar los formularios solos</h2>
+      <p class="detalle">Los portales piden esto y no está en tu CV. Si lo guardas ahora, cada postulación se completa sola. <strong>Todo es opcional</strong> y se guarda únicamente en tu computadora — lo que dejes vacío se te avisará al momento de postular.</p>
+      <div id="campos-personales"></div>
+      <div class="acciones">
+        <button class="secundario" id="btn-saltar-datos">Saltar por ahora</button>
+        <button class="primario" id="btn-guardar-datos">Guardar y continuar →</button>
+      </div>
+      <p class="detalle" id="estado-datos"></p>
+    </section>
+
+    <!-- PASO 4: privacidad + portales + vacantes -->
+    <section class="panel oculto" id="paso-4">
+      <h2>Antes de buscar: tu privacidad primero 🔒</h2>
+      <div class="alerta privacidad">
+        <p><strong>Debes abrir tu sesión en los portales por tu cuenta.</strong> Esta plataforma nunca te pedirá tu contraseña ni entrará a tu cuenta: tú inicias sesión en el portal desde tu propio navegador, y aquí solo confirmas que ya lo hiciste.</p>
+      </div>
+      <div id="lista-portales"></div>
+      <div class="pasos-sesion" id="bloque-navegador">
+        <p><strong>Paso 1.</strong> Abre el navegador de Computrabajo e inicia sesión ahí tú misma. Tu contraseña queda solo en tu computadora.</p>
+        <button class="secundario" id="btn-abrir-navegador">🌐 Abrir Computrabajo</button>
+        <p><strong>Paso 2.</strong> Cuando ya hayas entrado, verifícalo aquí.</p>
+        <button class="secundario" id="btn-verificar-sesion">Verificar mi sesión</button>
+        <p class="detalle" id="estado-sesion"></p>
+      </div>
+      <label class="confirmacion">
+        <input type="checkbox" id="check-sesion">
+        Ya abrí mi sesión en el portal por mi cuenta
+      </label>
+      <div class="acciones">
+        <button class="secundario" data-volver="3">← Volver</button>
+        <button class="primario" id="btn-buscar" disabled>Buscar vacantes</button>
+      </div>
+      <p class="detalle" id="resumen-busqueda"></p>
+      <div class="alerta aviso oculto" id="aviso-simulado">⚠️ Estás viendo <strong>vacantes de demostración</strong> (datos simulados). La conexión real empezará por Computrabajo.</div>
+      <div id="lista-vacantes"></div>
+    </section>
+
+    <!-- PASO 5: revisión humana + tracker -->
+    <section class="panel oculto" id="paso-5">
+      <h2>Revisa antes de enviar</h2>
+      <div id="resumen-postulacion"></div>
+      <div class="acciones">
+        <button class="secundario" data-volver="4">← Volver a vacantes</button>
+        <button class="primario" id="btn-preparar">Preparar formulario (no envía)</button>
+      </div>
+      <div id="reporte-preparacion"></div>
+      <div id="bloque-preguntas" class="oculto">
+        <h3>Preguntas de esta vacante</h3>
+        <p class="detalle">Las respuestas se redactan desde tu CV. Revísalas y corrígelas: se enviarán tal cual las dejes. Disponibilidad y aceptación de condiciones las decides tú siempre.</p>
+        <p class="detalle" id="estado-ia"></p>
+        <div id="lista-preguntas"></div>
+        <div class="acciones">
+          <button class="secundario" id="btn-escribir-respuestas">Escribir respuestas en el formulario</button>
+        </div>
+        <p class="detalle" id="estado-respuestas"></p>
+      </div>
+      <div class="alerta info oculto" id="alerta-datos-portal"></div>
+      <label class="confirmacion oculto" id="wrap-revision">
+        <input type="checkbox" id="check-revision">
+        Revisé el formulario en el navegador y confirmo el envío
+      </label>
+      <div class="acciones">
+        <button class="primario oculto" id="btn-confirmar-envio" disabled>Confirmar envío</button>
+      </div>
+      <hr class="separador">
+      <h3>⚡ Postular a varias de una vez</h3>
+      <p class="detalle">Se prepara cada vacante: CV adaptado al puesto, respuestas redactadas y formulario llenado. Elige cómo quieres que termine.</p>
+      <div class="acciones-lote">
+        <button class="primario" id="btn-lote-revisado">Preparar todas y revisar</button>
+        <button class="secundario peligro" id="btn-lote-auto">Postular automáticamente…</button>
+      </div>
+
+      <div class="alerta riesgo oculto" id="bloque-consentimiento">
+        <p><strong>⚠️ Modo automático: esto se envía sin que lo revises.</strong></p>
+        <p class="detalle">Marca cada punto solo si lo entiendes. Sin las cuatro, no se envía nada.</p>
+        <div id="casillas-riesgo"></div>
+        <div class="acciones">
+          <button class="secundario" id="btn-cancelar-auto">Mejor no</button>
+          <button class="primario peligro" id="btn-confirmar-auto" disabled>Entiendo los riesgos, postular automáticamente</button>
+        </div>
+      </div>
+
+      <div id="progreso-lote" class="oculto">
+        <p class="detalle" id="texto-progreso"></p>
+        <div class="barra"><div class="barra-relleno" id="barra-lote"></div></div>
+        <button class="secundario" id="btn-cancelar-lote">Cancelar tanda</button>
+      </div>
+
+      <div id="plan-lote"></div>
+      <div class="acciones oculto" id="acciones-plan">
+        <span class="detalle" id="resumen-plan"></span>
+        <button class="primario" id="btn-enviar-aprobadas">Enviar las marcadas</button>
+      </div>
+
+      <hr class="separador">
+      <h3>📋 Tu tracker de postulaciones</h3>
+      <div id="tabla-tracker"><p class="detalle">Aún no tienes postulaciones registradas.</p></div>
+    </section>
+  </main>
+
+  <footer class="pie">
+    <p>Los datos que no aparezcan en tu CV (como tu DNI) <strong>no se completan automáticamente</strong>: te avisamos para que los llenes tú en el portal.</p>
+  </footer>
+
+  <script src="/static/js/app.js"></script>
+</body>
+</html>

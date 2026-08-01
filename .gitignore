@@ -1,0 +1,44 @@
+# ---------------------------------------------------------------------------
+# NUNCA subir a un repositorio público
+# ---------------------------------------------------------------------------
+
+# Perfil del navegador: contiene las COOKIES DE SESIÓN de Computrabajo.
+# Subir esto equivale a publicar el acceso a la cuenta.
+perfil_navegador/
+
+# CVs de personas: datos personales.
+uploads/
+generados/
+*.docx
+*.pdf
+
+# Historial de postulaciones: dónde postuló cada persona y cuándo.
+postulaciones.json
+
+# Perfil del candidato, si se guarda en disco.
+perfil-candidato.md
+
+# DNI, fecha de nacimiento, dirección: datos que la persona guardó para
+# que los formularios se completen solos. Nunca salen de su máquina.
+datos-personales.json
+
+# Claves de API. La de Gemini va en variable de entorno, nunca en el repo.
+.env
+.env.*
+*.key
+secrets.json
+
+# ---------------------------------------------------------------------------
+# Basura habitual
+# ---------------------------------------------------------------------------
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+env/
+.pytest_cache/
+.DS_Store
+Thumbs.db
+*.log
+.vscode/
+.idea/

@@ -1,0 +1,214 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="description" content="Convierte tu CV al formato Harvard y postula a prácticas en Computrabajo. Corre en tu computadora: tu CV y tu sesión nunca salen de ahí.">
+<title>Chamba Lista — tu CV en formato Harvard, y postulaciones que tú apruebas</title>
+<style>
+  :root {
+    --papel: #FBFAF7;
+    --papel-2: #F2EFE8;
+    --tinta: #171A21;
+    --lapiz: #6E6A62;
+    --pluma: #1F4FD8;
+    --marcador: #FFD447;
+    --linea: #DCD7CC;
+
+    --serif: "Times New Roman", Times, serif;
+    --sans: ui-sans-serif, "Segoe UI", system-ui, -apple-system, Roboto, Helvetica, Arial, sans-serif;
+    --mono: ui-monospace, "Cascadia Mono", "Consolas", monospace;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --papel: #14161B;
+      --papel-2: #1C1F26;
+      --tinta: #ECE8E0;
+      --lapiz: #9C978D;
+      --pluma: #7FA0FF;
+      --marcador: #FFD447;
+      --linea: #2C313B;
+    }
+  }
+  :root[data-theme="dark"] {
+    --papel: #14161B; --papel-2: #1C1F26; --tinta: #ECE8E0;
+    --lapiz: #9C978D; --pluma: #7FA0FF; --linea: #2C313B;
+  }
+  :root[data-theme="light"] {
+    --papel: #FBFAF7; --papel-2: #F2EFE8; --tinta: #171A21;
+    --lapiz: #6E6A62; --pluma: #1F4FD8; --linea: #DCD7CC;
+  }
+
+  body {
+    margin: 0;
+    background: var(--papel);
+    color: var(--tinta);
+    font-family: var(--sans);
+    font-size: 16px;
+    line-height: 1.6;
+    -webkit-font-smoothing: antialiased;
+  }
+  .hoja { max-width: 720px; margin: 0 auto; padding: 0 24px; }
+
+  /* ---- La página se tipografía como el documento que produce ---- */
+  h1, h2, h3 { font-family: var(--serif); font-weight: 700; text-wrap: balance; margin: 0; }
+  h1 { font-size: clamp(2.4rem, 6vw, 3.6rem); line-height: 1.05; letter-spacing: -.015em; }
+  h2 { font-size: 1.05rem; text-transform: uppercase; letter-spacing: .06em; margin-bottom: 14px; }
+  h3 { font-size: 1.15rem; margin-bottom: 4px; }
+  p { margin: 0 0 14px; }
+  a { color: var(--pluma); }
+
+  .eyebrow {
+    font-family: var(--mono); font-size: .72rem; text-transform: uppercase;
+    letter-spacing: .14em; color: var(--lapiz); margin-bottom: 18px;
+  }
+
+  header { padding: 84px 0 56px; }
+  header .bajada { font-size: 1.15rem; color: var(--lapiz); max-width: 46ch; margin-top: 20px; }
+
+  /* ---- El encabezado de dos columnas del CV, como elemento estructural ---- */
+  .fila {
+    display: flex; align-items: baseline; gap: 12px;
+    padding: 9px 0; border-bottom: 1px solid var(--linea);
+  }
+  .fila .izq { flex: 1; min-width: 0; }
+  .fila .der {
+    font-family: var(--mono); font-size: .78rem; color: var(--lapiz);
+    text-align: right; white-space: nowrap; font-variant-numeric: tabular-nums;
+  }
+  .fila:last-child { border-bottom: none; }
+
+  section { padding: 44px 0; border-top: 1px solid var(--linea); }
+
+  /* ---- Espécimen del CV: Times New Roman de verdad ---- */
+  .especimen {
+    font-family: var(--serif); background: var(--papel-2);
+    border: 1px solid var(--linea); border-radius: 3px;
+    padding: 26px 30px; margin: 26px 0 0;
+  }
+  .especimen .nombre { text-align: center; font-size: 1.5rem; font-weight: 700; }
+  .especimen .contacto { text-align: center; font-size: .74rem; color: var(--lapiz); margin-bottom: 16px; }
+  .especimen .seccion { font-size: .8rem; font-weight: 700; text-transform: uppercase; margin: 14px 0 5px; }
+  .especimen .entrada { display: flex; justify-content: space-between; gap: 14px; font-size: .84rem; }
+  .especimen .entrada .der { white-space: nowrap; }
+  .especimen ul { margin: 4px 0 0 18px; padding: 0; font-size: .82rem; }
+  .especimen li { margin: 2px 0; }
+  .especimen .neg { font-weight: 700; }
+  .especimen .cur { font-style: italic; }
+
+  .marca { background: linear-gradient(transparent 62%, var(--marcador) 62%); padding: 0 2px; }
+  :root[data-theme="dark"] .marca, :root:not([data-theme]) .marca { color: inherit; }
+  @media (prefers-color-scheme: dark) { .marca { background: linear-gradient(transparent 62%, rgba(255,212,71,.32) 62%); } }
+  :root[data-theme="dark"] .marca { background: linear-gradient(transparent 62%, rgba(255,212,71,.32) 62%); }
+  :root[data-theme="light"] .marca { background: linear-gradient(transparent 62%, var(--marcador) 62%); }
+
+  .aviso {
+    border-left: 3px solid var(--pluma); background: var(--papel-2);
+    padding: 18px 20px; margin: 22px 0; border-radius: 0 3px 3px 0;
+  }
+  .aviso p:last-child { margin-bottom: 0; }
+
+  code, pre { font-family: var(--mono); font-size: .82rem; }
+  pre {
+    background: var(--papel-2); border: 1px solid var(--linea);
+    padding: 14px 16px; border-radius: 3px; overflow-x: auto; margin: 0 0 12px;
+  }
+
+  .no-hace li { margin-bottom: 8px; }
+  .no-hace { list-style: none; padding: 0; }
+  .no-hace li::before { content: "—"; color: var(--pluma); margin-right: 10px; }
+
+  footer { padding: 40px 0 70px; color: var(--lapiz); font-size: .84rem; border-top: 1px solid var(--linea); }
+
+  @media (prefers-reduced-motion: no-preference) {
+    .revelar { animation: subir .5s cubic-bezier(.2,.6,.3,1) both; }
+    .revelar:nth-child(2) { animation-delay: .06s; }
+    .revelar:nth-child(3) { animation-delay: .12s; }
+    @keyframes subir { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: none; } }
+  }
+  a:focus-visible, button:focus-visible { outline: 2px solid var(--pluma); outline-offset: 3px; }
+</style>
+</head>
+<body>
+<div class="hoja">
+
+  <header>
+    <p class="eyebrow revelar">Perú · Computrabajo · Código abierto</p>
+    <h1 class="revelar">Tu CV en formato Harvard.<br>Postulaciones que <span class="marca">tú apruebas</span>.</h1>
+    <p class="bajada revelar">Subes tu CV, lo convierte al formato que mejor pasan los filtros automáticos de los portales, busca vacantes y prepara cada postulación. Tú das el último clic.</p>
+
+    <div class="especimen" aria-label="Ejemplo del CV generado">
+      <div class="nombre">Alice Nicoll Romero León</div>
+      <div class="contacto">Lima, Perú &nbsp;·&nbsp; alice@ejemplo.com &nbsp;·&nbsp; (+51) 924 909 338</div>
+      <div class="seccion">Experiencia profesional</div>
+      <div class="entrada"><span class="neg">USIL – Market Research Group</span><span class="der neg">Lima, PE</span></div>
+      <div class="entrada"><span class="cur">Practicante de Investigación de Mercados</span><span class="der cur">Dic 2022 – Ago 2023</span></div>
+      <ul>
+        <li>Diseñé y ejecuté más de 6 estudios de comportamiento del consumidor.</li>
+        <li>Facilité más de 10 focus groups con 120+ participantes en total.</li>
+      </ul>
+    </div>
+  </header>
+
+  <section>
+    <h2>Qué hace</h2>
+    <div class="fila">
+      <div class="izq"><h3>Convierte tu CV</h3>Lee tu PDF o Word y lo reescribe en formato Harvard: una columna, Times New Roman, sin foto ni tablas. Es el formato que mejor leen los filtros automáticos.</div>
+      <div class="der">Paso 1–2</div>
+    </div>
+    <div class="fila">
+      <div class="izq"><h3>Busca vacantes reales</h3>Prácticas o primer empleo, por área. Trae las ofertas de Computrabajo con su descripción completa.</div>
+      <div class="der">Paso 3–4</div>
+    </div>
+    <div class="fila">
+      <div class="izq"><h3>Adapta el CV a cada puesto</h3>Reordena tu experiencia y reescribe el resumen hacia esa vacante. Sin inventar nada: solo mueve y reformula lo que tu CV ya dice.</div>
+      <div class="der">Por vacante</div>
+    </div>
+    <div class="fila">
+      <div class="izq"><h3>Redacta las preguntas del formulario</h3>«¿Qué carrera cursas y en qué ciclo?» se responde con una frase, no pegando tu CV. Lo que no está en tu CV, te lo pregunta.</div>
+      <div class="der">Paso 5</div>
+    </div>
+  </section>
+
+  <section>
+    <h2>Qué no hace, a propósito</h2>
+    <ul class="no-hace">
+      <li><strong>No te pide tu contraseña.</strong> Tú inicias sesión en el portal, en tu propio navegador. La plataforma nunca ve tus credenciales.</li>
+      <li><strong>No acepta condiciones por ti.</strong> Si una vacante te pide confirmar que las prácticas son <em>ad honorem</em>, te muestra el aviso y decides tú. Ni siquiera en modo automático.</li>
+      <li><strong>No completa tu DNI.</strong> Ni tu dirección, ni tu fecha de nacimiento. Te avisa qué falta para que lo escribas tú.</li>
+      <li><strong>No inventa experiencia.</strong> Adaptar es reordenar lo que ya tienes. Si la vacante pide algo que no manejas, no lo menciona.</li>
+      <li><strong>No resuelve CAPTCHAs.</strong> Cuando aparece uno, te pasa el control.</li>
+    </ul>
+  </section>
+
+  <section>
+    <h2>Corre en tu computadora</h2>
+    <p>No es una web donde subes tu CV a un servidor ajeno. Se instala y corre en tu propia máquina: tu CV, tu sesión del portal y tu historial de postulaciones <span class="marca">nunca salen de ahí</span>.</p>
+    <div class="aviso">
+      <p>Esa es también la razón técnica: para postular hace falta la sesión que tú abriste en tu navegador. Un servidor en la nube no la tiene, y pedírtela significaría pedirte la contraseña. Preferimos que corra en tu equipo.</p>
+    </div>
+    <pre><code>git clone https://github.com/&lt;tu-usuario&gt;/chamba-lista
+cd chamba-lista
+pip install -r requirements.txt
+python app.py</code></pre>
+    <p style="color: var(--lapiz); font-size: .88rem;">Necesita Python 3.10 o superior. Para que redacte las respuestas hace falta un modelo: <a href="https://ollama.com">Ollama</a> en local (gratis y privado), o una clave gratuita de Gemini o Groq.</p>
+  </section>
+
+  <section>
+    <h2>En qué punto está</h2>
+    <div class="fila"><div class="izq">CV a formato Harvard, con vista previa</div><div class="der">Funciona</div></div>
+    <div class="fila"><div class="izq">Búsqueda de vacantes en Computrabajo</div><div class="der">Funciona</div></div>
+    <div class="fila"><div class="izq">Respuestas redactadas desde tu CV</div><div class="der">Funciona</div></div>
+    <div class="fila"><div class="izq">Postulación con revisión, y en lote</div><div class="der">En pruebas</div></div>
+    <div class="fila"><div class="izq">Bumeran · Indeed · LinkedIn</div><div class="der">Pendiente</div></div>
+    <p style="margin-top: 20px; color: var(--lapiz); font-size: .9rem;">Es un proyecto en desarrollo, hecho para buscar prácticas en Perú. Los portales pueden cambiar su web y romper la automatización; cuando pasa, se arregla.</p>
+  </section>
+
+  <footer>
+    <p>Chamba Lista — herramienta abierta para buscar prácticas y primer empleo en Perú.</p>
+    <p>Revisa siempre lo que se envía en tu nombre.</p>
+  </footer>
+
+</div>
+</body>
+</html>
