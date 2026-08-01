@@ -42,3 +42,6 @@ Thumbs.db
 *.log
 .vscode/
 .idea/
+
+# Copias de prueba de la landing servidas desde static/
+static/_*.html

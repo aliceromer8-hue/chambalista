@@ -7,208 +7,317 @@
 <title>Chamba Lista — tu CV en formato Harvard, y postulaciones que tú apruebas</title>
 <style>
   :root {
-    --papel: #FBFAF7;
-    --papel-2: #F2EFE8;
-    --tinta: #171A21;
-    --lapiz: #6E6A62;
-    --pluma: #1F4FD8;
-    --marcador: #FFD447;
-    --linea: #DCD7CC;
+    --papel: #FCFBF8;
+    --papel-2: #F3F0E9;
+    --papel-3: #E9E5DB;
+    --tinta: #14161C;
+    --lapiz: #6C6960;
+    --pluma: #1B45C4;
+    --pluma-suave: #E4E9FA;
+    --marcador: #FFD84D;
+    --linea: #DDD8CD;
+    --verde: #1E7A4C;
 
     --serif: "Times New Roman", Times, serif;
     --sans: ui-sans-serif, "Segoe UI", system-ui, -apple-system, Roboto, Helvetica, Arial, sans-serif;
-    --mono: ui-monospace, "Cascadia Mono", "Consolas", monospace;
+    --mono: ui-monospace, "Cascadia Mono", Consolas, monospace;
+
+    --r: 4px;
   }
   @media (prefers-color-scheme: dark) {
     :root {
-      --papel: #14161B;
-      --papel-2: #1C1F26;
-      --tinta: #ECE8E0;
-      --lapiz: #9C978D;
-      --pluma: #7FA0FF;
-      --marcador: #FFD447;
-      --linea: #2C313B;
+      --papel: #101217; --papel-2: #171A21; --papel-3: #1F232C;
+      --tinta: #EEEAE1; --lapiz: #9B968C; --pluma: #8AA6FF;
+      --pluma-suave: #1B2440; --linea: #282D37; --verde: #5CC98D;
     }
   }
   :root[data-theme="dark"] {
-    --papel: #14161B; --papel-2: #1C1F26; --tinta: #ECE8E0;
-    --lapiz: #9C978D; --pluma: #7FA0FF; --linea: #2C313B;
+    --papel: #101217; --papel-2: #171A21; --papel-3: #1F232C;
+    --tinta: #EEEAE1; --lapiz: #9B968C; --pluma: #8AA6FF;
+    --pluma-suave: #1B2440; --linea: #282D37; --verde: #5CC98D;
   }
   :root[data-theme="light"] {
-    --papel: #FBFAF7; --papel-2: #F2EFE8; --tinta: #171A21;
-    --lapiz: #6E6A62; --pluma: #1F4FD8; --linea: #DCD7CC;
+    --papel: #FCFBF8; --papel-2: #F3F0E9; --papel-3: #E9E5DB;
+    --tinta: #14161C; --lapiz: #6C6960; --pluma: #1B45C4;
+    --pluma-suave: #E4E9FA; --linea: #DDD8CD; --verde: #1E7A4C;
   }
 
+  * { box-sizing: border-box; }
   body {
-    margin: 0;
-    background: var(--papel);
-    color: var(--tinta);
-    font-family: var(--sans);
-    font-size: 16px;
-    line-height: 1.6;
+    margin: 0; background: var(--papel); color: var(--tinta);
+    font-family: var(--sans); font-size: 16px; line-height: 1.6;
     -webkit-font-smoothing: antialiased;
   }
-  .hoja { max-width: 720px; margin: 0 auto; padding: 0 24px; }
+  .hoja { max-width: 760px; margin: 0 auto; padding: 0 24px; }
+  .ancho { max-width: 1080px; margin: 0 auto; padding: 0 24px; }
 
-  /* ---- La página se tipografía como el documento que produce ---- */
-  h1, h2, h3 { font-family: var(--serif); font-weight: 700; text-wrap: balance; margin: 0; }
-  h1 { font-size: clamp(2.4rem, 6vw, 3.6rem); line-height: 1.05; letter-spacing: -.015em; }
-  h2 { font-size: 1.05rem; text-transform: uppercase; letter-spacing: .06em; margin-bottom: 14px; }
-  h3 { font-size: 1.15rem; margin-bottom: 4px; }
+  h1, h2, h3, .logo-texto { font-family: var(--serif); font-weight: 700; text-wrap: balance; margin: 0; }
+  h1 { font-size: clamp(2.5rem, 6.5vw, 4rem); line-height: 1.02; letter-spacing: -.02em; }
+  h2 { font-size: 1rem; text-transform: uppercase; letter-spacing: .08em; margin-bottom: 18px; }
+  h3 { font-size: 1.1rem; margin-bottom: 3px; }
   p { margin: 0 0 14px; }
-  a { color: var(--pluma); }
+  a { color: var(--pluma); text-underline-offset: 3px; }
+
+  /* ---------- marca ---------- */
+  .barra {
+    position: sticky; top: 0; z-index: 20;
+    background: color-mix(in srgb, var(--papel) 88%, transparent);
+    backdrop-filter: blur(8px);
+    border-bottom: 1px solid var(--linea);
+  }
+  .barra .ancho { display: flex; align-items: center; gap: 12px; height: 58px; }
+  .logo { display: flex; align-items: center; gap: 9px; text-decoration: none; color: var(--tinta); }
+  .logo-texto { font-size: 1.05rem; letter-spacing: -.01em; }
+  .barra nav { margin-left: auto; display: flex; gap: 20px; font-size: .88rem; }
+  .barra nav a { color: var(--lapiz); text-decoration: none; }
+  .barra nav a:hover { color: var(--pluma); }
+  @media (max-width: 620px) { .barra nav { display: none; } }
 
   .eyebrow {
-    font-family: var(--mono); font-size: .72rem; text-transform: uppercase;
-    letter-spacing: .14em; color: var(--lapiz); margin-bottom: 18px;
+    font-family: var(--mono); font-size: .7rem; text-transform: uppercase;
+    letter-spacing: .16em; color: var(--lapiz);
   }
 
-  header { padding: 84px 0 56px; }
-  header .bajada { font-size: 1.15rem; color: var(--lapiz); max-width: 46ch; margin-top: 20px; }
-
-  /* ---- El encabezado de dos columnas del CV, como elemento estructural ---- */
-  .fila {
-    display: flex; align-items: baseline; gap: 12px;
-    padding: 9px 0; border-bottom: 1px solid var(--linea);
+  header { padding: 76px 0 40px; }
+  header .bajada { font-size: 1.16rem; color: var(--lapiz); max-width: 48ch; margin-top: 20px; }
+  .acciones-hero { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 28px; }
+  .boton {
+    display: inline-block; padding: 12px 22px; border-radius: var(--r);
+    font-weight: 600; font-size: .94rem; text-decoration: none; border: 1px solid transparent;
   }
-  .fila .izq { flex: 1; min-width: 0; }
-  .fila .der {
-    font-family: var(--mono); font-size: .78rem; color: var(--lapiz);
+  .boton.principal { background: var(--pluma); color: #fff; }
+  .boton.secundario { border-color: var(--linea); color: var(--tinta); }
+  .boton:hover { transform: translateY(-1px); }
+  @media (prefers-reduced-motion: reduce) { .boton:hover { transform: none; } }
+
+  /* ---------- demo interactiva: antes / después ---------- */
+  .demo { margin: 44px 0 0; }
+  .demo-tabs { display: flex; gap: 4px; margin-bottom: -1px; }
+  .demo-tab {
+    font: inherit; font-size: .84rem; font-weight: 600; cursor: pointer;
+    background: var(--papel-2); color: var(--lapiz);
+    border: 1px solid var(--linea); border-bottom: none;
+    padding: 9px 18px; border-radius: var(--r) var(--r) 0 0;
+  }
+  .demo-tab[aria-selected="true"] { background: var(--papel); color: var(--tinta); }
+  .demo-panel {
+    border: 1px solid var(--linea); border-radius: 0 var(--r) var(--r) var(--r);
+    background: var(--papel); padding: 26px 30px; min-height: 300px;
+  }
+  .antes {
+    font-family: var(--sans); font-size: .82rem; color: var(--lapiz);
+    white-space: pre-wrap; line-height: 1.5;
+  }
+
+  /* El CV: Times New Roman de verdad, con la tabulación derecha */
+  .cv { font-family: var(--serif); }
+  .cv .nombre { text-align: center; font-size: 1.45rem; font-weight: 700; }
+  .cv .contacto { text-align: center; font-size: .73rem; color: var(--lapiz); margin-bottom: 15px; }
+  .cv .seccion { font-size: .78rem; font-weight: 700; text-transform: uppercase; margin: 13px 0 4px; }
+  .cv .fila { display: flex; justify-content: space-between; gap: 14px; font-size: .83rem; }
+  .cv .fila .der { white-space: nowrap; }
+  .cv ul { margin: 4px 0 0 17px; padding: 0; font-size: .81rem; }
+  .cv li { margin: 2px 0; }
+  .cv .neg { font-weight: 700; }
+  .cv .cur { font-style: italic; }
+
+  /* ---------- estructura ---------- */
+  section { padding: 52px 0; border-top: 1px solid var(--linea); }
+  .fila-lista { display: flex; align-items: baseline; gap: 14px; padding: 11px 0; border-bottom: 1px solid var(--linea); }
+  .fila-lista:last-child { border-bottom: none; }
+  .fila-lista .izq { flex: 1; min-width: 0; }
+  .fila-lista .der {
+    font-family: var(--mono); font-size: .74rem; color: var(--lapiz);
     text-align: right; white-space: nowrap; font-variant-numeric: tabular-nums;
   }
-  .fila:last-child { border-bottom: none; }
+  .estado-ok .der { color: var(--verde); }
 
-  section { padding: 44px 0; border-top: 1px solid var(--linea); }
+  .marca-txt { background: linear-gradient(transparent 62%, var(--marcador) 62%); padding: 0 2px; }
+  @media (prefers-color-scheme: dark) { .marca-txt { background: linear-gradient(transparent 62%, rgba(255,216,77,.3) 62%); } }
+  :root[data-theme="dark"] .marca-txt { background: linear-gradient(transparent 62%, rgba(255,216,77,.3) 62%); }
+  :root[data-theme="light"] .marca-txt { background: linear-gradient(transparent 62%, var(--marcador) 62%); }
 
-  /* ---- Espécimen del CV: Times New Roman de verdad ---- */
-  .especimen {
-    font-family: var(--serif); background: var(--papel-2);
-    border: 1px solid var(--linea); border-radius: 3px;
-    padding: 26px 30px; margin: 26px 0 0;
-  }
-  .especimen .nombre { text-align: center; font-size: 1.5rem; font-weight: 700; }
-  .especimen .contacto { text-align: center; font-size: .74rem; color: var(--lapiz); margin-bottom: 16px; }
-  .especimen .seccion { font-size: .8rem; font-weight: 700; text-transform: uppercase; margin: 14px 0 5px; }
-  .especimen .entrada { display: flex; justify-content: space-between; gap: 14px; font-size: .84rem; }
-  .especimen .entrada .der { white-space: nowrap; }
-  .especimen ul { margin: 4px 0 0 18px; padding: 0; font-size: .82rem; }
-  .especimen li { margin: 2px 0; }
-  .especimen .neg { font-weight: 700; }
-  .especimen .cur { font-style: italic; }
+  .no-hace { list-style: none; padding: 0; margin: 0; }
+  .no-hace li { padding: 13px 0; border-bottom: 1px solid var(--linea); }
+  .no-hace li:last-child { border-bottom: none; }
+  .no-hace strong { display: block; }
 
-  .marca { background: linear-gradient(transparent 62%, var(--marcador) 62%); padding: 0 2px; }
-  :root[data-theme="dark"] .marca, :root:not([data-theme]) .marca { color: inherit; }
-  @media (prefers-color-scheme: dark) { .marca { background: linear-gradient(transparent 62%, rgba(255,212,71,.32) 62%); } }
-  :root[data-theme="dark"] .marca { background: linear-gradient(transparent 62%, rgba(255,212,71,.32) 62%); }
-  :root[data-theme="light"] .marca { background: linear-gradient(transparent 62%, var(--marcador) 62%); }
-
-  .aviso {
-    border-left: 3px solid var(--pluma); background: var(--papel-2);
-    padding: 18px 20px; margin: 22px 0; border-radius: 0 3px 3px 0;
-  }
+  .aviso { border-left: 3px solid var(--pluma); background: var(--pluma-suave); padding: 16px 20px; margin: 20px 0; border-radius: 0 var(--r) var(--r) 0; }
   .aviso p:last-child { margin-bottom: 0; }
 
-  code, pre { font-family: var(--mono); font-size: .82rem; }
-  pre {
-    background: var(--papel-2); border: 1px solid var(--linea);
-    padding: 14px 16px; border-radius: 3px; overflow-x: auto; margin: 0 0 12px;
-  }
+  code, pre { font-family: var(--mono); font-size: .81rem; }
+  pre { background: var(--papel-2); border: 1px solid var(--linea); padding: 15px 17px; border-radius: var(--r); overflow-x: auto; margin: 0 0 12px; }
 
-  .no-hace li { margin-bottom: 8px; }
-  .no-hace { list-style: none; padding: 0; }
-  .no-hace li::before { content: "—"; color: var(--pluma); margin-right: 10px; }
-
-  footer { padding: 40px 0 70px; color: var(--lapiz); font-size: .84rem; border-top: 1px solid var(--linea); }
+  footer { padding: 40px 0 72px; color: var(--lapiz); font-size: .84rem; border-top: 1px solid var(--linea); }
 
   @media (prefers-reduced-motion: no-preference) {
-    .revelar { animation: subir .5s cubic-bezier(.2,.6,.3,1) both; }
-    .revelar:nth-child(2) { animation-delay: .06s; }
-    .revelar:nth-child(3) { animation-delay: .12s; }
-    @keyframes subir { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: none; } }
+    .revelar { animation: subir .55s cubic-bezier(.2,.6,.3,1) both; }
+    .revelar:nth-child(2) { animation-delay: .05s; }
+    .revelar:nth-child(3) { animation-delay: .1s; }
+    .revelar:nth-child(4) { animation-delay: .15s; }
+    @keyframes subir { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: none; } }
   }
-  a:focus-visible, button:focus-visible { outline: 2px solid var(--pluma); outline-offset: 3px; }
+  a:focus-visible, button:focus-visible { outline: 2px solid var(--pluma); outline-offset: 3px; border-radius: 2px; }
 </style>
 </head>
 <body>
-<div class="hoja">
+<div class="barra">
+  <div class="ancho">
+    <a class="logo" href="#inicio" aria-label="Chamba Lista, inicio">
+      <!-- Logo: una hoja de CV con la tabulación derecha que define el formato -->
+      <svg width="24" height="26" viewBox="0 0 24 26" fill="none" aria-hidden="true">
+        <rect x="1.5" y="1.5" width="21" height="23" rx="2" stroke="currentColor" stroke-width="1.6"/>
+        <line x1="6" y1="7.5" x2="18" y2="7.5" stroke="currentColor" stroke-width="1.6"/>
+        <line x1="6" y1="12" x2="12" y2="12" stroke="currentColor" stroke-width="1.6"/>
+        <line x1="15" y1="12" x2="18" y2="12" stroke="var(--pluma)" stroke-width="1.6"/>
+        <line x1="6" y1="16" x2="12" y2="16" stroke="currentColor" stroke-width="1.6"/>
+        <line x1="15" y1="16" x2="18" y2="16" stroke="var(--pluma)" stroke-width="1.6"/>
+        <line x1="6" y1="20" x2="14" y2="20" stroke="currentColor" stroke-width="1.6" opacity=".45"/>
+      </svg>
+      <span class="logo-texto">Chamba Lista</span>
+    </a>
+    <nav>
+      <a href="#como">Cómo funciona</a>
+      <a href="#limites">Qué no hace</a>
+      <a href="#instalar">Instalar</a>
+    </nav>
+  </div>
+</div>
+
+<div class="hoja" id="inicio">
 
   <header>
-    <p class="eyebrow revelar">Perú · Computrabajo · Código abierto</p>
-    <h1 class="revelar">Tu CV en formato Harvard.<br>Postulaciones que <span class="marca">tú apruebas</span>.</h1>
-    <p class="bajada revelar">Subes tu CV, lo convierte al formato que mejor pasan los filtros automáticos de los portales, busca vacantes y prepara cada postulación. Tú das el último clic.</p>
-
-    <div class="especimen" aria-label="Ejemplo del CV generado">
-      <div class="nombre">Alice Nicoll Romero León</div>
-      <div class="contacto">Lima, Perú &nbsp;·&nbsp; alice@ejemplo.com &nbsp;·&nbsp; (+51) 924 909 338</div>
-      <div class="seccion">Experiencia profesional</div>
-      <div class="entrada"><span class="neg">USIL – Market Research Group</span><span class="der neg">Lima, PE</span></div>
-      <div class="entrada"><span class="cur">Practicante de Investigación de Mercados</span><span class="der cur">Dic 2022 – Ago 2023</span></div>
-      <ul>
-        <li>Diseñé y ejecuté más de 6 estudios de comportamiento del consumidor.</li>
-        <li>Facilité más de 10 focus groups con 120+ participantes en total.</li>
-      </ul>
+    <p class="eyebrow revelar">Perú · Computrabajo · Bumeran · Indeed</p>
+    <h1 class="revelar">Tu CV en formato Harvard.<br>Postulaciones que <span class="marca-txt">tú apruebas</span>.</h1>
+    <p class="bajada revelar">Subes tu CV, lo reescribe al formato que mejor pasan los filtros automáticos, busca vacantes de cualquier rubro y prepara cada postulación. El último clic siempre es tuyo.</p>
+    <div class="acciones-hero revelar">
+      <a class="boton principal" href="#instalar">Empezar</a>
+      <a class="boton secundario" href="#como">Ver cómo funciona</a>
     </div>
+
+    <div class="demo">
+      <div class="demo-tabs" role="tablist" aria-label="Antes y después del CV">
+        <button class="demo-tab" role="tab" id="tab-antes" aria-controls="panel-antes" aria-selected="false">Tu CV ahora</button>
+        <button class="demo-tab" role="tab" id="tab-despues" aria-controls="panel-despues" aria-selected="true">En formato Harvard</button>
+      </div>
+
+      <div class="demo-panel" id="panel-antes" role="tabpanel" aria-labelledby="tab-antes" hidden>
+<div class="antes">ALICE ROMERO
+alice@ejemplo.com / 924909338 / Lima
+
+EXPERIENCIA
+USIL - Market Research Group, Practicante de Investigacion de Mercados, Dic 2022 - Ago 2023
+Funciones: apoyo en estudios de consumidor, focus groups, procesamiento de encuestas en SPSS.
+
+Zero West Street - Social Media Marketing Manager (freelance) - Jul 2024 a Dic 2024
+Funciones: manejo de redes, contenido, coordinacion.</div>
+      </div>
+
+      <div class="demo-panel cv" id="panel-despues" role="tabpanel" aria-labelledby="tab-despues">
+        <div class="nombre">Alice Nicoll Romero León</div>
+        <div class="contacto">Lima, Perú &nbsp;·&nbsp; alice@ejemplo.com &nbsp;·&nbsp; (+51) 924 909 338</div>
+        <div class="seccion">Experiencia profesional</div>
+        <div class="fila"><span class="neg">USIL – Market Research Group</span><span class="der neg">Lima, PE</span></div>
+        <div class="fila"><span class="cur">Practicante de Investigación de Mercados</span><span class="der cur">Dic 2022 – Ago 2023</span></div>
+        <ul>
+          <li>Diseñé y ejecuté más de 6 estudios de comportamiento del consumidor.</li>
+          <li>Facilité más de 10 focus groups con 120+ participantes en total.</li>
+          <li>Procesé datos de encuestas con SPSS y generé reportes accionables.</li>
+        </ul>
+        <div class="fila" style="margin-top:9px"><span class="neg">Zero West Street</span><span class="der neg">Lima, PE (Remoto)</span></div>
+        <div class="fila"><span class="cur">Social Media Marketing Manager</span><span class="der cur">Jul 2024 – Dic 2024</span></div>
+        <ul>
+          <li>Lideré el lanzamiento digital de la marca desde cero.</li>
+        </ul>
+      </div>
+    </div>
+    <p class="eyebrow" style="margin-top:12px">Las funciones se convierten en logros con verbo de acción y números.</p>
   </header>
 
-  <section>
-    <h2>Qué hace</h2>
-    <div class="fila">
-      <div class="izq"><h3>Convierte tu CV</h3>Lee tu PDF o Word y lo reescribe en formato Harvard: una columna, Times New Roman, sin foto ni tablas. Es el formato que mejor leen los filtros automáticos.</div>
-      <div class="der">Paso 1–2</div>
+  <section id="como">
+    <h2>Cómo funciona</h2>
+    <div class="fila-lista">
+      <div class="izq"><h3>Lee tu CV, venga como venga</h3>PDF o Word. Una IA lo entiende por contenido, no por formato, así que da igual cómo esté maquetado.</div>
+      <div class="der">Paso 1</div>
     </div>
-    <div class="fila">
-      <div class="izq"><h3>Busca vacantes reales</h3>Prácticas o primer empleo, por área. Trae las ofertas de Computrabajo con su descripción completa.</div>
-      <div class="der">Paso 3–4</div>
+    <div class="fila-lista">
+      <div class="izq"><h3>Lo reescribe en formato Harvard</h3>Una columna, Times New Roman, sin foto ni tablas. Lo ves en pantalla antes de descargarlo.</div>
+      <div class="der">Paso 2</div>
     </div>
-    <div class="fila">
-      <div class="izq"><h3>Adapta el CV a cada puesto</h3>Reordena tu experiencia y reescribe el resumen hacia esa vacante. Sin inventar nada: solo mueve y reformula lo que tu CV ya dice.</div>
-      <div class="der">Por vacante</div>
+    <div class="fila-lista">
+      <div class="izq"><h3>Buscas el puesto que quieras</h3>Escribes «enfermera», «cajero», «practicante de derecho» — cualquier rubro. Busca en tres portales a la vez y junta los resultados.</div>
+      <div class="der">Paso 3</div>
     </div>
-    <div class="fila">
-      <div class="izq"><h3>Redacta las preguntas del formulario</h3>«¿Qué carrera cursas y en qué ciclo?» se responde con una frase, no pegando tu CV. Lo que no está en tu CV, te lo pregunta.</div>
+    <div class="fila-lista">
+      <div class="izq"><h3>Adapta tu CV a cada vacante</h3>Reordena tu experiencia hacia ese puesto y reescribe el resumen. Sin inventar: solo mueve y reformula lo que ya tienes.</div>
+      <div class="der">Paso 4</div>
+    </div>
+    <div class="fila-lista">
+      <div class="izq"><h3>Llena el formulario y tú revisas</h3>Las preguntas del portal se responden desde tu CV. Ves todo antes de que se envíe nada.</div>
       <div class="der">Paso 5</div>
     </div>
   </section>
 
-  <section>
+  <section id="limites">
     <h2>Qué no hace, a propósito</h2>
     <ul class="no-hace">
-      <li><strong>No te pide tu contraseña.</strong> Tú inicias sesión en el portal, en tu propio navegador. La plataforma nunca ve tus credenciales.</li>
-      <li><strong>No acepta condiciones por ti.</strong> Si una vacante te pide confirmar que las prácticas son <em>ad honorem</em>, te muestra el aviso y decides tú. Ni siquiera en modo automático.</li>
-      <li><strong>No completa tu DNI.</strong> Ni tu dirección, ni tu fecha de nacimiento. Te avisa qué falta para que lo escribas tú.</li>
-      <li><strong>No inventa experiencia.</strong> Adaptar es reordenar lo que ya tienes. Si la vacante pide algo que no manejas, no lo menciona.</li>
+      <li><strong>No te pide tu contraseña.</strong> Tú inicias sesión en el portal, en tu propio navegador.</li>
+      <li><strong>No acepta condiciones por ti.</strong> Si una vacante te pide confirmar que las prácticas son <em>ad honorem</em>, decides tú. Ni siquiera en modo automático.</li>
+      <li><strong>No inventa experiencia.</strong> Si la vacante pide algo que no manejas, no lo menciona.</li>
+      <li><strong>No rellena datos que no le diste.</strong> Tu DNI se completa solo si tú lo guardaste antes; si no, te avisa.</li>
       <li><strong>No resuelve CAPTCHAs.</strong> Cuando aparece uno, te pasa el control.</li>
     </ul>
   </section>
 
-  <section>
+  <section id="instalar">
     <h2>Corre en tu computadora</h2>
-    <p>No es una web donde subes tu CV a un servidor ajeno. Se instala y corre en tu propia máquina: tu CV, tu sesión del portal y tu historial de postulaciones <span class="marca">nunca salen de ahí</span>.</p>
+    <p>No es una web donde subes tu CV a un servidor ajeno. Se instala y corre en tu máquina: tu CV, tu sesión del portal y tu historial <span class="marca-txt">nunca salen de ahí</span>.</p>
     <div class="aviso">
-      <p>Esa es también la razón técnica: para postular hace falta la sesión que tú abriste en tu navegador. Un servidor en la nube no la tiene, y pedírtela significaría pedirte la contraseña. Preferimos que corra en tu equipo.</p>
+      <p>Es también la razón técnica: para postular hace falta la sesión que tú abriste en tu navegador. Un servidor en la nube no la tiene, y pedírtela significaría pedirte la contraseña.</p>
     </div>
     <pre><code>git clone https://github.com/&lt;tu-usuario&gt;/chamba-lista
 cd chamba-lista
 pip install -r requirements.txt
 python app.py</code></pre>
-    <p style="color: var(--lapiz); font-size: .88rem;">Necesita Python 3.10 o superior. Para que redacte las respuestas hace falta un modelo: <a href="https://ollama.com">Ollama</a> en local (gratis y privado), o una clave gratuita de Gemini o Groq.</p>
+    <p class="eyebrow">Python 3.10+. Para que redacte las respuestas: Ollama en local (gratis y privado) o una clave gratuita de Gemini o Groq.</p>
   </section>
 
   <section>
     <h2>En qué punto está</h2>
-    <div class="fila"><div class="izq">CV a formato Harvard, con vista previa</div><div class="der">Funciona</div></div>
-    <div class="fila"><div class="izq">Búsqueda de vacantes en Computrabajo</div><div class="der">Funciona</div></div>
-    <div class="fila"><div class="izq">Respuestas redactadas desde tu CV</div><div class="der">Funciona</div></div>
-    <div class="fila"><div class="izq">Postulación con revisión, y en lote</div><div class="der">En pruebas</div></div>
-    <div class="fila"><div class="izq">Bumeran · Indeed · LinkedIn</div><div class="der">Pendiente</div></div>
-    <p style="margin-top: 20px; color: var(--lapiz); font-size: .9rem;">Es un proyecto en desarrollo, hecho para buscar prácticas en Perú. Los portales pueden cambiar su web y romper la automatización; cuando pasa, se arregla.</p>
+    <div class="fila-lista estado-ok"><div class="izq">CV a formato Harvard, con vista previa</div><div class="der">Listo</div></div>
+    <div class="fila-lista estado-ok"><div class="izq">Búsqueda libre en Computrabajo, Bumeran e Indeed</div><div class="der">Listo</div></div>
+    <div class="fila-lista estado-ok"><div class="izq">Respuestas redactadas desde tu CV</div><div class="der">Listo</div></div>
+    <div class="fila-lista"><div class="izq">Postulación con revisión, y en lote</div><div class="der">En pruebas</div></div>
+    <div class="fila-lista"><div class="izq">Postular desde Bumeran e Indeed</div><div class="der">Pendiente</div></div>
+    <p style="margin-top:22px" class="eyebrow">Proyecto en desarrollo, hecho para buscar trabajo en Perú.</p>
   </section>
 
   <footer>
-    <p>Chamba Lista — herramienta abierta para buscar prácticas y primer empleo en Perú.</p>
+    <p>Chamba Lista — herramienta abierta para buscar trabajo en Perú.</p>
     <p>Revisa siempre lo que se envía en tu nombre.</p>
   </footer>
 
 </div>
+
+<script>
+  // Pestañas antes/después. Sin dependencias: la página debe cargar al instante.
+  (function () {
+    var tabs = [document.getElementById("tab-antes"), document.getElementById("tab-despues")];
+    var paneles = [document.getElementById("panel-antes"), document.getElementById("panel-despues")];
+    function activar(i) {
+      tabs.forEach(function (t, n) { t.setAttribute("aria-selected", n === i ? "true" : "false"); });
+      paneles.forEach(function (p, n) { p.hidden = n !== i; });
+    }
+    tabs.forEach(function (t, i) {
+      t.addEventListener("click", function () { activar(i); });
+      t.addEventListener("keydown", function (e) {
+        if (e.key === "ArrowRight" || e.key === "ArrowLeft") {
+          var otro = i === 0 ? 1 : 0;
+          activar(otro); tabs[otro].focus();
+        }
+      });
+    });
+  })();
+</script>
 </body>
 </html>
