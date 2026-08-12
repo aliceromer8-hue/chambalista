@@ -1,0 +1,51 @@
+{
+  "manifest_version": 3,
+  "name": "Chamba Lista — postula sin escribir lo mismo mil veces",
+  "version": "0.1.0",
+  "description": "Busca vacantes en los portales peruanos, adapta tu CV a cada una y prepara la postulación. Tú das el último clic.",
+  "default_locale": "es",
+
+  "permissions": [
+    "storage",
+    "activeTab",
+    "scripting"
+  ],
+
+  "host_permissions": [
+    "https://pe.computrabajo.com/*",
+    "https://candidato.pe.computrabajo.com/*",
+    "https://www.bumeran.com.pe/*",
+    "https://pe.indeed.com/*",
+    "https://generativelanguage.googleapis.com/*",
+    "https://api.groq.com/*"
+  ],
+
+  "background": {
+    "service_worker": "background.js",
+    "type": "module"
+  },
+
+  "action": {
+    "default_popup": "popup/popup.html",
+    "default_title": "Chamba Lista",
+    "default_icon": {
+      "16": "iconos/16.png",
+      "48": "iconos/48.png",
+      "128": "iconos/128.png"
+    }
+  },
+
+  "icons": {
+    "16": "iconos/16.png",
+    "48": "iconos/48.png",
+    "128": "iconos/128.png"
+  },
+
+  "content_scripts": [
+    {
+      "matches": ["https://pe.computrabajo.com/*", "https://candidato.pe.computrabajo.com/*"],
+      "js": ["contenido/comun.js", "contenido/computrabajo.js"],
+      "run_at": "document_idle"
+    }
+  ]
+}
