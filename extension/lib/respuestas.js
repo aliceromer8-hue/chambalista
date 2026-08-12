@@ -103,11 +103,14 @@ export async function redactar(preguntas, perfil, guardados = {}, respuestasPers
 
   // 3. Lo que queda, al modelo — en UNA sola llamada.
   const pendientes = salida.filter((q) => !q.texto && q.necesita.length === 0);
-  if (pendientes.length && (await ia.disponible())) {
+  if (pendientes.length) {
     const respuestas = await ia.redactarLote(
       pendientes.map((q) => q.enunciado), perfil, guardados,
     );
-    if (respuestas) {
+    if (respuestas?.agotada) {
+      // Sin cuota: la persona escribe estas a mano. Se le dice por qué.
+      pendientes.forEach((q) => { q.avisoCuota = respuestas.error; });
+    } else if (Array.isArray(respuestas)) {
       pendientes.forEach((q, i) => {
         const r = respuestas[i];
         if (!r) return;

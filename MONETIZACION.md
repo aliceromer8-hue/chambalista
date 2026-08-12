@@ -27,6 +27,34 @@ Los generadores de CV que existen cobran **entre 16 y 25 dólares al mes** (Enha
 
 Nadie está atendiendo ese mercado a precio peruano. Ahí está tu oportunidad, y no necesita tráfico masivo: necesita **conversión**.
 
+## Cómo lo hacen los que ya venden esto
+
+Se verificó: **ninguno pide una clave de IA**. Simplify, JobCopilot, LazyApply y AIApply la incluyen en el precio. JobCopilot cobra $8.90 por semana por 20 postulaciones diarias; LazyApply, de $99 a $999 al año.
+
+Y tiene sentido, porque **pedir la clave es el mayor filtro de usuarias posible**. La persona que busca prácticas no es desarrolladora: mandarla a Google AI Studio a crear un proyecto hace que abandone ahí mismo.
+
+### Lo que cuesta incluirla
+
+Con Gemini 2.5 Flash a $0.30 por millón de tokens de entrada y $2.50 de salida, y el consumo real medido en este proyecto:
+
+| Operación | Coste |
+|---|---|
+| Analizar un CV | ~$0.004 (S/ 0.015) |
+| Adaptar el CV + responder las preguntas de una vacante | ~$0.008 (S/ 0.03) |
+| **100 postulaciones completas** | **~$1.00 (S/ 3.70)** |
+
+Cobrando S/ 12 por 100 postulaciones, el coste es S/ 3.70 y el margen S/ 8.30 — un 69%. La IA se puede incluir sin problema.
+
+### Cómo está construido
+
+`proxy_ia.py` recibe la petición de la extensión y llama al modelo con la clave del servidor. La clave no puede ir dentro de la extensión: su código es visible para cualquiera que la instale.
+
+El uso se controla por identificador de dispositivo que genera la extensión — sin cuentas ni correos. Es un límite blando (alguien decidido lo regenera) y está bien: sirve para que un usuario no agote la cuota de todos.
+
+Quien tenga su propia clave puede usarla y entonces no consume cuota. Ese camino sigue existiendo porque no cuesta nada mantenerlo.
+
+**El único gasto real:** una clave de Gemini con facturación activada, porque la capa gratuita se agota con varios usuarios. Al pagarse por uso, si nadie usa la herramienta no pagas nada.
+
 ## El modelo que recomiendo
 
 **Gratis:** convertir el CV al formato Harvard y descargarlo. Sin registro, sin límite. Esto es el gancho y es lo que la gente va a compartir.

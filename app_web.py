@@ -144,6 +144,46 @@ def descargar():
     )
 
 
+# ---------------------------------------------------------------------------
+# Proxy de IA
+#
+# La extensión llama aquí en vez de a Google. Así la persona no necesita
+# crear ninguna clave — que es como lo hacen Simplify, JobCopilot y los
+# demás — y la clave del servidor nunca sale de aquí.
+# ---------------------------------------------------------------------------
+
+def _dispositivo():
+    """Identificador que genera la extensión. No es una cuenta ni un correo."""
+    ident = (request.headers.get("X-Dispositivo") or "").strip()
+    return ident[:64] if ident else f"ip:{_ip()}"
+
+
+@app.get("/api/ia/cuota")
+def cuota_ia():
+    import proxy_ia
+    datos = proxy_ia.consultar_cuota(_dispositivo())
+    datos["servidor_configurado"] = proxy_ia.hay_clave_servidor()
+    return jsonify(datos)
+
+
+@app.post("/api/ia/<operacion>")
+def operacion_ia(operacion):
+    """Ejecuta una operación de IA con la clave del servidor.
+
+    Si la persona manda su propia clave en X-IA-Key, se usa esa y no
+    consume de su cuota gratuita.
+    """
+    import proxy_ia
+
+    carga = request.get_json(silent=True) or {}
+    resultado, error, codigo = proxy_ia.procesar(
+        operacion, carga, _dispositivo(), _clave_del_usuario() or None
+    )
+    if error:
+        return jsonify({"error": error}), codigo
+    return jsonify(resultado)
+
+
 @app.errorhandler(413)
 def demasiado_grande(_):
     return jsonify({"error": "El archivo pesa más de 6 MB."}), 413

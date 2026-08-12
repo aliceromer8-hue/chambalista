@@ -183,14 +183,31 @@ def disponible():
 # ---------------------------------------------------------------------------
 
 def _cv_en_texto(perfil, extras=None):
-    """Arma el contexto del CV que se le pasa al modelo."""
+    """Arma el contexto del CV que se le pasa al modelo.
+
+    Acepta los dos modelos: el estructurado por entradas (el que produce
+    el análisis con IA y el que manda la extensión) y el plano de
+    `secciones` (el del parseo por reglas). Antes solo leía el plano, y
+    con un perfil estructurado le llegaba al modelo un CV casi vacío.
+    """
     lineas = []
     if perfil.get("nombre"):
         lineas.append(f"Nombre: {perfil['nombre']}")
     contacto = perfil.get("contacto", {})
-    for etiqueta, clave in [("Email", "email"), ("Teléfono/celular", "telefono"), ("LinkedIn", "linkedin")]:
+    for etiqueta, clave in [("Ciudad", "ubicacion"), ("Email", "email"),
+                            ("Teléfono/celular", "telefono"), ("LinkedIn", "linkedin")]:
         if contacto.get(clave):
             lineas.append(f"{etiqueta}: {contacto[clave]}")
+
+    planas = perfil.get("secciones") or {}
+    if not planas:
+        # Perfil estructurado: se aplana aquí mismo.
+        try:
+            from harvard_template import a_secciones_planas
+
+            planas = a_secciones_planas(perfil)
+        except Exception:
+            planas = {}
 
     titulos = {
         "resumen": "Resumen profesional",
@@ -201,7 +218,7 @@ def _cv_en_texto(perfil, extras=None):
         "certificaciones": "Certificaciones y logros",
     }
     for clave, titulo in titulos.items():
-        contenido = perfil.get("secciones", {}).get(clave)
+        contenido = planas.get(clave)
         if contenido:
             lineas.append(f"\n{titulo}:\n" + "\n".join(contenido))
 

@@ -8,14 +8,68 @@
 //   texto truncado o vacío.
 // - Al parsear hay que descartar las partes marcadas `thought`.
 
-import { claveIA } from "./almacen.js";
+import { claveIA, leer, guardar } from "./almacen.js";
 
 const MODELO_GEMINI = "gemini-flash-latest";
 const MODELO_GROQ = "llama-3.3-70b-versatile";
 const MARCA_FALTA = "FALTA_DATO:";
 
+// Servidor propio que hace de proxy: así la persona NO necesita crear
+// ninguna clave, igual que Simplify o JobCopilot. Quien tenga su propia
+// clave puede usarla y entonces no consume cuota.
+export const SERVIDOR = "https://chamba-lista.onrender.com";
+
+/** Identificador del dispositivo, para llevar la cuenta de la cuota.
+ *  No es una cuenta ni un correo: es un número al azar de este navegador. */
+async function dispositivo() {
+  let id = await leer("dispositivo", null);
+  if (!id) {
+    id = crypto.randomUUID();
+    await guardar("dispositivo", id);
+  }
+  return id;
+}
+
+/** Siempre hay IA: con la clave de la persona o con la del servidor. */
 export async function disponible() {
-  return Boolean(await claveIA.obtener());
+  return true;
+}
+
+/** Llama al proxy. Devuelve null si falla, para que se use el respaldo. */
+async function porServidor(operacion, carga) {
+  try {
+    const clave = await claveIA.obtener();
+    const r = await fetch(`${SERVIDOR}/api/ia/${operacion}`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "X-Dispositivo": await dispositivo(),
+        ...(clave ? { "X-IA-Key": clave } : {}),
+      },
+      body: JSON.stringify(carga),
+    });
+    const j = await r.json();
+    if (!r.ok) {
+      // 429 es "se acabó la cuota": conviene decírselo, no callarlo.
+      return { error: j.error, agotada: r.status === 429 };
+    }
+    return j;
+  } catch (e) {
+    console.warn("Chamba Lista — el servidor de IA no respondió:", e.message);
+    return null;
+  }
+}
+
+/** Cuánto le queda de cuota gratuita. */
+export async function cuota() {
+  try {
+    const r = await fetch(`${SERVIDOR}/api/ia/cuota`, {
+      headers: { "X-Dispositivo": await dispositivo() },
+    });
+    return r.ok ? r.json() : null;
+  } catch {
+    return null;
+  }
 }
 
 /** Las claves de Gemini y las de Groq se distinguen por su forma. */
@@ -137,9 +191,24 @@ REGLAS ESTRICTAS:
 6. Máximo 400 caracteres por respuesta. Sin viñetas ni comillas envolventes.
 7. No copies fragmentos del CV en crudo: redacta una frase.`;
 
-/** Redacta varias respuestas en una sola llamada. */
+/** Redacta varias respuestas en una sola llamada.
+ *
+ *  Primero por el servidor (sin que la persona configure nada). Si el
+ *  servidor no está disponible y ella tiene clave propia, se llama a
+ *  Google directamente.
+ */
 export async function redactarLote(enunciados, perfil, extras = {}) {
   if (!enunciados.length) return [];
+
+  const delServidor = await porServidor("redactar_lote", { enunciados, perfil, extras });
+  if (delServidor?.respuestas) return delServidor.respuestas;
+  if (delServidor?.agotada) {
+    // Cuota agotada: se propaga para poder avisar en la interfaz.
+    return { agotada: true, error: delServidor.error };
+  }
+
+  // Respaldo: la clave de la persona, contra Google directamente.
+  if (!(await claveIA.obtener())) return null;
   const listado = enunciados.map((e, i) => `${i + 1}. ${e}`).join("\n");
   const datos = extraerJSON(await llamar(
     INSTRUCCIONES_LOTE,
@@ -172,6 +241,14 @@ REGLAS ABSOLUTAS:
 
 /** Reenfoca el resumen del CV hacia una vacante. */
 export async function adaptarAVacante(perfil, vacante) {
+  const delServidor = await porServidor("adaptar", { perfil, vacante });
+  if (delServidor?.adaptacion) {
+    const a = delServidor.adaptacion;
+    return { resumen: a.resumen || [], cambios: (a.cambios || []).slice(0, 5) };
+  }
+  if (delServidor?.agotada) return null;
+
+  if (!(await claveIA.obtener())) return null;
   const partes = [
     `VACANTE: ${vacante.titulo || ""}`,
     `Empresa: ${vacante.empresa || ""}`,

@@ -84,12 +84,16 @@
       <a class="boton texto" href="https://chamba-lista.onrender.com" target="_blank" rel="noopener">Convertir a Harvard</a>
     </div>
 
-    <h3>Clave de IA</h3>
-    <p class="detalle">Gratis en <a href="https://aistudio.google.com/apikey" target="_blank" rel="noopener">Google AI Studio</a>. Se guarda solo en tu navegador. Sin ella funciona igual, con respuestas más simples.</p>
-    <div class="fila">
-      <input type="password" id="clave-ia" placeholder="Pega tu clave">
-      <button class="boton secundario" id="btn-guardar-clave">Guardar</button>
-    </div>
+    <h3>Inteligencia artificial</h3>
+    <p class="detalle" id="estado-cuota">Incluida. No tienes que configurar nada.</p>
+    <details>
+      <summary class="detalle">Usar mi propia clave (opcional)</summary>
+      <p class="detalle">Si tienes una clave gratuita de <a href="https://aistudio.google.com/apikey" target="_blank" rel="noopener">Google AI Studio</a>, puedes usarla y no gastas de tu cuota. Se guarda solo en tu navegador.</p>
+      <div class="fila">
+        <input type="password" id="clave-ia" placeholder="Pega tu clave">
+        <button class="boton secundario" id="btn-guardar-clave">Guardar</button>
+      </div>
+    </details>
 
     <h3>Datos para los formularios</h3>
     <p class="detalle">Opcional. Lo que guardes se rellena solo; lo que no, te lo avisamos al postular.</p>

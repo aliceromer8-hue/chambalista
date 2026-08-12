@@ -4,6 +4,7 @@
 import { NIVELES, CIUDADES } from "../lib/portales.js";
 import * as almacen from "../lib/almacen.js";
 import * as datos from "../lib/datos.js";
+import * as ia from "../lib/ia.js";
 
 const $ = (s) => document.querySelector(s);
 const estado = { vacantes: [], vacanteAbierta: null, reporte: null, respuestasPersona: {}, aprobacion: {} };
@@ -391,7 +392,29 @@ $("#btn-guardar-clave").addEventListener("click", async () => {
   else await almacen.claveIA.borrar();
   $("#clave-ia").value = "";
   $("#clave-ia").placeholder = v ? "Clave guardada ✓" : "Pega tu clave";
+  pintarCuota();
 });
+
+/** Cuánta IA le queda. Con clave propia no se consume nada. */
+async function pintarCuota() {
+  const linea = $("#estado-cuota");
+  if (await almacen.claveIA.obtener()) {
+    linea.textContent = "Usando tu propia clave. No consumes cuota.";
+    return;
+  }
+  const c = await ia.cuota();
+  if (!c) {
+    linea.textContent = "IA incluida. (No se pudo consultar la cuota; si el servicio está dormido, tarda ~30 s en despertar.)";
+    return;
+  }
+  if (!c.servidor_configurado) {
+    linea.textContent = "El servidor aún no tiene IA configurada. Puedes poner tu propia clave abajo.";
+    return;
+  }
+  linea.textContent = c.restantes > 0
+    ? `IA incluida — te quedan ${c.restantes} de ${c.limite} usos en ${c.ventana_horas} h.`
+    : `Sin usos gratis por ahora${c.se_renueva_en_minutos ? `, se renuevan en ${c.se_renueva_en_minutos} min` : ""}. Puedes usar tu propia clave abajo.`;
+}
 
 async function pintarCamposDatos() {
   const guardados = await almacen.datosPersonales.obtener();
@@ -477,4 +500,5 @@ $("#btn-exportar").addEventListener("click", async () => {
 
   await pintarCamposDatos();
   await revisarSesion();
+  pintarCuota();
 })();
