@@ -58,7 +58,7 @@ export const PORTALES = {
       oferta: "article.box_offer[data-id]",
       titulo: "h2 a.js-o-link",
       empresa: "[offer-grid-article-company-url]",
-      ubicacion: "p.fs16.fc_base.mt5 span",
+      ubicacion: "p.fs16.fc_base.mt5:not(.dFlex) span.mr10",
       fecha: "p.fs13.fc_aux",
       yaPostulado: "[applied-offer-tag]:not(.hide)",
       urlPostular: "[data-href-offer-apply]",

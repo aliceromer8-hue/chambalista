@@ -148,3 +148,8 @@ main { padding: 12px 14px 20px; }
 @media (prefers-color-scheme: dark) { .pregunta .aviso-consent { background: #33280F; } }
 .etiq { font-family: var(--mono); font-size: 9px; text-transform: uppercase; background: var(--papel-2); color: var(--lapiz); border-radius: 99px; padding: 1px 6px; }
 .etiq.falta { background: #FFF6E8; color: var(--ambar); }
+
+/* Selección de portales en el buscador */
+.chk-fila { display: flex; align-items: center; gap: 7px; padding: 5px 0; font-size: 12px; cursor: pointer; }
+.chk-fila input { accent-color: var(--pluma); width: 14px; height: 14px; }
+.chk-fila .etiq { margin-left: auto; }

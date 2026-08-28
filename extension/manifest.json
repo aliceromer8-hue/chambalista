@@ -4,27 +4,24 @@
   "version": "0.1.0",
   "description": "Busca vacantes en los portales peruanos, adapta tu CV a cada una y prepara la postulación. Tú das el último clic.",
   "default_locale": "es",
-
   "permissions": [
     "storage",
     "activeTab",
     "scripting"
   ],
-
   "host_permissions": [
-    "https://pe.computrabajo.com/*",
+    "https://api.groq.com/*",
+    "https://bumeran.com.pe/*",
     "https://candidato.pe.computrabajo.com/*",
-    "https://www.bumeran.com.pe/*",
-    "https://pe.indeed.com/*",
     "https://generativelanguage.googleapis.com/*",
-    "https://api.groq.com/*"
+    "https://pe.computrabajo.com/*",
+    "https://pe.indeed.com/*",
+    "https://www.bumeran.com.pe/*"
   ],
-
   "background": {
     "service_worker": "background.js",
     "type": "module"
   },
-
   "action": {
     "default_popup": "popup/popup.html",
     "default_title": "Chamba Lista",
@@ -34,17 +31,40 @@
       "128": "iconos/128.png"
     }
   },
-
   "icons": {
     "16": "iconos/16.png",
     "48": "iconos/48.png",
     "128": "iconos/128.png"
   },
-
   "content_scripts": [
     {
-      "matches": ["https://pe.computrabajo.com/*", "https://candidato.pe.computrabajo.com/*"],
-      "js": ["contenido/comun.js", "contenido/computrabajo.js"],
+      "matches": [
+        "https://pe.computrabajo.com/*",
+        "https://candidato.pe.computrabajo.com/*"
+      ],
+      "js": [
+        "contenido/comun.js",
+        "contenido/computrabajo.js"
+      ],
+      "run_at": "document_idle"
+    },
+    {
+      "matches": [
+        "https://www.bumeran.com.pe/*",
+        "https://bumeran.com.pe/*"
+      ],
+      "js": [
+        "contenido/bumeran.js"
+      ],
+      "run_at": "document_idle"
+    },
+    {
+      "matches": [
+        "https://pe.indeed.com/*"
+      ],
+      "js": [
+        "contenido/indeed.js"
+      ],
       "run_at": "document_idle"
     }
   ]

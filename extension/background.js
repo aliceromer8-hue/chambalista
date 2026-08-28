@@ -75,16 +75,11 @@ async function buscar({ puesto, ciudad, nivel, portales: elegidos }) {
   for (const pid of elegidos?.length ? elegidos : ["computrabajo"]) {
     const portal = PORTALES[pid];
     if (!portal) continue;
-    // Por ahora solo Computrabajo tiene content script; los otros se
-    // añadirán con sus propios selectores.
-    if (pid !== "computrabajo") {
-      errores.push({ portal: portal.nombre, error: "Aún no conectado en la extensión." });
-      continue;
-    }
     try {
       for (let pagina = 1; pagina <= 2; pagina++) {
         const r = await irY(tabId, portal.url(termino, ciudad, pagina), "ofertas");
-        if (r?.sesion === false) {
+        // Solo Computrabajo necesita sesión: los otros listan en público.
+        if (portal.postulable && r?.sesion === false) {
           errores.push({ portal: portal.nombre, error: "Necesitas iniciar sesión." });
           break;
         }
@@ -111,6 +106,18 @@ async function buscar({ puesto, ciudad, nivel, portales: elegidos }) {
 async function prepararUna(vacante, perfil, guardados, respuestasPersona) {
   const tabId = await pestanaDeTrabajo();
   const reporte = { url: vacante.url, completados: [], pendientes: [], preguntas: [], cambiosCV: [] };
+
+  // Bumeran e Indeed aportan vacantes pero no se postula desde aquí:
+  // se abre la oferta para que la persona la complete en el portal.
+  if (vacante.postulable === false) {
+    await chrome.tabs.create({ url: vacante.url, active: true });
+    return {
+      ...reporte,
+      soloLectura: true,
+      nota: `${vacante.portal} no permite postular desde la extensión todavía. `
+          + "Te abrimos la oferta para que postules ahí.",
+    };
+  }
 
   // Detalle de la oferta: sin la descripción, adaptar el CV no tiene con qué.
   if (!vacante.descripcion) {

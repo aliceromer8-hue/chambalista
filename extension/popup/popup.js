@@ -1,7 +1,7 @@
 // Interfaz de la extensión. Solo pinta y recoge decisiones: la lógica
 // vive en background.js y en el content script.
 
-import { NIVELES, CIUDADES } from "../lib/portales.js";
+import { NIVELES, CIUDADES, LISTA_PORTALES } from "../lib/portales.js";
 import * as almacen from "../lib/almacen.js";
 import * as datos from "../lib/datos.js";
 import * as ia from "../lib/ia.js";
@@ -50,6 +50,14 @@ $("#btn-abrir-portal").addEventListener("click", () => enviar({ accion: "abrirCo
 function iniciarBuscador() {
   $("#nivel").innerHTML = NIVELES.map((n) => `<option value="${n.id}">${n.nombre}</option>`).join("");
   $("#ciudades").innerHTML = CIUDADES.map((c) => `<option value="${c}">`).join("");
+
+  // Portales: se buscan los tres a la vez. Solo Computrabajo permite
+  // postular desde aquí; los otros aportan vacantes a la lista.
+  $("#portales").innerHTML = LISTA_PORTALES.map((p) =>
+    `<label class="chk-fila"><input type="checkbox" class="chk-portal" value="${p.id}" checked>` +
+    `<span>${p.nombre}</span>` +
+    `<span class="etiq${p.postulable ? "" : " falta"}">${p.postulable ? "postula" : "solo busca"}</span></label>`,
+  ).join("");
 }
 
 $("#btn-buscar").addEventListener("click", async () => {
@@ -58,12 +66,13 @@ $("#btn-buscar").addEventListener("click", async () => {
   const boton = $("#btn-buscar");
   boton.disabled = true;
   boton.textContent = "Buscando…";
-  $("#resumen-busqueda").textContent = "Recorriendo Computrabajo…";
+  const elegidos = [...document.querySelectorAll(".chk-portal:checked")].map((c) => c.value);
+  $("#resumen-busqueda").textContent = `Recorriendo ${elegidos.length} portal(es)…`;
 
   try {
     const prefs = { puesto, ciudad: $("#ciudad").value.trim(), nivel: $("#nivel").value };
-    await almacen.preferencias.guardar(prefs);
-    const r = await enviar({ accion: "buscar", ...prefs, portales: ["computrabajo"] });
+    await almacen.preferencias.guardar({ ...prefs, portales: elegidos });
+    const r = await enviar({ accion: "buscar", ...prefs, portales: elegidos });
     if (r?.error) throw new Error(r.error);
 
     estado.vacantes = r.vacantes || [];
@@ -103,7 +112,7 @@ function pintarTarjetas() {
 
     const ver = document.createElement("button");
     ver.className = "boton secundario";
-    ver.textContent = "Ver y postular";
+    ver.textContent = v.postulable === false ? "Abrir en el portal" : "Ver y postular";
     ver.style.marginLeft = "auto";
     ver.addEventListener("click", () => abrirVacante(v));
     pie.appendChild(ver);
@@ -132,6 +141,12 @@ function pintarModal() {
   const v = estado.vacanteAbierta;
   const r = estado.reporte || {};
   const c = $("#modal-contenido");
+
+  if (r.soloLectura) {
+    c.innerHTML = `<h3>${v.titulo}</h3><p class="detalle">${v.empresa}</p>` +
+      `<div class="aviso"><p>${r.nota}</p></div>`;
+    return;
+  }
 
   if (r.error || r.requiereLogin || r.captcha) {
     c.innerHTML = `<h3>${v.titulo}</h3><p class="detalle">${v.empresa}</p>` +
