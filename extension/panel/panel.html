@@ -1,0 +1,177 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Chamba Lista — Panel</title>
+<link rel="stylesheet" href="panel.css">
+</head>
+<body>
+
+<header class="cabecera">
+  <span class="marca">
+    <svg width="22" height="24" viewBox="0 0 24 26" fill="none" aria-hidden="true">
+      <rect x="1.5" y="1.5" width="21" height="23" rx="2" stroke="currentColor" stroke-width="1.7"/>
+      <line x1="6" y1="7.5" x2="18" y2="7.5" stroke="currentColor" stroke-width="1.7"/>
+      <line x1="6" y1="12" x2="12" y2="12" stroke="currentColor" stroke-width="1.7"/>
+      <line x1="15" y1="12" x2="18" y2="12" stroke="var(--acento)" stroke-width="1.7"/>
+      <line x1="6" y1="16" x2="12" y2="16" stroke="currentColor" stroke-width="1.7"/>
+      <line x1="15" y1="16" x2="18" y2="16" stroke="var(--acento)" stroke-width="1.7"/>
+    </svg>
+    Chamba Lista
+  </span>
+
+  <nav class="menu" role="tablist">
+    <button class="tab activa" data-vista="inicio" role="tab">Inicio</button>
+    <button class="tab" data-vista="vacantes" role="tab">Vacantes</button>
+    <button class="tab" data-vista="pipeline" role="tab">Postulaciones</button>
+    <button class="tab" data-vista="perfil" role="tab">Mi perfil</button>
+  </nav>
+
+  <span class="estado-sesion" id="estado-sesion">…</span>
+</header>
+
+<main>
+
+  <!-- ══════════ INICIO ══════════ -->
+  <section class="vista" id="vista-inicio">
+
+    <div class="kanban" id="kanban-resumen"></div>
+
+    <div class="rejilla">
+      <article class="tarjeta metricas">
+        <h2>Tu búsqueda</h2>
+        <div class="cifra-grande">
+          <b id="m-semana">—</b>
+          <span>postulaciones esta semana</span>
+        </div>
+        <svg class="grafico" id="grafico" viewBox="0 0 300 70" preserveAspectRatio="none" aria-hidden="true"></svg>
+        <div class="fila-cifras">
+          <div><b id="m-tasa">—</b><span>llegaron a entrevista</span></div>
+          <div><b id="m-entrevistas">—</b><span>entrevistas</span></div>
+        </div>
+      </article>
+
+      <article class="tarjeta">
+        <div class="cabecera-tarjeta">
+          <h2>Últimos movimientos</h2>
+          <button class="enlace" data-ir="pipeline">Ver todas</button>
+        </div>
+        <div id="ultimos"></div>
+      </article>
+    </div>
+
+    <article class="tarjeta">
+      <div class="cabecera-tarjeta">
+        <h2>Vacantes que encajan contigo</h2>
+        <button class="enlace" data-ir="vacantes">Buscar más</button>
+      </div>
+      <div id="destacadas"><p class="vacio">Busca vacantes para verlas aquí.</p></div>
+    </article>
+  </section>
+
+  <!-- ══════════ VACANTES ══════════ -->
+  <section class="vista oculto" id="vista-vacantes">
+    <article class="tarjeta buscador">
+      <div class="fila-busqueda">
+        <input type="text" id="puesto" placeholder="¿Qué puesto buscas? Ej.: practicante de derecho, enfermera, cajero" autocomplete="off">
+        <input type="text" id="ciudad" list="ciudades" placeholder="Ciudad (opcional)" autocomplete="off">
+        <datalist id="ciudades"></datalist>
+        <select id="nivel"></select>
+        <button class="boton primario" id="btn-buscar">Buscar</button>
+      </div>
+      <div class="fila-portales" id="portales"></div>
+      <p class="nota" id="resumen-busqueda"></p>
+    </article>
+
+    <div class="barra-acciones oculto" id="acciones-lote">
+      <span class="nota" id="cuenta-marcadas"></span>
+      <button class="boton secundario" id="btn-lote-revisar">Preparar las marcadas</button>
+      <button class="boton peligro" id="btn-lote-auto">Postular a todas…</button>
+    </div>
+
+    <div class="riesgo oculto" id="bloque-riesgo">
+      <p><strong>⚠️ Esto se envía sin que lo revises.</strong> Marca cada punto solo si lo entiendes.</p>
+      <div id="casillas"></div>
+      <div class="fila-botones">
+        <button class="boton secundario" id="btn-cancelar-auto">Mejor no</button>
+        <button class="boton peligro" id="btn-confirmar-auto" disabled>Entiendo los riesgos, postular</button>
+      </div>
+    </div>
+
+    <div class="oculto" id="progreso">
+      <p class="nota" id="texto-progreso"></p>
+      <div class="barra"><div id="relleno"></div></div>
+      <button class="enlace" id="btn-cancelar-lote">Cancelar tanda</button>
+    </div>
+
+    <div class="rejilla-vacantes" id="lista-vacantes"></div>
+  </section>
+
+  <!-- ══════════ PIPELINE ══════════ -->
+  <section class="vista oculto" id="vista-pipeline">
+    <div class="cabecera-vista">
+      <h2>Tus postulaciones</h2>
+      <button class="enlace" id="btn-exportar">Exportar CSV</button>
+    </div>
+    <p class="nota">Arrastra una tarjeta a otra columna, o usa el menú de cada una, para llevar el seguimiento.</p>
+    <div class="columnas" id="columnas"></div>
+  </section>
+
+  <!-- ══════════ PERFIL ══════════ -->
+  <section class="vista oculto" id="vista-perfil">
+    <div class="rejilla">
+      <article class="tarjeta">
+        <h2>Tu CV</h2>
+        <p class="nota" id="estado-perfil">Sin CV cargado.</p>
+        <div id="resumen-cv"></div>
+        <div class="fila-botones">
+          <input type="file" id="archivo-cv" accept=".pdf,.docx,.doc,.txt" hidden>
+          <button class="boton primario" id="btn-cargar-cv">Cargar CV</button>
+          <a class="boton secundario" id="enlace-harvard" href="https://chamba-lista.onrender.com" target="_blank" rel="noopener">Ver en formato Harvard</a>
+        </div>
+      </article>
+
+      <article class="tarjeta">
+        <h2>Portales</h2>
+        <p class="nota">Tu sesión la abres tú. La extensión nunca ve tu contraseña.</p>
+        <div id="lista-portales"></div>
+
+        <h2 style="margin-top:22px">Inteligencia artificial</h2>
+        <p class="nota" id="estado-cuota">Incluida. No tienes que configurar nada.</p>
+        <details>
+          <summary class="nota">Usar mi propia clave (opcional)</summary>
+          <p class="nota">Clave gratuita en <a href="https://aistudio.google.com/apikey" target="_blank" rel="noopener">Google AI Studio</a>. Se guarda solo en tu navegador y no consume cuota.</p>
+          <div class="fila-botones">
+            <input type="password" id="clave-ia" placeholder="Pega tu clave">
+            <button class="boton secundario" id="btn-guardar-clave">Guardar</button>
+          </div>
+        </details>
+      </article>
+    </div>
+
+    <article class="tarjeta">
+      <h2>Datos para llenar formularios</h2>
+      <p class="nota">Los portales piden esto y no está en tu CV. Lo que guardes se rellena solo; lo que no, te lo avisamos al postular. <strong>Todo es opcional</strong> y vive únicamente en tu navegador.</p>
+      <div class="rejilla-datos" id="campos-datos"></div>
+      <div class="fila-botones">
+        <button class="boton primario" id="btn-guardar-datos">Guardar</button>
+        <button class="enlace" id="btn-borrar-datos">Borrar todos</button>
+      </div>
+      <p class="nota" id="estado-datos"></p>
+    </article>
+  </section>
+
+</main>
+
+<!-- Detalle de una vacante -->
+<div class="modal oculto" id="modal">
+  <div class="caja">
+    <button class="cerrar" id="btn-cerrar-modal" aria-label="Cerrar">×</button>
+    <div id="modal-contenido"></div>
+  </div>
+</div>
+
+<script type="module" src="panel.js"></script>
+</body>
+</html>

@@ -23,7 +23,6 @@
     "type": "module"
   },
   "action": {
-    "default_popup": "popup/popup.html",
     "default_title": "Chamba Lista",
     "default_icon": {
       "16": "iconos/16.png",

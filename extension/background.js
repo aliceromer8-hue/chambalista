@@ -350,3 +350,20 @@ chrome.runtime.onMessage.addListener((msg, _e, responder) => {
   })();
   return true;
 });
+
+
+// ---------------------------------------------------------------------
+// El icono de la extensión abre el panel en su propia pestaña.
+// Si ya está abierto, se trae al frente en vez de duplicarlo.
+// ---------------------------------------------------------------------
+const URL_PANEL = chrome.runtime.getURL("panel/panel.html");
+
+chrome.action.onClicked.addListener(async () => {
+  const abiertas = await chrome.tabs.query({ url: URL_PANEL });
+  if (abiertas.length) {
+    await chrome.tabs.update(abiertas[0].id, { active: true });
+    await chrome.windows.update(abiertas[0].windowId, { focused: true });
+  } else {
+    await chrome.tabs.create({ url: URL_PANEL });
+  }
+});
