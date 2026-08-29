@@ -61,6 +61,20 @@
       </div>
     </section>
 
+    <!-- Lo que hace la web sola. Es la promesa del producto puesta en
+         términos de trabajo que la persona NO tiene que hacer. -->
+    <section class="hace" id="hace">
+      <h2 class="titulo-seccion">Lo hace la web</h2>
+      <ol class="cadena">
+        <li><span class="paso-num">01</span><b>Busca</b><span>en cuatro portales a la vez</span></li>
+        <li><span class="paso-num">02</span><b>Ordena</b><span>por lo que encaja con tu CV</span></li>
+        <li><span class="paso-num">03</span><b>Adapta</b><span>tu CV a cada vacante</span></li>
+        <li><span class="paso-num">04</span><b>Llena</b><span>el formulario del portal</span></li>
+        <li><span class="paso-num">05</span><b>Redacta</b><span>las preguntas desde tu CV</span></li>
+      </ol>
+      <p class="tuyo"><span class="marca-tuyo">Lo tuyo</span> es dar el sí. Nada se envía sin que lo confirmes.</p>
+    </section>
+
     <div id="arranque" class="oculto"></div>
 
     <div class="kanban" id="kanban-resumen"></div>
@@ -129,8 +143,9 @@
     </div>
 
     <div class="oculto" id="progreso">
-      <p class="nota" id="texto-progreso"></p>
+      <div class="consola" id="consola" role="status" aria-live="polite"></div>
       <div class="barra"><div id="relleno"></div></div>
+      <p class="nota" id="texto-progreso"></p>
       <button class="enlace" id="btn-cancelar-lote">Cancelar tanda</button>
     </div>
 

@@ -571,3 +571,100 @@ select:focus-visible, textarea:focus-visible, [draggable]:focus-visible {
   .portada-arte, .portada.compacta .portada-arte { display: none; }
   .portada.compacta { grid-template-columns: 1fr; }
 }
+
+/* ══════════════════════════════════════════════════════════════
+   FUERA DEL PATRÓN SaaS
+   El look de tarjetas blancas flotando sobre gris es el de Shopify o
+   ManyChat. Aquí el papel es la página: las secciones se separan con
+   reglas de tinta, no con cajas, y el peso lo lleva la tipografía.
+   Solo se encajona lo que de verdad es una unidad manipulable —una
+   vacante, una ficha del tablero—, porque ahí la caja significa algo.
+   ══════════════════════════════════════════════════════════════ */
+body { background: var(--papel); }
+main { max-width: 1120px; }
+
+/* Las tarjetas dejan de ser cajas y pasan a ser secciones con regla. */
+.tarjeta {
+  background: none; border: none; border-radius: 0;
+  box-shadow: none; padding: 26px 0 4px;
+  border-top: 2px solid var(--tinta); margin-bottom: 0;
+}
+.rejilla { gap: 0 40px; }
+@media (min-width: 881px) { .rejilla > .tarjeta + .tarjeta { border-left: none; padding-left: 0; } }
+
+.titulo-seccion {
+  font-family: var(--mono); font-size: 11px; font-weight: 800;
+  text-transform: uppercase; letter-spacing: .16em;
+  color: var(--tinta-2); margin: 0 0 16px;
+}
+
+/* Cifras del embudo: sin caja, separadas por reglas verticales. */
+.kanban {
+  gap: 0; border-top: 2px solid var(--tinta); border-bottom: 2px solid var(--tinta);
+  margin-bottom: 0; padding: 0;
+}
+.etapa {
+  background: none; border: none; border-radius: 0; box-shadow: none;
+  padding: 18px 18px 16px; border-right: 2px solid var(--tinta);
+}
+.etapa:last-child { border-right: none; }
+.etapa::before { height: 4px; inset: 0 auto auto 0; width: 34px; top: 0; }
+.etapa b { font-size: 2.6rem; margin-top: 12px; }
+@media (max-width: 880px) {
+  .etapa:nth-child(2n) { border-right: none; }
+  .etapa { border-bottom: 2px solid var(--tinta); }
+}
+
+/* ── Lo hace la web: la promesa, en tipografía ── */
+.hace { border-top: 2px solid var(--tinta); padding: 30px 0 6px; }
+.cadena { list-style: none; margin: 0; padding: 0; display: grid; gap: 0; }
+.cadena li {
+  display: flex; align-items: baseline; gap: 16px;
+  padding: 13px 0; border-bottom: 1px solid var(--papel-3);
+}
+.cadena li:last-child { border-bottom: none; }
+.paso-num {
+  font-family: var(--mono); font-size: 11px; font-weight: 800;
+  color: var(--tinta-2); width: 26px; flex-shrink: 0;
+}
+.cadena b { font-size: 1.45rem; font-weight: 900; letter-spacing: -.035em; width: 130px; flex-shrink: 0; }
+.cadena li > span:last-child { font-size: 14px; color: var(--tinta-2); font-weight: 600; }
+@media (max-width: 620px) {
+  .cadena b { width: auto; font-size: 1.2rem; }
+  .cadena li { flex-wrap: wrap; gap: 8px; }
+}
+.tuyo { margin: 20px 0 0; font-size: 15px; font-weight: 700; }
+.marca-tuyo {
+  background: var(--lima); color: #131316; padding: 2px 10px;
+  border: 2px solid var(--tinta); border-radius: 99px; font-size: 13px;
+  font-weight: 800; margin-right: 6px; display: inline-block;
+}
+
+/* ── Consola: la máquina narra lo que va haciendo ── */
+.consola {
+  font-family: var(--mono); font-size: 12.5px; line-height: 1.7;
+  background: var(--tinta); color: var(--papel);
+  border-radius: var(--r-chico); padding: 16px 18px;
+  max-height: 168px; overflow-y: auto; margin-bottom: 14px;
+}
+.consola p { margin: 0; display: flex; gap: 9px; }
+.consola .marca-linea { color: var(--lima); flex-shrink: 0; }
+.consola .apagado { opacity: .45; }
+.consola p:last-child .marca-linea::after {
+  content: "▋"; animation: latir 1s steps(2) infinite; margin-left: 2px;
+}
+@keyframes latir { 50% { opacity: 0; } }
+@media (prefers-reduced-motion: reduce) { .consola p:last-child .marca-linea::after { animation: none; } }
+
+/* La barra de progreso, más presente: es la señal de que algo trabaja. */
+.barra { height: 18px; border-width: 2px; }
+
+/* El buscador deja de ser una caja de color y pasa a ser una franja. */
+.buscador {
+  background: none; border: none; border-top: 2px solid var(--tinta);
+  border-bottom: 2px solid var(--tinta); border-radius: 0;
+  box-shadow: none; padding: 22px 0; margin-bottom: 22px;
+}
+
+/* Vista de perfil y pipeline: las secciones respiran sin cajas. */
+.cabecera-vista { padding-bottom: 12px; border-bottom: 2px solid var(--tinta); margin-bottom: 14px; }

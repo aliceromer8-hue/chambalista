@@ -23,6 +23,35 @@ const estado = {
 // «Iniciar sesión»; el resto de la interfaz lo lee de aquí.
 let sesionesCache = [];
 
+/**
+ * Consola de actividad: la máquina cuenta lo que va haciendo.
+ *
+ * No es decoración. Buscar en cuatro portales y preparar una tanda tarda
+ * minutos, y sin esto la persona ve una barra avanzar sin saber qué pasa
+ * ni por qué tarda. Narrarlo es lo que hace que se entienda que el
+ * trabajo lo está haciendo la web y no ella.
+ */
+const consola = {
+  lineas: [],
+  escribir(texto, definitiva = false) {
+    const c = $("#consola");
+    if (!c) return;
+    // La última línea se reemplaza mientras la etapa sigue en curso.
+    if (!definitiva && this.lineas.length && this.lineas.at(-1).viva) {
+      this.lineas.at(-1).texto = texto;
+    } else {
+      this.lineas.push({ texto, viva: !definitiva });
+    }
+    if (definitiva && this.lineas.length) this.lineas.at(-1).viva = false;
+    this.lineas = this.lineas.slice(-8);
+    c.innerHTML = this.lineas.map((l, i) =>
+      `<p class="${i < this.lineas.length - 1 ? "apagado" : ""}">` +
+      `<span class="marca-linea">›</span><span>${escapar(l.texto)}</span></p>`).join("");
+    c.scrollTop = c.scrollHeight;
+  },
+  limpiar() { this.lineas = []; const c = $("#consola"); if (c) c.innerHTML = ""; },
+};
+
 /** Aviso flotante. Antes las acciones se completaban en silencio y no
  *  quedaba claro si habían funcionado. */
 function avisar(texto, tipo = "") {
@@ -101,14 +130,16 @@ function pintarPortada(resumen) {
   const etapa = !estado.perfil ? 1 : !conectados.length ? 2 : 3;
 
   portada.classList.toggle("compacta", etapa === 3);
+  // La promesa solo hace falta mientras no la haya comprobado.
+  $("#hace").classList.toggle("oculto", etapa === 3 && resumen.total > 0);
   tablero.classList.toggle("esperando", etapa !== 3);
   $("#arranque").classList.add("oculto");
 
   if (etapa === 1) {
-    $("#portada-titulo").innerHTML = "Un clic.<br>Treinta postulaciones.";
+    $("#portada-titulo").innerHTML = "Tú subes el CV.<br>Lo demás lo hace la web.";
     $("#portada-bajada").textContent =
-      "Sube tu CV, elige dónde buscar y postula a todo lo que encaje contigo. " +
-      "Tú das el último clic, siempre.";
+      "Busca en cuatro portales, adapta tu CV a cada vacante, llena los formularios y "
+      + "redacta las respuestas. Tú solo das el sí antes de que salga.";
     acciones.innerHTML =
       `<button class="boton oscuro" id="p-cv">Empezar con mi CV</button>` +
       `<span class="nota" style="opacity:.7">PDF o Word · toma unos segundos</span>`;
@@ -120,8 +151,8 @@ function pintarPortada(resumen) {
     const nombre = (estado.perfil.nombre || "").split(" ")[0];
     $("#portada-titulo").innerHTML = `Listo${nombre ? `, ${escapar(nombre)}` : ""}.<br>¿Dónde buscamos?`;
     $("#portada-bajada").textContent =
-      "Inicia sesión en los portales donde quieras que busque. Lo haces tú, en tu navegador: " +
-      "nunca vemos tu contraseña.";
+      "Conecta los portales una vez y ya no vuelves a entrar. La sesión la abres tú, "
+      + "en tu navegador: nunca vemos tu contraseña.";
     acciones.innerHTML = `<div class="portales-portada" style="width:100%">${
       sesionesCache.map((p) => `
         <div class="portal-tarjeta">
@@ -153,7 +184,8 @@ function pintarPortada(resumen) {
   $("#portada-bajada").textContent = cuantas
     ? `${resumen.entrevistas} en entrevista · ${conectados.length} ${conectados.length === 1 ? "portal conectado" : "portales conectados"}`
     : `${conectados.length} ${conectados.length === 1 ? "portal conectado" : "portales conectados"}. Escribe el puesto que buscas y empezamos.`;
-  acciones.innerHTML = `<button class="boton oscuro" id="p-buscar">Buscar vacantes</button>`;
+  acciones.innerHTML = `<button class="boton oscuro" id="p-buscar">Buscar y postular</button>`
+    + `<span class="nota" style="opacity:.7">La web hace el resto</span>`;
   $("#p-buscar").addEventListener("click", () => irA("vacantes"));
   $("#sello").innerHTML = `${resumen.porEtapa.enviada || 0}<small>enviadas</small>`;
 }
@@ -256,7 +288,15 @@ $("#btn-buscar").addEventListener("click", async () => {
   boton.disabled = true;
   boton.textContent = "Buscando…";
   const elegidos = [...document.querySelectorAll(".chk-p:checked")].map((c) => c.value);
-  $("#resumen-busqueda").textContent = `Recorriendo ${elegidos.length} portal(es)… puede tardar unos segundos.`;
+  $("#progreso").classList.remove("oculto");
+  consola.limpiar();
+  consola.escribir(`Buscando «${puesto}»…`, true);
+  elegidos.forEach((id) => {
+    const p = LISTA_PORTALES.find((x) => x.id === id);
+    if (p) consola.escribir(`Entrando a ${p.nombre}…`, true);
+  });
+  $("#relleno").style.width = "35%";
+  $("#resumen-busqueda").textContent = "";
   // Esqueletos: recorrer los portales tarda, y una pantalla en blanco
   // durante 10 segundos se siente como que algo se rompió.
   $("#lista-vacantes").innerHTML = Array.from({ length: 6 },
@@ -285,6 +325,11 @@ $("#btn-buscar").addEventListener("click", async () => {
       conectarTarjetas($("#lista-vacantes"));
     }
     actualizarCuenta();
+
+    $("#relleno").style.width = "100%";
+    consola.escribir(`${estado.vacantes.length} vacantes encontradas.`, true);
+    if (estado.perfil) consola.escribir("Ordenadas por lo que encaja con tu CV.", true);
+    setTimeout(() => $("#progreso").classList.add("oculto"), 1400);
 
     const fallos = (r.errores || []).map((e) => `${e.portal}: ${e.error}`).join(" · ");
     $("#resumen-busqueda").textContent =
@@ -484,12 +529,17 @@ $("#btn-confirmar-auto").addEventListener("click", () => {
 });
 
 async function arrancarLote(modo) {
+  consola.limpiar();
   const marcadas = [...$("#lista-vacantes").querySelectorAll(".vacante")]
     .filter((el) => el.querySelector(".chk-v")?.checked)
     .map((el) => estado.vacantes.find((v) => v.id === el.dataset.id))
     .filter(Boolean);
   if (!marcadas.length) return;
 
+  consola.escribir(
+    modo === "automatico"
+      ? `Postulando a ${marcadas.length} vacantes. No tienes que hacer nada.`
+      : `Preparando ${marcadas.length} vacantes. Nada se envía todavía.`, true);
   await enviar({
     accion: "lotePreparar", vacantes: marcadas, modo,
     aprobacion: estado.aprobacion, respuestasPersona: estado.respuestasPersona,
@@ -504,8 +554,21 @@ function seguirLote() {
   temporizador = setInterval(async () => {
     const s = await enviar({ accion: "loteEstado" });
     if (!s) return;
-    $("#texto-progreso").textContent = `${s.mensaje} (${s.hechas}/${s.total})`;
+    $("#texto-progreso").textContent = `${s.hechas} de ${s.total}`;
     $("#relleno").style.width = s.total ? `${Math.round((s.hechas / s.total) * 100)}%` : "0";
+
+    // Se narra cada vacante conforme se resuelve, con su desenlace.
+    const hechos = (s.items || []).filter((i) => i.estado !== "pendiente");
+    hechos.slice(consola.lineas.length ? undefined : 0).forEach(() => {});
+    const yaContadas = consola.lineas.filter((l) => l.contada).length;
+    hechos.slice(yaContadas).forEach((i) => {
+      const desenlace = {
+        enviada: "enviada ✓", preparada: "lista para revisar",
+        omitida: "omitida", fallida: "no se pudo",
+      }[i.estado] || i.estado;
+      consola.escribir(`${i.empresa || i.titulo} — ${desenlace}`, true);
+      if (consola.lineas.at(-1)) consola.lineas.at(-1).contada = true;
+    });
     if (s.fase === "listo" || s.fase === "terminado") {
       clearInterval(temporizador);
       $("#progreso").classList.add("oculto");
