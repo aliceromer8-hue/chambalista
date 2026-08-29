@@ -64,15 +64,14 @@
     <!-- Lo que hace la web sola. Es la promesa del producto puesta en
          términos de trabajo que la persona NO tiene que hacer. -->
     <section class="hace" id="hace">
-      <h2 class="titulo-seccion">Lo hace la web</h2>
+      <h2 class="titulo-seccion">Treinta postulaciones mientras tomas desayuno</h2>
       <ol class="cadena">
-        <li><span class="paso-num">01</span><b>Busca</b><span>en cuatro portales a la vez</span></li>
-        <li><span class="paso-num">02</span><b>Ordena</b><span>por lo que encaja con tu CV</span></li>
-        <li><span class="paso-num">03</span><b>Adapta</b><span>tu CV a cada vacante</span></li>
-        <li><span class="paso-num">04</span><b>Llena</b><span>el formulario del portal</span></li>
-        <li><span class="paso-num">05</span><b>Redacta</b><span>las preguntas desde tu CV</span></li>
+        <li class="entra entra-1"><span class="paso-num">01</span><b>Encuentra</b><span>Barre cuatro portales a la vez y trae todo lo que salió hoy</span></li>
+        <li class="entra entra-2"><span class="paso-num">02</span><b>Descarta</b><span>Deja arriba lo que va contigo y hunde lo que no</span></li>
+        <li class="entra entra-3"><span class="paso-num">03</span><b>Postula</b><span>Abre la vacante, llena el formulario y contesta sus preguntas</span></li>
+        <li class="entra entra-4"><span class="paso-num">04</span><b>Repite</b><span>Una tras otra, sin que vuelvas a escribir lo mismo</span></li>
       </ol>
-      <p class="tuyo"><span class="marca-tuyo">Lo tuyo</span> es dar el sí. Nada se envía sin que lo confirmes.</p>
+      <p class="tuyo"><span class="marca-tuyo">Lo tuyo</span> es leer y decir que sí. Dos segundos por vacante, y nada sale sin tu visto bueno.</p>
     </section>
 
     <div id="arranque" class="oculto"></div>
@@ -116,6 +115,9 @@
   <!-- ══════════ VACANTES ══════════ -->
   <section class="vista oculto" id="vista-vacantes">
     <article class="tarjeta buscador">
+      <p class="pista"><strong>Escribe el puesto como lo dirías tú.</strong>
+        Enfermera, cajero, practicante de derecho, chef, lo que sea: cualquier rubro sirve.
+        Deja la ciudad vacía si te da igual dónde.</p>
       <div class="fila-busqueda">
         <input type="text" id="puesto" placeholder="¿Qué puesto buscas? Ej.: practicante de derecho, enfermera, cajero" autocomplete="off">
         <input type="text" id="ciudad" list="ciudades" placeholder="Ciudad (opcional)" autocomplete="off">
@@ -158,7 +160,9 @@
       <h2>Tus postulaciones</h2>
       <button class="enlace" id="btn-exportar">Exportar CSV</button>
     </div>
-    <p class="nota">Arrastra una tarjeta a otra columna, o usa el menú de cada una, para llevar el seguimiento.</p>
+    <p class="pista"><strong>Aquí sabes en qué va cada una sin abrir el correo.</strong>
+      Cuando una empresa te escriba, arrastra su tarjeta a «Entrevista». Si te dicen que no,
+      a «Descartada». Así ves de un vistazo cuántas siguen vivas.</p>
     <div class="columnas" id="columnas"></div>
   </section>
 
@@ -167,6 +171,8 @@
     <div class="rejilla">
       <article class="tarjeta">
         <h2>Tu CV</h2>
+        <p class="pista">Se lee una vez y sirve para todas las postulaciones.
+          Para cada vacante se reordena solo, resaltando lo que esa empresa pide.</p>
         <p class="nota" id="estado-perfil">Sin CV cargado.</p>
         <div id="resumen-cv"></div>
         <div class="fila-botones">

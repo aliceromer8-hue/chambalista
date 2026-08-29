@@ -136,13 +136,13 @@ function pintarPortada(resumen) {
   $("#arranque").classList.add("oculto");
 
   if (etapa === 1) {
-    $("#portada-titulo").innerHTML = "Tú subes el CV.<br>Lo demás lo hace la web.";
+    $("#portada-titulo").innerHTML = "Postula a treinta<br>sin escribir ninguna.";
     $("#portada-bajada").textContent =
-      "Busca en cuatro portales, adapta tu CV a cada vacante, llena los formularios y "
-      + "redacta las respuestas. Tú solo das el sí antes de que salga.";
+      "Sube tu CV una vez. Desde ahí la web busca, llena formularios y contesta las "
+      + "preguntas de cada empresa. Tú solo lees y dices que sí.";
     acciones.innerHTML =
-      `<button class="boton oscuro" id="p-cv">Empezar con mi CV</button>` +
-      `<span class="nota" style="opacity:.7">PDF o Word · toma unos segundos</span>`;
+      `<button class="boton primario" id="p-cv">Subir mi CV y empezar</button>` +
+      `<span class="nota">PDF o Word · listo en unos segundos</span>`;
     $("#p-cv").addEventListener("click", () => { irA("perfil"); $("#archivo-cv").click(); });
     return;
   }
@@ -151,8 +151,8 @@ function pintarPortada(resumen) {
     const nombre = (estado.perfil.nombre || "").split(" ")[0];
     $("#portada-titulo").innerHTML = `Listo${nombre ? `, ${escapar(nombre)}` : ""}.<br>¿Dónde buscamos?`;
     $("#portada-bajada").textContent =
-      "Conecta los portales una vez y ya no vuelves a entrar. La sesión la abres tú, "
-      + "en tu navegador: nunca vemos tu contraseña.";
+      "Marca dónde quieres que busque. Entras una vez a cada uno y ya no vuelves a hacerlo: "
+      + "la sesión queda en tu navegador y nunca vemos tu contraseña.";
     acciones.innerHTML = `<div class="portales-portada" style="width:100%">${
       sesionesCache.map((p) => `
         <div class="portal-tarjeta">
@@ -177,15 +177,16 @@ function pintarPortada(resumen) {
 
   // Etapa 3: ya está todo listo. La portada resume y deja pasar.
   const cuantas = resumen.total;
+  const nombreCorto = (estado.perfil?.nombre || "").split(" ")[0];
   $("#portada-titulo").textContent = cuantas
     // «postulación» pierde la tilde en plural: no se puede pegar «es».
-    ? `${cuantas} ${cuantas === 1 ? "postulación" : "postulaciones"} hasta ahora`
-    : "Todo listo. A buscar.";
+    ? `Llevas ${cuantas} ${cuantas === 1 ? "postulación" : "postulaciones"}`
+    : `Todo listo${nombreCorto ? `, ${nombreCorto}` : ""}. ¿Qué buscamos hoy?`;
   $("#portada-bajada").textContent = cuantas
     ? `${resumen.entrevistas} en entrevista · ${conectados.length} ${conectados.length === 1 ? "portal conectado" : "portales conectados"}`
     : `${conectados.length} ${conectados.length === 1 ? "portal conectado" : "portales conectados"}. Escribe el puesto que buscas y empezamos.`;
-  acciones.innerHTML = `<button class="boton oscuro" id="p-buscar">Buscar y postular</button>`
-    + `<span class="nota" style="opacity:.7">La web hace el resto</span>`;
+  acciones.innerHTML = `<button class="boton primario" id="p-buscar">Buscar y postular</button>`
+    + `<span class="nota">Ponle el puesto y déjala trabajando</span>`;
   $("#p-buscar").addEventListener("click", () => irA("vacantes"));
   $("#sello").innerHTML = `${resumen.porEtapa.enviada || 0}<small>enviadas</small>`;
 }
@@ -193,6 +194,19 @@ function pintarPortada(resumen) {
 /** Línea de los últimos 14 días. Sin librerías: es un path y punto. */
 function dibujarGrafico(serie) {
   const svg = $("#grafico");
+
+  // Sin ninguna postulación, una línea plana pegada al suelo parece un
+  // error. Mejor decir que todavía no hay nada que graficar.
+  if (!serie.some((v) => v > 0)) {
+    svg.innerHTML =
+      `<line x1="0" y1="60" x2="300" y2="60" stroke="var(--linea)" ` +
+      `stroke-width="1.5" stroke-dasharray="4 5"/>` +
+      `<text x="150" y="34" text-anchor="middle" fill="var(--tinta-3)" ` +
+      `font-size="12" font-family="system-ui, sans-serif">` +
+      `Tus postulaciones aparecerán aquí</text>`;
+    return;
+  }
+
   const max = Math.max(1, ...serie);
   const puntos = serie.map((v, i) => [
     (i / (serie.length - 1)) * 300,
@@ -204,12 +218,12 @@ function dibujarGrafico(serie) {
 
   svg.innerHTML =
     `<defs><linearGradient id="g" x1="0" y1="0" x2="0" y2="1">` +
-    `<stop offset="0%" stop-color="var(--neon)" stop-opacity=".3"/>` +
-    `<stop offset="100%" stop-color="var(--neon)" stop-opacity="0"/></linearGradient></defs>` +
+    `<stop offset="0%" stop-color="var(--acento)" stop-opacity=".3"/>` +
+    `<stop offset="100%" stop-color="var(--acento)" stop-opacity="0"/></linearGradient></defs>` +
     `<path d="${area}" fill="url(#g)"/>` +
-    `<path d="${linea}" fill="none" stroke="var(--neon)" stroke-width="2" ` +
+    `<path d="${linea}" fill="none" stroke="var(--acento)" stroke-width="2" ` +
     `stroke-linejoin="round" stroke-linecap="round" vector-effect="non-scaling-stroke"/>` +
-    `<circle cx="${ux.toFixed(1)}" cy="${uy.toFixed(1)}" r="4.5" fill="var(--neon)"/>`;
+    `<circle cx="${ux.toFixed(1)}" cy="${uy.toFixed(1)}" r="4.5" fill="var(--acento)"/>`;
 }
 
 function pintarDestacadas() {
@@ -239,7 +253,8 @@ function tarjetaVacante(v, i) {
   const etiquetas = (e.coincidencias || []).slice(0, 5)
     .map((c) => `<span class="etiqueta">${escapar(c)}</span>`).join("");
 
-  return `<article class="vacante marcada" data-id="${escapar(v.id)}">
+  const retardo = Math.min(i || 0, 8) * 45;
+  return `<article class="vacante marcada" data-id="${escapar(v.id)}" style="animation-delay:${retardo}ms">
     <div class="arriba">
       <input type="checkbox" class="chk-v" checked>
       <div style="flex:1;min-width:0">
