@@ -204,12 +204,12 @@ function dibujarGrafico(serie) {
 
   svg.innerHTML =
     `<defs><linearGradient id="g" x1="0" y1="0" x2="0" y2="1">` +
-    `<stop offset="0%" stop-color="var(--lima)" stop-opacity=".22"/>` +
-    `<stop offset="100%" stop-color="var(--lima)" stop-opacity="0"/></linearGradient></defs>` +
+    `<stop offset="0%" stop-color="var(--neon)" stop-opacity=".3"/>` +
+    `<stop offset="100%" stop-color="var(--neon)" stop-opacity="0"/></linearGradient></defs>` +
     `<path d="${area}" fill="url(#g)"/>` +
-    `<path d="${linea}" fill="none" stroke="var(--tinta)" stroke-width="2.5" ` +
+    `<path d="${linea}" fill="none" stroke="var(--neon)" stroke-width="2" ` +
     `stroke-linejoin="round" stroke-linecap="round" vector-effect="non-scaling-stroke"/>` +
-    `<circle cx="${ux.toFixed(1)}" cy="${uy.toFixed(1)}" r="4.5" fill="var(--lima)" stroke="var(--tinta)" stroke-width="2"/>`;
+    `<circle cx="${ux.toFixed(1)}" cy="${uy.toFixed(1)}" r="4.5" fill="var(--neon)"/>`;
 }
 
 function pintarDestacadas() {
