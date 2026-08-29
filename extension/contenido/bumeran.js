@@ -56,6 +56,15 @@
     });
   }
 
+  // Sesión: cuando NO hay, Bumeran muestra el enlace /login («Ingresar»).
+  // Verificado contra el sitio real. La detección es por ausencia, así
+  // que primero hay que confirmar que la página cargó de verdad; si no,
+  // una página en blanco diría «sesión abierta» en falso.
+  function haySesion() {
+    if (!document.querySelector("footer, a[href*='/empleos'], header")) return false;
+    return !document.querySelector("a[href='/login'], a[href*='/login?']");
+  }
+
   function leerDetalle() {
     const texto = (s) => {
       const e = document.querySelector(s);
@@ -75,8 +84,9 @@
 
   chrome.runtime.onMessage.addListener((msg, _e, responder) => {
     try {
-      if (msg.accion === "ping") responder({ ok: true, url: location.href, sesion: true });
-      else if (msg.accion === "ofertas") responder({ ofertas: leerOfertas(), sesion: true });
+      if (msg.accion === "ping") responder({ ok: true, url: location.href, sesion: haySesion() });
+      else if (msg.accion === "sesion") responder({ sesion: haySesion() });
+      else if (msg.accion === "ofertas") responder({ ofertas: leerOfertas(), sesion: haySesion() });
       else if (msg.accion === "detalle") responder(leerDetalle());
       else responder({ error: "Bumeran solo permite buscar por ahora." });
     } catch (e) {

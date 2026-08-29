@@ -40,6 +40,13 @@
     }).filter((o) => o.titulo && o.url);
   }
 
+  // Sesión: sin ella Indeed muestra el enlace a secure.indeed.com/auth.
+  // Verificado contra el sitio real.
+  function haySesion() {
+    if (!document.querySelector("footer, #jobsearch, [data-testid], header")) return false;
+    return !document.querySelector("a[href*='secure.indeed.com/auth'], a[href*='account/login']");
+  }
+
   function leerDetalle() {
     return {
       titulo: texto(document, "h1, [data-testid='jobsearch-JobInfoHeader-title']"),
@@ -52,8 +59,9 @@
 
   chrome.runtime.onMessage.addListener((msg, _e, responder) => {
     try {
-      if (msg.accion === "ping") responder({ ok: true, url: location.href, sesion: true });
-      else if (msg.accion === "ofertas") responder({ ofertas: leerOfertas(), sesion: true });
+      if (msg.accion === "ping") responder({ ok: true, url: location.href, sesion: haySesion() });
+      else if (msg.accion === "sesion") responder({ sesion: haySesion() });
+      else if (msg.accion === "ofertas") responder({ ofertas: leerOfertas(), sesion: haySesion() });
       else if (msg.accion === "detalle") responder(leerDetalle());
       else responder({ error: "Indeed solo permite buscar por ahora." });
     } catch (e) {

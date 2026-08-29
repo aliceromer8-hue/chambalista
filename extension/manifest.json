@@ -16,7 +16,8 @@
     "https://generativelanguage.googleapis.com/*",
     "https://pe.computrabajo.com/*",
     "https://pe.indeed.com/*",
-    "https://www.bumeran.com.pe/*"
+    "https://www.bumeran.com.pe/*",
+    "https://www.linkedin.com/*"
   ],
   "background": {
     "service_worker": "background.js",
@@ -63,6 +64,15 @@
       ],
       "js": [
         "contenido/indeed.js"
+      ],
+      "run_at": "document_idle"
+    },
+    {
+      "matches": [
+        "https://www.linkedin.com/*"
+      ],
+      "js": [
+        "contenido/linkedin.js"
       ],
       "run_at": "document_idle"
     }

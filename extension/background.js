@@ -336,6 +336,35 @@ chrome.runtime.onMessage.addListener((msg, _e, responder) => {
           return responder({ cancelado: true });
         case "consentimiento":
           return responder({ casillas: CONSENTIMIENTO, tope: TOPE_POR_TANDA });
+        case "sesionPortales": {
+          // Estado de los cuatro portales, en paralelo. Se consulta en
+          // las pestañas ya abiertas: no se navega a ningún sitio para
+          // no interrumpir lo que la persona esté haciendo.
+          const estados = await Promise.all(
+            Object.values(PORTALES).map(async (p) => {
+              const patron = `${p.base.replace(/^https:\/\/(www\.)?/, "https://*.")}/*`;
+              try {
+                const tabs = await chrome.tabs.query({ url: [patron, `${p.base}/*`] });
+                for (const t of tabs) {
+                  try {
+                    const r = await chrome.tabs.sendMessage(t.id, { accion: "sesion" });
+                    if (r) return { id: p.id, nombre: p.nombre, postulable: p.postulable,
+                                    acceso: p.acceso, sesion: Boolean(r.sesion), abierto: true };
+                  } catch { /* esa pestaña no tiene content script */ }
+                }
+              } catch { /* patrón inválido */ }
+              return { id: p.id, nombre: p.nombre, postulable: p.postulable,
+                       acceso: p.acceso, sesion: null, abierto: false };
+            }),
+          );
+          return responder({ portales: estados });
+        }
+        case "abrirAcceso": {
+          const p = PORTALES[msg.portal];
+          if (!p) return responder({ error: "Portal desconocido." });
+          await chrome.tabs.create({ url: p.acceso || p.base, active: true });
+          return responder({ ok: true });
+        }
         case "abrirComputrabajo": {
           const t = await pestanaDeTrabajo();
           await chrome.tabs.update(t, { url: "https://candidato.pe.computrabajo.com/acceso/", active: true });

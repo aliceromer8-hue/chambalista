@@ -48,6 +48,7 @@ export const PORTALES = {
     nombre: "Computrabajo",
     postulable: true,
     base: "https://pe.computrabajo.com",
+    acceso: "https://candidato.pe.computrabajo.com/acceso/",
     url(termino, ciudad, pagina = 1) {
       let ruta = `trabajo-de-${slug(termino)}`;
       if (ciudad) ruta += `-en-${slug(ciudad)}`;
@@ -76,6 +77,7 @@ export const PORTALES = {
     nombre: "Bumeran",
     postulable: false,
     base: "https://www.bumeran.com.pe",
+    acceso: "https://www.bumeran.com.pe/login",
     url(termino, ciudad, pagina = 1) {
       let ruta = `empleos-busqueda-${slug(termino)}`;
       if (ciudad) ruta += `-en-${slug(ciudad)}`;
@@ -91,11 +93,27 @@ export const PORTALES = {
     },
   },
 
+  linkedin: {
+    id: "linkedin",
+    nombre: "LinkedIn",
+    postulable: false,
+    // El más restrictivo de los cuatro: aquí solo se busca. Postular se
+    // hace a mano en la oferta.
+    base: "https://www.linkedin.com",
+    acceso: "https://www.linkedin.com/login",
+    url(termino, ciudad) {
+      const p = new URLSearchParams({ keywords: termino });
+      if (ciudad) p.set("location", `${ciudad}, Perú`);
+      return `${this.base}/jobs/search/?${p}`;
+    },
+  },
+
   indeed: {
     id: "indeed",
     nombre: "Indeed",
     postulable: false,
     base: "https://pe.indeed.com",
+    acceso: "https://secure.indeed.com/auth?hl=es_PE&co=PE",
     url(termino, ciudad, pagina = 1) {
       const p = new URLSearchParams({ q: termino });
       if (ciudad) p.set("l", ciudad);

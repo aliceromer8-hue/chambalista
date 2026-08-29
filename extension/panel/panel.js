@@ -19,6 +19,26 @@ const estado = {
   respuestasPersona: {}, aprobacion: {},
 };
 
+// Estado de sesión de cada portal. Se consulta al arrancar y tras pulsar
+// «Iniciar sesión»; el resto de la interfaz lo lee de aquí.
+let sesionesCache = [];
+
+/** Aviso flotante. Antes las acciones se completaban en silencio y no
+ *  quedaba claro si habían funcionado. */
+function avisar(texto, tipo = "") {
+  let cont = document.getElementById("avisos");
+  if (!cont) {
+    cont = document.createElement("div");
+    cont.id = "avisos";
+    document.body.appendChild(cont);
+  }
+  const el = document.createElement("div");
+  el.className = `flotante ${tipo}`;
+  el.textContent = texto;
+  cont.appendChild(el);
+  setTimeout(() => el.remove(), 3800);
+}
+
 // ---------------------------------------------------------------------
 // Navegación
 // ---------------------------------------------------------------------
@@ -37,6 +57,32 @@ document.querySelectorAll("[data-ir]").forEach((b) => b.addEventListener("click"
 // ---------------------------------------------------------------------
 async function pintarInicio() {
   const r = await almacen.tracker.resumen();
+
+  // Primera vez: en vez de cinco ceros y un gráfico plano, se explica
+  // qué hacer. Los pasos se marcan solos conforme se van cumpliendo.
+  const arranque = $("#arranque");
+  const conectado = sesionesCache.some((p) => p.sesion === true);
+  const primeraVez = !r.total && !estado.vacantes.length;
+  arranque.classList.toggle("oculto", !primeraVez);
+  if (primeraVez) {
+    const pasos = [
+      { hecho: Boolean(estado.perfil), t: "Carga tu CV",
+        d: "Lo leemos y lo pasamos a formato Harvard, el que mejor leen los filtros." },
+      { hecho: conectado, t: "Conecta un portal",
+        d: "Inicias sesión tú, en tu navegador. Nunca vemos tu contraseña." },
+      { hecho: false, t: "Busca y postula",
+        d: "Escribe el puesto que quieras. Tú das el último clic siempre." },
+    ];
+    arranque.innerHTML = `<div class="vacio-guiado">
+        <h3>Empecemos</h3>
+        <p>Tres pasos y ya estás postulando. Se marcan solos conforme los completes.</p>
+      </div>
+      <div class="pasos">${pasos.map((p, i) => `
+        <div class="paso ${p.hecho ? "hecho" : ""}">
+          <span class="num">${p.hecho ? "✓" : i + 1}</span>
+          <h4>${p.t}</h4><p>${p.d}</p>
+        </div>`).join("")}</div>`;
+  }
 
   $("#kanban-resumen").innerHTML = almacen.ETAPAS.map((e) =>
     `<div class="etapa ${e.id}"><b>${r.porEtapa[e.id] || 0}</b><span>${e.nombre}</span></div>`,
@@ -75,12 +121,12 @@ function dibujarGrafico(serie) {
 
   svg.innerHTML =
     `<defs><linearGradient id="g" x1="0" y1="0" x2="0" y2="1">` +
-    `<stop offset="0%" stop-color="var(--acento)" stop-opacity=".22"/>` +
-    `<stop offset="100%" stop-color="var(--acento)" stop-opacity="0"/></linearGradient></defs>` +
+    `<stop offset="0%" stop-color="var(--lima)" stop-opacity=".22"/>` +
+    `<stop offset="100%" stop-color="var(--lima)" stop-opacity="0"/></linearGradient></defs>` +
     `<path d="${area}" fill="url(#g)"/>` +
-    `<path d="${linea}" fill="none" stroke="var(--acento)" stroke-width="2" ` +
+    `<path d="${linea}" fill="none" stroke="var(--tinta)" stroke-width="2.5" ` +
     `stroke-linejoin="round" stroke-linecap="round" vector-effect="non-scaling-stroke"/>` +
-    `<circle cx="${ux.toFixed(1)}" cy="${uy.toFixed(1)}" r="3.5" fill="var(--acento)"/>`;
+    `<circle cx="${ux.toFixed(1)}" cy="${uy.toFixed(1)}" r="4.5" fill="var(--lima)" stroke="var(--tinta)" stroke-width="2"/>`;
 }
 
 function pintarDestacadas() {
@@ -147,6 +193,11 @@ function actualizarCuenta() {
   $("#acciones-lote").classList.toggle("oculto", !estado.vacantes.length);
 }
 
+// Enter en cualquiera de los campos lanza la búsqueda.
+["#puesto", "#ciudad"].forEach((sel) => {
+  $(sel).addEventListener("keydown", (e) => { if (e.key === "Enter") $("#btn-buscar").click(); });
+});
+
 $("#btn-buscar").addEventListener("click", async () => {
   const puesto = $("#puesto").value.trim();
   if (!puesto) return;
@@ -154,7 +205,11 @@ $("#btn-buscar").addEventListener("click", async () => {
   boton.disabled = true;
   boton.textContent = "Buscando…";
   const elegidos = [...document.querySelectorAll(".chk-p:checked")].map((c) => c.value);
-  $("#resumen-busqueda").textContent = `Recorriendo ${elegidos.length} portal(es)…`;
+  $("#resumen-busqueda").textContent = `Recorriendo ${elegidos.length} portal(es)… puede tardar unos segundos.`;
+  // Esqueletos: recorrer los portales tarda, y una pantalla en blanco
+  // durante 10 segundos se siente como que algo se rompió.
+  $("#lista-vacantes").innerHTML = Array.from({ length: 6 },
+    () => `<div class="esqueleto"></div>`).join("");
 
   try {
     const prefs = { puesto, ciudad: $("#ciudad").value.trim(), nivel: $("#nivel").value };
@@ -167,8 +222,17 @@ $("#btn-buscar").addEventListener("click", async () => {
       ? coincidencia.ordenar(r.vacantes || [], estado.perfil)
       : (r.vacantes || []);
 
-    $("#lista-vacantes").innerHTML = estado.vacantes.map(tarjetaVacante).join("");
-    conectarTarjetas($("#lista-vacantes"));
+    if (!estado.vacantes.length) {
+      $("#lista-vacantes").innerHTML = `<div class="vacio-guiado" style="grid-column:1/-1">
+        <span class="emoji">🔍</span>
+        <h3>Sin resultados para «${escapar(r.termino)}»</h3>
+        <p>Prueba con un término más corto («marketing» en vez de «practicante de marketing digital»),
+           quita la ciudad para buscar en todo el país, o revisa que tengas sesión en los portales.</p>
+      </div>`;
+    } else {
+      $("#lista-vacantes").innerHTML = estado.vacantes.map(tarjetaVacante).join("");
+      conectarTarjetas($("#lista-vacantes"));
+    }
     actualizarCuenta();
 
     const fallos = (r.errores || []).map((e) => `${e.portal}: ${e.error}`).join(" · ");
@@ -319,7 +383,8 @@ async function enviarUna() {
   const r = await enviar({ accion: "enviarUna", vacante: estado.vacanteAbierta, respuestas });
   const est = $("#estado-envio");
   if (r?.enviada) {
-    est.textContent = `✅ ${r.mensaje}`;
+    est.textContent = r.mensaje;
+    avisar("Postulación enviada", "bien");
     pintarInicio();
   } else {
     const d = r?.diagnostico || {};
@@ -458,6 +523,7 @@ function conectarArrastre() {
     // El menú sirve de alternativa accesible al arrastre.
     f.querySelector(".mover")?.addEventListener("change", async (e) => {
       await almacen.tracker.moverEtapa(f.dataset.id, e.target.value);
+      avisar("Movida de etapa", "bien");
       pintarPipeline();
     });
   });
@@ -470,6 +536,7 @@ function conectarArrastre() {
       col.classList.remove("encima");
       if (!arrastrada) return;
       await almacen.tracker.moverEtapa(arrastrada.dataset.id, col.dataset.etapa);
+      avisar("Movida de etapa", "bien");
       pintarPipeline();
     });
   });
@@ -486,6 +553,7 @@ $("#btn-exportar").addEventListener("click", async () => {
   a.download = "chamba-lista-postulaciones.csv";
   a.click();
   setTimeout(() => URL.revokeObjectURL(url), 2000);
+  avisar("CSV descargado", "bien");
 });
 
 // ---------------------------------------------------------------------
@@ -509,6 +577,7 @@ $("#archivo-cv").addEventListener("change", async (e) => {
     estado.perfil = j.perfil;
     await almacen.perfil.guardar(j.perfil);
     pintarPerfil();
+    avisar("CV cargado y listo", "bien");
   } catch (err) {
     $("#estado-perfil").textContent =
       `No se pudo leer: ${err.message}. Si el servicio está dormido, espera 30 s y reintenta.`;
@@ -537,6 +606,7 @@ $("#btn-guardar-clave").addEventListener("click", async () => {
   else await almacen.claveIA.borrar();
   $("#clave-ia").value = "";
   $("#clave-ia").placeholder = v ? "Clave guardada ✓" : "Pega tu clave";
+  avisar(v ? "Clave guardada" : "Clave borrada", "bien");
   pintarCuota();
 });
 
@@ -578,10 +648,13 @@ $("#btn-guardar-datos").addEventListener("click", async () => {
   const { limpio, errores } = datos.validar(crudo);
   if (Object.keys(errores).length) {
     $("#estado-datos").textContent = Object.values(errores).join(" · ");
+    avisar("Revisa los campos marcados", "mal");
     return;
   }
   await almacen.datosPersonales.guardar(limpio);
-  $("#estado-datos").textContent = `Guardados ${Object.keys(limpio).length} dato(s), solo en tu navegador.`;
+  const n = Object.keys(limpio).length;
+  $("#estado-datos").textContent = `Guardados ${n} dato(s), solo en tu navegador.`;
+  avisar(`${n} dato(s) guardados`, "bien");
 });
 
 $("#btn-borrar-datos").addEventListener("click", async () => {
@@ -591,32 +664,45 @@ $("#btn-borrar-datos").addEventListener("click", async () => {
   $("#estado-datos").textContent = "Borrados.";
 });
 
-async function pintarPortales() {
-  $("#lista-portales").innerHTML = LISTA_PORTALES.map((p) =>
-    `<div class="portal-fila"><span>${p.nombre}</span>` +
-    `<span class="nota">${p.postulable ? "busca y postula" : "solo busca"}</span>` +
-    `<button class="enlace" data-abrir="${p.id}">Abrir</button></div>`).join("");
-  document.querySelectorAll("[data-abrir]").forEach((b) => {
-    b.addEventListener("click", () => {
-      const p = LISTA_PORTALES.find((x) => x.id === b.dataset.abrir);
-      chrome.tabs.create({ url: p.base, active: true });
-    });
-  });
+async function revisarSesion() {
+  const chip = $("#estado-sesion");
+  const r = await enviar({ accion: "sesionPortales" });
+  sesionesCache = r?.portales || [];
+  const conectados = sesionesCache.filter((p) => p.sesion === true).length;
+  const total = sesionesCache.length;
+
+  chip.textContent = conectados ? `${conectados}/${total} conectados` : "sin conectar";
+  chip.className = "estado-sesion " + (conectados ? "ok" : "mal");
+  pintarPortales();
 }
 
-async function revisarSesion() {
-  const p = $("#estado-sesion");
-  try {
-    const [tab] = await chrome.tabs.query({ url: "https://pe.computrabajo.com/*" });
-    if (!tab) throw new Error("sin pestaña");
-    const r = await chrome.tabs.sendMessage(tab.id, { accion: "sesion" });
-    if (!r?.sesion) throw new Error("sin sesión");
-    p.textContent = "sesión lista";
-    p.className = "estado-sesion ok";
-  } catch {
-    p.textContent = "sin sesión en Computrabajo";
-    p.className = "estado-sesion mal";
-  }
+/** Tarjeta de portales: estado y botón para iniciar sesión en cada uno. */
+function pintarPortales() {
+  const cont = $("#lista-portales");
+  if (!cont) return;
+  cont.innerHTML = sesionesCache.map((p) => {
+    const etiqueta = p.sesion === true ? "conectado"
+      : p.sesion === false ? "sin sesión"
+      : "sin abrir";
+    const clase = p.sesion === true ? "ok" : p.sesion === false ? "mal" : "";
+    return `<div class="portal-fila">
+      <strong>${escapar(p.nombre)}</strong>
+      <span class="portal-chip">${p.postulable ? "postula" : "solo busca"}</span>
+      <span class="estado-sesion ${clase}" style="margin-left:auto">${etiqueta}</span>
+      <button class="boton chico" data-acceso="${p.id}">
+        ${p.sesion === true ? "Abrir" : "Iniciar sesión"}
+      </button>
+    </div>`;
+  }).join("");
+
+  cont.querySelectorAll("[data-acceso]").forEach((b) => {
+    b.addEventListener("click", async () => {
+      await enviar({ accion: "abrirAcceso", portal: b.dataset.acceso });
+      avisar("Inicia sesión en la pestaña que se abrió, luego vuelve aquí.");
+      // Se revisa al rato: para entonces ya debería haber entrado.
+      setTimeout(revisarSesion, 12000);
+    });
+  });
 }
 
 // ---------------------------------------------------------------------
@@ -634,7 +720,6 @@ async function revisarSesion() {
   if (await almacen.claveIA.obtener()) $("#clave-ia").placeholder = "Clave guardada ✓";
 
   await pintarCamposDatos();
-  await pintarPortales();
   await pintarInicio();
   revisarSesion();
   pintarCuota();
