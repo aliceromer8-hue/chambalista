@@ -58,31 +58,7 @@ document.querySelectorAll("[data-ir]").forEach((b) => b.addEventListener("click"
 async function pintarInicio() {
   const r = await almacen.tracker.resumen();
 
-  // Primera vez: en vez de cinco ceros y un gráfico plano, se explica
-  // qué hacer. Los pasos se marcan solos conforme se van cumpliendo.
-  const arranque = $("#arranque");
-  const conectado = sesionesCache.some((p) => p.sesion === true);
-  const primeraVez = !r.total && !estado.vacantes.length;
-  arranque.classList.toggle("oculto", !primeraVez);
-  if (primeraVez) {
-    const pasos = [
-      { hecho: Boolean(estado.perfil), t: "Carga tu CV",
-        d: "Lo leemos y lo pasamos a formato Harvard, el que mejor leen los filtros." },
-      { hecho: conectado, t: "Conecta un portal",
-        d: "Inicias sesión tú, en tu navegador. Nunca vemos tu contraseña." },
-      { hecho: false, t: "Busca y postula",
-        d: "Escribe el puesto que quieras. Tú das el último clic siempre." },
-    ];
-    arranque.innerHTML = `<div class="vacio-guiado">
-        <h3>Empecemos</h3>
-        <p>Tres pasos y ya estás postulando. Se marcan solos conforme los completes.</p>
-      </div>
-      <div class="pasos">${pasos.map((p, i) => `
-        <div class="paso ${p.hecho ? "hecho" : ""}">
-          <span class="num">${p.hecho ? "✓" : i + 1}</span>
-          <h4>${p.t}</h4><p>${p.d}</p>
-        </div>`).join("")}</div>`;
-  }
+  pintarPortada(r);
 
   $("#kanban-resumen").innerHTML = almacen.ETAPAS.map((e) =>
     `<div class="etapa ${e.id}"><b>${r.porEtapa[e.id] || 0}</b><span>${e.nombre}</span></div>`,
@@ -105,6 +81,81 @@ async function pintarInicio() {
     : `<p class="vacio">Todavía no has postulado a nada.</p>`;
 
   if (estado.vacantes.length) pintarDestacadas();
+}
+
+/**
+ * La portada cambia según en qué punto está la persona. El panel entero
+ * se comporta como una landing cuando es nueva —una sola cosa que hacer,
+ * el resto atenuado— y se convierte en tablero cuando ya está lista.
+ *
+ * 1. Sin CV        → titular grande y un único botón: cargar el CV.
+ * 2. Con CV        → elegir dónde buscar e iniciar sesión.
+ * 3. Todo listo    → la portada se encoge a una franja y manda el tablero.
+ */
+function pintarPortada(resumen) {
+  const portada = $("#portada");
+  const acciones = $("#portada-acciones");
+  const tablero = $("#tablero");
+  const conectados = sesionesCache.filter((p) => p.sesion === true);
+
+  const etapa = !estado.perfil ? 1 : !conectados.length ? 2 : 3;
+
+  portada.classList.toggle("compacta", etapa === 3);
+  tablero.classList.toggle("esperando", etapa !== 3);
+  $("#arranque").classList.add("oculto");
+
+  if (etapa === 1) {
+    $("#portada-titulo").innerHTML = "Un clic.<br>Treinta postulaciones.";
+    $("#portada-bajada").textContent =
+      "Sube tu CV, elige dónde buscar y postula a todo lo que encaje contigo. " +
+      "Tú das el último clic, siempre.";
+    acciones.innerHTML =
+      `<button class="boton oscuro" id="p-cv">Empezar con mi CV</button>` +
+      `<span class="nota" style="opacity:.7">PDF o Word · toma unos segundos</span>`;
+    $("#p-cv").addEventListener("click", () => { irA("perfil"); $("#archivo-cv").click(); });
+    return;
+  }
+
+  if (etapa === 2) {
+    const nombre = (estado.perfil.nombre || "").split(" ")[0];
+    $("#portada-titulo").innerHTML = `Listo${nombre ? `, ${escapar(nombre)}` : ""}.<br>¿Dónde buscamos?`;
+    $("#portada-bajada").textContent =
+      "Inicia sesión en los portales donde quieras que busque. Lo haces tú, en tu navegador: " +
+      "nunca vemos tu contraseña.";
+    acciones.innerHTML = `<div class="portales-portada" style="width:100%">${
+      sesionesCache.map((p) => `
+        <div class="portal-tarjeta">
+          <span class="marca-punto ${p.sesion ? "si" : "no"}"></span>
+          <span>${escapar(p.nombre)}
+            <span class="portal-chip" style="margin-left:5px">${p.postulable ? "postula" : "solo busca"}</span>
+          </span>
+          <button class="boton chico" data-portada-acceso="${p.id}">
+            ${p.sesion ? "Abrir" : "Iniciar sesión"}
+          </button>
+        </div>`).join("")
+    }</div>`;
+    acciones.querySelectorAll("[data-portada-acceso]").forEach((b) => {
+      b.addEventListener("click", async () => {
+        await enviar({ accion: "abrirAcceso", portal: b.dataset.portadaAcceso });
+        avisar("Inicia sesión en la pestaña que se abrió y vuelve aquí.");
+        setTimeout(revisarSesion, 12000);
+      });
+    });
+    return;
+  }
+
+  // Etapa 3: ya está todo listo. La portada resume y deja pasar.
+  const cuantas = resumen.total;
+  $("#portada-titulo").textContent = cuantas
+    // «postulación» pierde la tilde en plural: no se puede pegar «es».
+    ? `${cuantas} ${cuantas === 1 ? "postulación" : "postulaciones"} hasta ahora`
+    : "Todo listo. A buscar.";
+  $("#portada-bajada").textContent = cuantas
+    ? `${resumen.entrevistas} en entrevista · ${conectados.length} ${conectados.length === 1 ? "portal conectado" : "portales conectados"}`
+    : `${conectados.length} ${conectados.length === 1 ? "portal conectado" : "portales conectados"}. Escribe el puesto que buscas y empezamos.`;
+  acciones.innerHTML = `<button class="boton oscuro" id="p-buscar">Buscar vacantes</button>`;
+  $("#p-buscar").addEventListener("click", () => irA("vacantes"));
+  $("#sello").innerHTML = `${resumen.porEtapa.enviada || 0}<small>enviadas</small>`;
 }
 
 /** Línea de los últimos 14 días. Sin librerías: es un path y punto. */
@@ -578,6 +629,7 @@ $("#archivo-cv").addEventListener("change", async (e) => {
     await almacen.perfil.guardar(j.perfil);
     pintarPerfil();
     avisar("CV cargado y listo", "bien");
+    pintarInicio();   // cargar el CV cambia de etapa
   } catch (err) {
     $("#estado-perfil").textContent =
       `No se pudo leer: ${err.message}. Si el servicio está dormido, espera 30 s y reintenta.`;
@@ -674,6 +726,8 @@ async function revisarSesion() {
   chip.textContent = conectados ? `${conectados}/${total} conectados` : "sin conectar";
   chip.className = "estado-sesion " + (conectados ? "ok" : "mal");
   pintarPortales();
+  // Conectar un portal cambia de etapa: la portada debe reaccionar.
+  if (!$("#vista-inicio").classList.contains("oculto")) pintarInicio();
 }
 
 /** Tarjeta de portales: estado y botón para iniciar sesión en cada uno. */
@@ -720,7 +774,9 @@ function pintarPortales() {
   if (await almacen.claveIA.obtener()) $("#clave-ia").placeholder = "Clave guardada ✓";
 
   await pintarCamposDatos();
+  // Las sesiones primero: la etapa de la portada depende de ellas y si
+  // no, se pinta la etapa equivocada durante un instante.
+  await revisarSesion();
   await pintarInicio();
-  revisarSesion();
   pintarCuota();
 })();

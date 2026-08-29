@@ -36,10 +36,36 @@
   <!-- ══════════ INICIO ══════════ -->
   <section class="vista" id="vista-inicio">
 
+    <!-- Portada: manda cuando la persona es nueva, se encoge cuando ya
+         está lista. El panel es landing y tablero según el momento. -->
+    <section class="portada" id="portada">
+      <div class="portada-texto">
+        <p class="antetitulo">Prácticas y primer empleo en Perú</p>
+        <h1 id="portada-titulo">Un clic.<br>Treinta postulaciones.</h1>
+        <p class="bajada" id="portada-bajada">
+          Sube tu CV, elige dónde buscar y postula a todo lo que encaje contigo.
+          Tú das el último clic, siempre.
+        </p>
+        <div class="portada-acciones" id="portada-acciones"></div>
+      </div>
+      <div class="portada-arte" aria-hidden="true">
+        <div class="hoja-flotante">
+          <span class="linea larga"></span>
+          <span class="linea"></span>
+          <span class="linea corta acento"></span>
+          <span class="linea"></span>
+          <span class="linea corta acento"></span>
+          <span class="linea media"></span>
+        </div>
+        <div class="sello" id="sello">30<small>por tanda</small></div>
+      </div>
+    </section>
+
     <div id="arranque" class="oculto"></div>
 
     <div class="kanban" id="kanban-resumen"></div>
 
+    <div id="tablero">
     <div class="rejilla">
       <article class="tarjeta metricas">
         <h2>Tu búsqueda</h2>
@@ -70,6 +96,7 @@
       </div>
       <div id="destacadas"><p class="vacio">Busca vacantes y las mejores aparecen aquí.</p></div>
     </article>
+    </div>
   </section>
 
   <!-- ══════════ VACANTES ══════════ -->
