@@ -52,9 +52,14 @@ check("URL de Bumeran",
   PORTALES.bumeran.url("cajero", "Arequipa").includes("empleos-busqueda-cajero-en-arequipa"));
 check("URL de Indeed",
   PORTALES.indeed.url("analista de datos", "Lima").includes("q=analista+de+datos"));
-check("los tres portales están registrados", LISTA_PORTALES.length === 3);
-check("solo Computrabajo postula",
+check("los cuatro portales están registrados", LISTA_PORTALES.length === 4,
+  LISTA_PORTALES.map((p) => p.nombre).join(", "));
+check("solo Computrabajo postula automáticamente",
   LISTA_PORTALES.filter((p) => p.postulable).map((p) => p.id).join() === "computrabajo");
+check("todos tienen URL de acceso para iniciar sesión",
+  LISTA_PORTALES.every((p) => p.acceso && p.acceso.startsWith("https://")));
+check("URL de LinkedIn",
+  PORTALES.linkedin.url("practicante de marketing", "Lima").includes("keywords=practicante"));
 
 titulo("DATOS PERSONALES");
 const { limpio, errores } = datos.validar({ dni: "70123456", distrito: "Surco", pretension: "S/1500" });
