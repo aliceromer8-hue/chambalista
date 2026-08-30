@@ -10,6 +10,7 @@
     "scripting"
   ],
   "host_permissions": [
+    "https://chamba-lista.onrender.com/*",
     "https://api.groq.com/*",
     "https://bumeran.com.pe/*",
     "https://candidato.pe.computrabajo.com/*",

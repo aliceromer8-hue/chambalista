@@ -1,0 +1,81 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>Vuelta completa: docx real</title>
+<!--
+  La otra prueba usa un archivo de mentira de 42 bytes. Esta usa el .docx
+  de verdad que devuelve /api/cv/docx: 37 KB de ZIP con XML dentro, con
+  tildes en el nombre y bytes que no son texto.
+
+  Lo que se comprueba es que el archivo sobrevive entero la cadena:
+
+      python-docx → base64 → JSON → Uint8Array → File → FormData
+
+  Si algo se corrompe por el camino, la empresa recibe un .docx que Word
+  no abre, y eso es peor que no adjuntar nada.
+
+      python -m http.server 8940   (desde extension/)
+-->
+<style>
+  body { font-family: ui-sans-serif, system-ui, sans-serif; max-width: 760px;
+         margin: 40px auto; padding: 0 20px; line-height: 1.6; color: #16181D; }
+  #salida { background: #f4f4f0; border: 1px solid #ddd; border-radius: 8px;
+            padding: 16px; white-space: pre-wrap; font-family: ui-monospace, monospace;
+            font-size: .82rem; }
+  .ok { color: #0E6E5B; font-weight: 700; } .mal { color: #A33223; font-weight: 700; }
+</style>
+
+<h1>Vuelta completa con el .docx real</h1>
+<form id="formulario">
+  <label>Adjunta tu CV <input type="file" name="cv" accept=".doc,.docx,.pdf"></label>
+</form>
+<div id="salida">corriendo…</div>
+
+<script src="contenido/comun.js"></script>
+<script>
+  const C = window.ChambaComun;
+  const linea = [];
+  const di = (t, c) => linea.push(c ? `<span class="${c}">${t}</span>` : t);
+  const check = (n, ok, d = "") => di(`${ok ? "ok   " : "FALLA"}  ${n}${d ? "  → " + d : ""}`, ok ? "ok" : "mal");
+
+  (async () => {
+    const j = await (await fetch("_docx-real.json")).json();
+    di(`ARCHIVO DEL SERVIDOR`);
+    di(`  ${j.nombre}`);
+    di(`  ${j.bytes} bytes · base64 de ${j.base64.length} caracteres`);
+    di(`  habilidades añadidas por ella: ${JSON.stringify(j.anadidas)}\n`);
+
+    di("ADJUNTAR");
+    const r = C.adjuntarCV(j.nombre, j.base64);
+    check("lo mete en el formulario", r.adjuntado === true, r.motivo || "");
+    check("y reporta el tamaño real", r.bytes === j.bytes, `${r.bytes} vs ${j.bytes}`);
+
+    const enviado = new FormData(document.getElementById("formulario")).get("cv");
+    di("\nLO QUE RECIBIRÍA LA EMPRESA");
+    check("es un archivo, no una cadena", enviado instanceof File);
+    check("conserva el nombre con tildes", enviado.name === j.nombre, enviado.name);
+    check("pesa lo mismo", enviado.size === j.bytes, `${enviado.size} vs ${j.bytes}`);
+
+    const bytes = new Uint8Array(await enviado.arrayBuffer());
+    check("empieza por PK: sigue siendo un ZIP válido",
+          bytes[0] === 0x50 && bytes[1] === 0x4B, `${bytes[0]},${bytes[1]}`);
+
+    // Un .docx es un ZIP. Si el central directory está al final e intacto,
+    // el archivo no se truncó ni se corrompió a medio camino.
+    let finDeZip = -1;
+    for (let i = bytes.length - 22; i >= 0 && finDeZip < 0; i--) {
+      if (bytes[i] === 0x50 && bytes[i + 1] === 0x4B && bytes[i + 2] === 0x05 && bytes[i + 3] === 0x06) finDeZip = i;
+    }
+    check("termina con el índice del ZIP intacto", finDeZip > 0, `en el byte ${finDeZip}`);
+
+    // Y que de verdad se puede leer como documento: se busca la cadena
+    // "word/document.xml" en el índice, que todo .docx tiene.
+    const texto = new TextDecoder("latin1").decode(bytes);
+    check("contiene word/document.xml", texto.includes("word/document.xml"));
+
+    const fallos = linea.filter((l) => l.includes("FALLA")).length;
+    di(`\n${fallos === 0 ? "TODO OK — el .docx llega entero" : fallos + " FALLO(S)"}`, fallos ? "mal" : "ok");
+    document.getElementById("salida").innerHTML = linea.join("\n");
+  })().catch((e) => {
+    document.getElementById("salida").textContent = "Error: " + e.message;
+  });
+</script>

@@ -243,6 +243,7 @@
           case "abrirFormulario": return responder(await abrirFormulario());
           case "preguntas":     return responder({ preguntas: leerPreguntas() });
           case "rellenar":      return responder(rellenarCampos(msg.perfil, msg.guardados, msg.patrones));
+          case "adjuntar":      return responder(C.adjuntarCV(msg.nombre, msg.base64));
           case "escribir":      return responder(escribirRespuestas(msg.respuestas));
           case "enviar":        return responder(await enviar());
           default:              return responder({ error: `Acción desconocida: ${msg.accion}` });

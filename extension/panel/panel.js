@@ -387,8 +387,25 @@ function pintarModal() {
   }
 
   let html = cab;
-  if (r.cambiosCV?.length) {
-    html += `<div class="aviso"><strong>CV adaptado a esta vacante:</strong><br>${r.cambiosCV.map(escapar).join("<br>")}</div>`;
+
+  // El CV. Se dice lo que pasó de verdad, no lo que se intentó.
+  //
+  // Antes esto ponía «CV adaptado a esta vacante» siempre que el modelo
+  // devolviera cambios, aunque el archivo que le llegaba a la empresa
+  // fuera el viejo del portal. Ahora el aviso depende de si el adjunto
+  // quedó puesto, que es lo único que la empresa llega a ver.
+  if (r.cv?.adjuntado) {
+    const extra = r.cv.anadidas?.length
+      ? `<br><span class="nota">Incluye ${r.cv.anadidas.map(escapar).join(", ")}, que confirmaste tú.</span>`
+      : "";
+    const cambios = r.cambiosCV?.length
+      ? `<br>${r.cambiosCV.map(escapar).join("<br>")}`
+      : "";
+    html += `<div class="aviso"><strong>Se adjuntó tu CV adaptado a esta vacante.</strong><br>`
+          + `<span class="nota">${escapar(r.cv.archivo)}</span>${cambios}${extra}</div>`;
+  } else if (r.cv) {
+    html += `<div class="aviso alerta"><strong>Vas a postular con el CV que ya tienes en el portal.</strong><br>`
+          + `${escapar(r.cv.nota || "No se pudo adjuntar el CV adaptado.")}</div>`;
   }
   if (r.completados?.length) {
     html += `<p class="nota">Se completaron solos ${r.completados.length} campo(s) del formulario.</p>`;

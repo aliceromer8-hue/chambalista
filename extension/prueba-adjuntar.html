@@ -1,0 +1,115 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>Prueba de adjuntar CV</title>
+<!--
+  Comprueba en un navegador real que se puede meter un archivo en un
+  formulario desde un content script.
+
+  El navegador prohíbe escribir `input.value` de un campo de archivo, y
+  eso hace dudar de si `input.files` también está bloqueado. No lo está:
+  se puede asignar con un DataTransfer construido a mano. Esta página lo
+  demuestra sobre los tres casos que salen en los portales — campo
+  visible, campo oculto detrás de un botón, y campo de foto que NO hay
+  que tocar — porque asumirlo y descubrirlo en producción sería caro.
+
+      python -m http.server 8940   (desde extension/)
+      abrir http://localhost:8940/prueba-adjuntar.html
+-->
+<style>
+  body { font-family: ui-sans-serif, system-ui, sans-serif; max-width: 760px;
+         margin: 40px auto; padding: 0 20px; line-height: 1.6; color: #16181D; }
+  h1 { font-size: 1.5rem; } h2 { font-size: 1rem; margin: 28px 0 8px; }
+  fieldset { border: 1px solid #ddd; border-radius: 8px; margin: 0 0 14px; padding: 14px 16px; }
+  legend { font-size: .8rem; color: #666; padding: 0 6px; }
+  .oculto { display: none; }
+  #salida { background: #f4f4f0; border: 1px solid #ddd; border-radius: 8px;
+            padding: 16px; white-space: pre-wrap; font-family: ui-monospace, monospace;
+            font-size: .82rem; margin-top: 20px; }
+  .ok { color: #0E6E5B; font-weight: 700; } .mal { color: #A33223; font-weight: 700; }
+</style>
+
+<h1>¿Se puede adjuntar el CV desde la extensión?</h1>
+<p>Tres formas en que los portales presentan el campo de archivo. La tercera es una trampa: es la foto de perfil y no hay que tocarla.</p>
+
+<form id="formulario">
+  <fieldset>
+    <legend>1 · campo visible, acepta documentos</legend>
+    <label>Adjunta tu CV <input type="file" name="cv" accept=".doc,.docx,.pdf"></label>
+  </fieldset>
+
+  <fieldset>
+    <legend>2 · campo oculto detrás de un botón (lo más común)</legend>
+    <button type="button">Subir otro CV</button>
+    <input type="file" name="archivo_hoja_vida" class="oculto">
+  </fieldset>
+
+  <fieldset>
+    <legend>3 · trampa: foto de perfil</legend>
+    <label>Foto <input type="file" name="foto_perfil" accept="image/*"></label>
+  </fieldset>
+</form>
+
+<div id="salida">corriendo…</div>
+
+<script src="contenido/comun.js"></script>
+<script>
+  const C = window.ChambaComun;
+  const linea = [];
+  const di = (t, clase) => linea.push(clase ? `<span class="${clase}">${t}</span>` : t);
+  const check = (nombre, ok, detalle = "") =>
+    di(`${ok ? "ok   " : "FALLA"}  ${nombre}${detalle ? "  → " + detalle : ""}`, ok ? "ok" : "mal");
+
+  // Un .docx de mentira: lo que importa es que los bytes lleguen enteros.
+  const CRUDO = "PK\x03\x04contenido de prueba del CV Harvard ñáé";
+  const BASE64 = btoa(CRUDO);
+  const NOMBRE = "CV-Alice-Harvard-Consultora-Andina.docx";
+
+  di("PUNTUACIÓN DE CAMPOS");
+  const campos = C.camposDeArchivo();
+  di(`  candidatos, mejor primero: ${campos.map(c => c.name).join(", ") || "(ninguno)"}`);
+  check("descarta la foto de perfil", !campos.some(c => c.name === "foto_perfil"));
+  check("encuentra el campo de CV visible", campos.some(c => c.name === "cv"));
+  check("encuentra el campo oculto", campos.some(c => c.name === "archivo_hoja_vida"));
+  check("prefiere el campo de CV", campos[0]?.name === "cv");
+
+  di("\nADJUNTAR");
+  const r = C.adjuntarCV(NOMBRE, BASE64);
+  di("  " + JSON.stringify(r, null, 2).split("\n").join("\n  "));
+  check("dice que adjuntó", r.adjuntado === true, r.motivo || "");
+
+  di("\nLO QUE VE EL FORMULARIO DE VERDAD");
+  const input = document.querySelector("input[name='cv']");
+  check("el input tiene exactamente un archivo", input.files.length === 1);
+  check("con el nombre correcto", input.files[0]?.name === NOMBRE, input.files[0]?.name);
+  check("y el tamaño correcto", input.files[0]?.size === CRUDO.length,
+        `${input.files[0]?.size} vs ${CRUDO.length}`);
+  check("la foto de perfil sigue vacía", document.querySelector("input[name='foto_perfil']").files.length === 0);
+
+  di("\nLO QUE SE ENVIARÍA AL SERVIDOR");
+  const fd = new FormData(document.getElementById("formulario"));
+  const enviado = fd.get("cv");
+  check("el FormData lleva el archivo", enviado instanceof File, String(enviado));
+  check("con el nombre correcto", enviado?.name === NOMBRE);
+
+  (async () => {
+    // Se comparan BYTES, no texto: un .docx es binario y `File.text()`
+    // lo decodifica como UTF-8, que rompe cualquier byte que no lo sea.
+    // Comparar el texto daba un falso fallo con los bytes intactos.
+    const recibidos = new Uint8Array(await enviado.arrayBuffer());
+    const esperados = Uint8Array.from(CRUDO, (c) => c.charCodeAt(0));
+    const iguales = recibidos.length === esperados.length
+      && recibidos.every((b, i) => b === esperados[i]);
+    check("y con los bytes intactos", iguales,
+          iguales ? "" : `${recibidos.length} bytes vs ${esperados.length}`);
+
+    di("\nCUANDO NO HAY DÓNDE ADJUNTAR");
+    document.getElementById("formulario").innerHTML = "<p>Usaremos el CV de tu perfil.</p>";
+    const sin = C.adjuntarCV(NOMBRE, BASE64);
+    check("no miente: dice que no adjuntó", sin.adjuntado === false);
+    check("y explica por qué", Boolean(sin.motivo), sin.motivo);
+
+    const fallos = linea.filter(l => l.includes("FALLA")).length;
+    di(`\n${fallos === 0 ? "TODO OK" : fallos + " FALLO(S)"}`, fallos ? "mal" : "ok");
+    document.getElementById("salida").innerHTML = linea.join("\n");
+  })();
+</script>

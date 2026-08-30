@@ -358,7 +358,9 @@ def generar_docx(perfil, carpeta_salida, sufijo=None):
         doc.save(buffer)
         buffer.seek(0)
         slug = re.sub(r"[^\w]+", "-", d["nombre"] or "candidato").strip("-")
-        return buffer, f"CV-{slug}-Harvard.docx"
+        # El sufijo también aquí: esta es la rama que usa la extensión
+        # para adjuntar, y la empresa ve el nombre del archivo.
+        return buffer, f"CV-{slug}-Harvard" + (f"-{sufijo}" if sufijo else "") + ".docx"
 
     carpeta = Path(carpeta_salida)
     carpeta.mkdir(exist_ok=True)
@@ -375,9 +377,15 @@ def generar_docx(perfil, carpeta_salida, sufijo=None):
 # Vista previa en HTML
 # ---------------------------------------------------------------------------
 
-def documento_en_memoria(perfil):
-    """(buffer, nombre) del .docx sin tocar el disco. Para la versión web."""
-    return generar_docx(perfil, None)
+def documento_en_memoria(perfil, sufijo=None):
+    """(buffer, nombre) del .docx sin tocar el disco. Para la versión web.
+
+    `sufijo` lleva empresa y puesto cuando el CV va adaptado a una
+    vacante: así la persona distingue en su carpeta de descargas cuál
+    mandó a cada sitio, y la empresa recibe un archivo con un nombre que
+    no parece genérico.
+    """
+    return generar_docx(perfil, None, sufijo=sufijo)
 
 
 def render_html(perfil):

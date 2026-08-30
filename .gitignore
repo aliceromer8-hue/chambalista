@@ -48,3 +48,6 @@ static/_*.html
 
 # Paquete de la extensión: se regenera, no se versiona.
 chamba-lista-extension.zip
+
+# Artefactos de las pruebas de adjuntar (se regeneran).
+extension/_docx-real.json

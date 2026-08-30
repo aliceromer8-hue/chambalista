@@ -139,5 +139,75 @@ pasan = [
 for e in pasan:
     check(f"deja pasar: {e[:52]}", not respuestas.es_decision_personal(e))
 
+# ---------------------------------------------------------------------
+titulo("EL .DOCX ADAPTADO — solo añade, nunca borra")
+# ---------------------------------------------------------------------
+import base64
+import io
+import re as _re
+import zipfile
+
+import app_web
+
+cliente = app_web.app.test_client()
+
+CV = {
+    "nombre": "Alice Nicoll Romero León",
+    "contacto": {"email": "a@b.pe", "telefono": "999888777", "ubicacion": "Lima, Perú"},
+    "secciones": {
+        "resumen": ["Estudiante de Marketing en la USIL, ciclo 11."],
+        "experiencia": ["Practicante de Marketing Digital — Tienda Nube (2025)"],
+        "educacion": ["USIL — Marketing, ciclo 11"],
+        "habilidades": ["Excel intermedio", "Meta Ads", "Canva"],
+    },
+}
+
+
+def pedir_docx(**extra):
+    r = cliente.post("/api/cv/docx", json={"perfil": CV, **extra})
+    return r.status_code, r.get_json()
+
+
+def texto_del_docx(b64):
+    crudo = base64.b64decode(b64)
+    with zipfile.ZipFile(io.BytesIO(crudo)) as z:
+        xml = z.read("word/document.xml").decode("utf-8")
+    return crudo, _re.sub(r"<[^>]+>", "", xml)
+
+
+estado, j = pedir_docx(resumen=["Enfocada en investigación de mercados."],
+                       competencias_extra=["Power BI"],
+                       sufijo="Consultora-Andina")
+check("el endpoint responde", estado == 200, str(j)[:120])
+crudo, texto = texto_del_docx(j["base64"])
+
+check("devuelve un .docx de verdad", crudo[:2] == b"PK")
+check("el tamaño declarado coincide", j["bytes"] == len(crudo))
+check("el nombre lleva la empresa", "Consultora-Andina" in j["nombre"], j["nombre"])
+check("mete el resumen adaptado", "investigación de mercados" in texto)
+check("mete la habilidad que ella confirmó", "Power BI" in texto)
+check("y dice cuál añadió", j["anadidas"] == ["Power BI"], str(j["anadidas"]))
+
+# Lo que no puede pasar nunca: que adaptar borre algo del CV original.
+for pieza in ("Excel", "Meta Ads", "Canva", "Tienda Nube", "USIL", "Alice"):
+    check(f"conserva «{pieza}» del CV original", pieza in texto)
+
+_, j2 = pedir_docx()
+_, texto2 = texto_del_docx(j2["base64"])
+check("sin adaptación, no inventa habilidades", "Power BI" not in texto2)
+check("sin adaptación, conserva todo", all(p in texto2 for p in ("Excel", "Meta Ads", "Canva")))
+check("sin sufijo, el nombre queda limpio", "Consultora" not in j2["nombre"], j2["nombre"])
+
+_, j3 = pedir_docx(resumen=[], competencias_extra=[])
+_, texto3 = texto_del_docx(j3["base64"])
+check("una petición vacía no vacía el CV",
+      all(p in texto3 for p in ("Excel", "Tienda Nube", "USIL")))
+
+_, j4 = pedir_docx(competencias_extra=["Excel intermedio"])
+check("no duplica una habilidad que ya estaba", j4["anadidas"] == [], str(j4["anadidas"]))
+
+estado5, _ = cliente.post("/api/cv/docx", json={}).status_code, None
+check("sin perfil devuelve error, no un CV vacío", estado5 == 400)
+
 print(f"\n{'TODO OK' if fallos == 0 else f'{fallos} FALLO(S)'}")
 sys.exit(1 if fallos else 0)

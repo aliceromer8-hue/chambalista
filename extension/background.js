@@ -8,6 +8,8 @@ import * as almacen from "./lib/almacen.js";
 import * as datos from "./lib/datos.js";
 import * as respuestas from "./lib/respuestas.js";
 import * as ia from "./lib/ia.js";
+import * as cv from "./lib/cv.js";
+import * as huecos from "./lib/huecos.js";
 
 const TOPE_POR_TANDA = 15;
 const PAUSA_ENTRE_VACANTES = 2500;
@@ -103,6 +105,55 @@ async function buscar({ puesto, ciudad, nivel, portales: elegidos }) {
 // Preparar una postulación
 // ---------------------------------------------------------------------
 
+/**
+ * Genera el CV adaptado y lo mete en el formulario.
+ *
+ * Devuelve siempre un parte de lo que pasó de verdad, nunca un "listo"
+ * optimista. Antes esto no existía: se reescribía el resumen en memoria
+ * y el panel decía «CV adaptado a esta vacante», pero a la empresa le
+ * llegaba el CV viejo que la persona tenía guardado en el portal. Era lo
+ * único que el producto afirmaba y no hacía.
+ *
+ * Que falle no aborta la postulación: se manda con el CV del portal, que
+ * es exactamente lo que pasaba antes. Pero se DICE.
+ */
+async function adjuntarCVAdaptado(tabId, perfil, vacante, resumen, competenciasExtra) {
+  const pedido = await cv.docxAdaptado(perfil, vacante, { resumen, competenciasExtra });
+  if (!pedido || pedido.error) {
+    return {
+      adjuntado: false,
+      nota: `No se pudo generar el CV adaptado (${pedido?.error || "sin respuesta"}). `
+          + "Se postula con el CV que ya tienes en el portal.",
+    };
+  }
+
+  let puesto;
+  try {
+    puesto = await chrome.tabs.sendMessage(tabId, {
+      accion: "adjuntar", nombre: pedido.nombre, base64: pedido.base64,
+    });
+  } catch (e) {
+    return { adjuntado: false, nota: `No se pudo adjuntar: ${e.message}` };
+  }
+
+  if (!puesto?.adjuntado) {
+    return {
+      adjuntado: false,
+      archivo: pedido.nombre,
+      nota: puesto?.motivo || "El formulario no aceptó el archivo.",
+    };
+  }
+
+  return {
+    adjuntado: true,
+    archivo: pedido.nombre,
+    bytes: pedido.bytes,
+    anadidas: pedido.anadidas,
+    nota: `CV adaptado adjuntado: ${pedido.nombre}`
+        + (pedido.anadidas?.length ? ` (con ${pedido.anadidas.join(", ")}, que confirmaste tú)` : ""),
+  };
+}
+
 async function prepararUna(vacante, perfil, guardados, respuestasPersona) {
   const tabId = await pestanaDeTrabajo();
   const reporte = { url: vacante.url, completados: [], pendientes: [], preguntas: [], cambiosCV: [] };
@@ -131,11 +182,19 @@ async function prepararUna(vacante, perfil, guardados, respuestasPersona) {
     await irY(tabId, vacante.url, "ping");
   }
 
+  // Habilidades que la oferta pide y el CV no menciona. Se preguntan a la
+  // persona ANTES de adaptar: si dice que sí, entran al .docx; si no
+  // contesta, no entra nada. Nunca las decide el modelo.
+  reporte.huecos = huecos.detectar(vacante, perfil);
+  const confirmadas = huecos.aCompetencias(reporte.huecos, respuestasPersona?.habilidades || {});
+
   // Resumen del CV reenfocado a esta vacante.
+  let resumenAdaptado = null;
   if (await ia.disponible()) {
     try {
       const ad = await ia.adaptarAVacante(perfil, vacante);
       if (ad?.resumen?.length) {
+        resumenAdaptado = ad.resumen;
         perfil = { ...perfil, perfil: ad.resumen };
         reporte.cambiosCV = ad.cambios || [];
       }
@@ -148,6 +207,13 @@ async function prepararUna(vacante, perfil, guardados, respuestasPersona) {
   if (abierto?.requiereLogin) return { ...reporte, requiereLogin: true, nota: abierto.nota };
   if (abierto?.captcha) return { ...reporte, captcha: true, nota: abierto.nota };
   if (abierto?.error) return { ...reporte, error: abierto.error };
+
+  // El .docx adaptado, adjuntado de verdad al formulario.
+  //
+  // Va DESPUÉS de abrir el formulario porque el campo de archivo no
+  // existe hasta entonces, y antes de rellenar para que si el portal
+  // autocompleta algo al recibir el CV, lo de después mande.
+  reporte.cv = await adjuntarCVAdaptado(tabId, perfil, vacante, resumenAdaptado, confirmadas);
 
   const patrones = datos.CAMPOS.map((c) => ({
     clave: c.clave, etiqueta: c.etiqueta, patron: c.patron.source,

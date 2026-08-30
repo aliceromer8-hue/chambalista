@@ -144,6 +144,77 @@ def descargar():
     )
 
 
+@app.post("/api/cv/docx")
+def cv_docx():
+    """El .docx adaptado a una vacante, en base64, para la extensión.
+
+    Existe porque el .docx solo se puede generar aquí: python-docx no
+    corre en un navegador. La extensión manda el perfil ya adaptado y
+    recibe los bytes para adjuntarlos al formulario del portal.
+
+    Va en base64 y no como binario a propósito: `chrome.tabs.sendMessage`
+    serializa a JSON, así que un Blob no sobrevive el salto del service
+    worker al content script. Un CV pesa 20-40 KB; en base64, 30-55 KB.
+
+    El merge se hace AQUÍ y no en la extensión para que la regla se pueda
+    verificar en un solo sitio: `resumen` reemplaza solo el resumen y
+    `competencias_extra` solo AÑADE. Nada de lo que venga en la petición
+    puede borrar una sección del CV original.
+    """
+    datos = request.get_json(silent=True) or {}
+    perfil = datos.get("perfil")
+    if not perfil:
+        return jsonify({"error": "Falta el perfil."}), 400
+    if not _pasa_limite():
+        return jsonify({"error": "Demasiadas peticiones. Espera un momento."}), 429
+
+    import base64
+
+    from harvard_template import documento_en_memoria, normalizar
+
+    # Se normaliza ANTES de tocar nada. El perfil llega en dos formatos
+    # —el estructurado y el plano `secciones`— y el generador da
+    # prioridad al estructurado: escribir en el plano cuando el
+    # estructurado ya tiene algo hace que lo escrito se ignore en
+    # silencio, o peor, que se pierda lo que había. Normalizar primero
+    # deja una sola representación sobre la que operar.
+    adaptado = normalizar(perfil)
+
+    # 1. El resumen reenfocado a la vacante, si el adaptador devolvió uno.
+    resumen = datos.get("resumen")
+    if resumen:
+        lineas = [str(x).strip() for x in resumen if str(x).strip()]
+        if lineas:
+            adaptado["perfil"] = lineas
+
+    # 2. Las habilidades que la PERSONA confirmó que sí tiene y se le
+    #    habían olvidado. Solo se AÑADEN, nunca reemplazan lo que ya
+    #    estaba: si esto pudiera borrar una sección, un error nuestro le
+    #    mandaría a la empresa un CV mutilado.
+    extra = [str(x).strip() for x in (datos.get("competencias_extra") or []) if str(x).strip()]
+    anadidas = []
+    if extra:
+        competencias = list(adaptado.get("competencias") or [])
+        ya = " ".join(c.get("items", "") for c in competencias).lower()
+        anadidas = [h for h in extra if h.lower() not in ya]
+        if anadidas:
+            competencias.append({"categoria": "", "items": ", ".join(anadidas)})
+            adaptado["competencias"] = competencias
+
+    try:
+        buffer, nombre = documento_en_memoria(adaptado, sufijo=datos.get("sufijo"))
+    except Exception as e:
+        return jsonify({"error": f"No se pudo generar el .docx: {e}"}), 500
+
+    contenido = buffer.getvalue() if hasattr(buffer, "getvalue") else buffer.read()
+    return jsonify({
+        "nombre": nombre,
+        "bytes": len(contenido),
+        "base64": base64.b64encode(contenido).decode("ascii"),
+        "anadidas": anadidas,
+    })
+
+
 # ---------------------------------------------------------------------------
 # Proxy de IA
 #
