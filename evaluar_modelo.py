@@ -400,6 +400,66 @@ def probar_adaptacion():
     return {"invencion": 1 if (inv or coladas) else 0}
 
 
+# ---------------------------------------------------------------------
+# Coste
+# ---------------------------------------------------------------------
+# Precios por millón de tokens, verificados el 30-ago-2026.
+# El tipo de cambio se deja a la vista para poder actualizarlo solo.
+
+SOLES_POR_DOLAR = 3.75
+
+PRECIOS = [
+    # nombre,                 $ entrada, $ salida, nota
+    ("Gemini 2.5 Flash-Lite",     0.10,    0.40, "se retira el 16-oct-2026"),
+    ("Gemini 3.1 Flash-Lite",     0.25,    1.50, "el reemplazo barato"),
+    ("Gemini 2.5 Flash",          0.30,    2.50, ""),
+    ("Gemini 3 Flash",            0.50,    3.00, ""),
+    ("Claude Haiku 4.5",          1.00,    5.00, ""),
+    ("Gemini 3.6 Flash",          1.50,    7.50, "aquí puede saltar el alias"),
+]
+
+
+def medir_prompt():
+    """Cuántos tokens gasta UNA postulación, medido sobre el CV real.
+
+    No es una estimación al aire: el CV se serializa con la misma función
+    que usa el producto, y los enunciados son los de las pruebas. Se
+    aproxima 1 token ≈ 4 caracteres, que es lo habitual en español.
+    """
+    cv = redactor_ia._cv_en_texto(PERFIL, EXTRAS)
+    enunciados = sum(len(c["enunciado"]) for c in CASOS_REDACCION)
+    # Los dos prompts que se lanzan por vacante: adaptar y responder.
+    # Las instrucciones fijas están medidas del código (1242 y 1038 car).
+    entrada = (len(cv) + len(json.dumps(VACANTE, ensure_ascii=False)) + 1242
+               + len(cv) + enunciados + 1038) / 4
+    # Salida: el resumen adaptado más una respuesta por pregunta.
+    salida = (600 + len(CASOS_REDACCION) * 150) / 4
+    return entrada, salida
+
+
+def probar_costo():
+    entrada, salida = medir_prompt()
+    print(f"\n{'─' * 66}\nCOSTE POR POSTULACIÓN\n{'─' * 66}")
+    print(f"  Medido sobre un CV real: ~{entrada:.0f} tokens de entrada, "
+          f"~{salida:.0f} de salida.\n")
+    print(f"  {'modelo':<23}{'100 postulaciones':>19}{'  margen de S/ 12':>18}")
+    print(f"  {'─' * 62}")
+    for nombre, p_in, p_out, nota in PRECIOS:
+        usd = entrada / 1e6 * p_in + salida / 1e6 * p_out
+        cien = usd * SOLES_POR_DOLAR * 100
+        print(f"  {nombre:<23}{'S/ ' + format(cien, '.2f'):>19}"
+              f"{'S/ ' + format(12 - cien, '.2f'):>18}   {GRIS}{nota}{FIN}")
+
+    barato = min(PRECIOS, key=lambda m: entrada * m[1] + salida * m[2])
+    caro = max(PRECIOS, key=lambda m: entrada * m[1] + salida * m[2])
+    d = ((entrada / 1e6 * (caro[1] - barato[1]) + salida / 1e6 * (caro[2] - barato[2]))
+         * SOLES_POR_DOLAR * 100)
+    print(f"\n  Entre el más barato y el más caro hay {AMBAR}S/ {d:.2f}{FIN} "
+          f"por cada 100 postulaciones.")
+    print("  Sobre un precio de S/ 12, elegir por precio no mueve la aguja.")
+    print(f"  {VERDE}Elige por honestidad: cuál inventa menos.{FIN}")
+
+
 def veredicto(bloqueo, redaccion, adaptacion):
     print(f"\n{'═' * 66}\nVEREDICTO\n{'═' * 66}")
     if not bloqueo:
@@ -442,6 +502,7 @@ def main():
     print(f"{'═' * 66}")
 
     bloqueo = probar_bloqueo()
+    probar_costo()
 
     if args.solo_deterministas:
         return veredicto(bloqueo, None, None)
