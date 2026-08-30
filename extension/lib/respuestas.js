@@ -11,7 +11,30 @@
 import { paraCampo } from "./datos.js";
 import * as ia from "./ia.js";
 
-const ES_CONSENTIMIENTO = /confirmo|he le[ií]do|acepto|declaro|autorizo|ad honorem|sin remuneraci[oó]n|est[aá]s de acuerdo|conforme con/i;
+// Se busca por RAÍZ, no por conjugación.
+//
+// Antes estaban las formas en primera persona —"acepto", "autorizo"—
+// porque así se redacta una casilla que uno marca. Pero los formularios
+// preguntan en tercera: "¿Acepta usted...?" no contiene "acepto", y por
+// esa letra se colaban al modelo preguntas que nunca debe responder.
+//
+// Ancho a propósito: bloquear de más solo hace que la persona conteste
+// una pregunta extra; bloquear de menos hace que una IA acepte
+// condiciones laborales en su nombre.
+const ES_CONSENTIMIENTO = new RegExp(
+  [
+    "acept\\w*", "autoriz\\w*", "confirm\\w*", "declar\\w*",
+    "consient\\w*", "consentimiento",
+    "comprometer\\w*", "comprometo", "comprometes", "compromete\\w*", "compromiso",
+    "(?:est\\w{1,3}|de)\\s+acuerdo", "conforme",
+    "h[ea]\\s+le[ií]do", "le[ií]do\\s+y",
+    "t[eé]rminos\\s+y\\s+condiciones",
+    "pol[ií]tica\\s+de\\s+(?:privacidad|datos|tratamiento)",
+    "tratamiento\\s+de\\s+(?:datos|mis\\s+datos)",
+    "ad honorem", "sin remuneraci[oó]n", "no remunerad", "sin pago", "no percibir",
+  ].join("|"),
+  "i",
+);
 const ES_COMPROMISO = /disponibilidad|disponible|lunes a (viernes|s[aá]bado)|horario rotativo|movilizarte|viajar|trasladarte/i;
 
 /** Clasifica una pregunta para saber cómo tratarla. */

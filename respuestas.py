@@ -396,7 +396,28 @@ def _con_ia(enunciado, perfil, extras):
     return texto, []
 
 
-PATRON_CONSENTIMIENTO = r"confirmo|he le[ií]do|acepto|declaro|ad honorem|sin remuneraci[oó]n"
+# Consentimiento. Se busca por RAÍZ, no por conjugación.
+#
+# La versión anterior listaba las formas en primera persona —"acepto",
+# "confirmo", "declaro"— porque así se redacta una casilla que uno marca.
+# Pero los formularios no hablan así: preguntan en tercera persona.
+# "¿Acepta usted...?" no contiene "acepto", y por esa letra se colaban al
+# modelo preguntas que él nunca debe responder: aceptar términos,
+# autorizar descuentos, comprometerse a permanecer dos años.
+#
+# `acept\w*` cubre acepto, acepta, aceptas, aceptar, aceptación. Igual con
+# el resto. Es deliberadamente ancho: bloquear de más solo hace que la
+# persona conteste una pregunta extra; bloquear de menos hace que una IA
+# acepte condiciones laborales en su nombre.
+PATRON_CONSENTIMIENTO = (
+    r"acept\w*|autoriz\w*|confirm\w*|declar\w*|consient\w*|consentimiento"
+    r"|comprometer\w*|comprometo|comprometes|compromete\w*|compromiso"
+    r"|(?:est\w{1,3}|de)\s+acuerdo|conforme"
+    r"|h[ea]\s+le[ií]do|le[ií]do\s+y"
+    r"|t[eé]rminos\s+y\s+condiciones|pol[ií]tica\s+de\s+(?:privacidad|datos|tratamiento)"
+    r"|tratamiento\s+de\s+(?:datos|mis\s+datos)"
+    r"|ad honorem|sin remuneraci[oó]n|no remunerad|sin pago|no percibir"
+)
 PATRON_DISPONIBILIDAD = r"disponibilidad|disponible|lunes a viernes|horario|movilizarte"
 
 
