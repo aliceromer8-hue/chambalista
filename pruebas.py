@@ -69,6 +69,34 @@ for nombre, p, esperado in casos:
 check("un CV sin pistas lo admite en vez de inventar",
       sugerencias.momento_de_carrera(perfil("Persona proactiva."))[0] == "sin-determinar")
 
+# CVs en inglés. Muchos estudiantes de Derecho y Negocios los escriben
+# así para postular a multinacionales. Sin esto se les clasificaba como
+# "no sé en qué momento estás" y se les ofrecía asistente teniéndoles
+# que tocar prácticas — justo el error que el módulo existe para evitar.
+ingles = [
+    ("«Twelfth Cycle» se lee igual que «ciclo 12»",
+     perfil("Law Student | Twelfth Cycle"), "estudiante-final"),
+    ("«12th-year law student» también",
+     perfil("I am a 12th-year law student at USMP."), "estudiante-final"),
+    ("«4th cycle» es inicio de carrera",
+     perfil("Business student, 4th cycle."), "estudiante-inicio"),
+    ("«graduated» no es estudiante",
+     perfil("Graduated in Business Administration."), "egresado"),
+    ("«bachelor's degree» sube un escalón",
+     perfil("Bachelor's degree in Industrial Engineering."), "bachiller"),
+]
+for nombre, p, esperado in ingles:
+    clave, _ = sugerencias.momento_de_carrera(p)
+    check(nombre, clave == esperado, f"salió «{clave}»")
+
+en_ingles = sugerencias.sugerir(perfil("Law Student | Twelfth Cycle at USMP.",
+                                       experiencia=["Legal Assistant, government contracts."]))
+tex_en = [p["texto"] for p in en_ingles["puestos"]]
+check("a un CV en inglés se le ofrece practicante, no asistente",
+      all(t.startswith("Practicante") for t in tex_en), str(tex_en))
+check("y acierta el área aunque diga «law» y no «derecho»",
+      any("Derecho" in t or "Legal" in t for t in tex_en), str(tex_en))
+
 # ---------------------------------------------------------------------
 titulo("SUGERENCIAS — nunca por encima del momento")
 # ---------------------------------------------------------------------

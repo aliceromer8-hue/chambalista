@@ -68,20 +68,35 @@ def texto_del_cv(perfil):
 ORDINALES = {
     "primer": 1, "segundo": 2, "tercer": 3, "cuarto": 4, "quinto": 5,
     "sexto": 6, "septimo": 7, "octavo": 8, "noveno": 9, "decimo": 10,
+    "undecimo": 11, "duodecimo": 12,
     "i": 1, "ii": 2, "iii": 3, "iv": 4, "v": 5, "vi": 6,
-    "vii": 7, "viii": 8, "ix": 9, "x": 10,
+    "vii": 7, "viii": 8, "ix": 9, "x": 10, "xi": 11, "xii": 12,
+    # En inglés. No es un adorno: muchos estudiantes de Derecho y
+    # Negocios escriben el CV en inglés para postular a multinacionales,
+    # y sin esto se les clasifica como "no sé en qué momento estás" y se
+    # les ofrece asistente cuando les tocan prácticas.
+    "first": 1, "second": 2, "third": 3, "fourth": 4, "fifth": 5,
+    "sixth": 6, "seventh": 7, "eighth": 8, "ninth": 9, "tenth": 10,
+    "eleventh": 11, "twelfth": 12,
 }
+
+# "ciclo" en español, "cycle" / "semester" / "year" en inglés.
+_PERIODO = r"(?:ciclo|cycle|semester|semestre|year)"
 
 
 def _ciclo(t):
     """El ciclo que cursa, si el CV lo dice. Devuelve None si no."""
-    m = re.search(r"ciclo\s*(?:n[°º]?\s*)?(\d{1,2})", t)
+    # "ciclo 11", "cycle 12", "semester 8"
+    m = re.search(_PERIODO + r"\s*(?:n[°º]?\s*)?(\d{1,2})\b", t)
     if m:
         return int(m.group(1))
-    m = re.search(r"(\d{1,2})\s*(?:er|do|to|vo|mo|°|º)?\s*ciclo", t)
+    # "11º ciclo", "8vo ciclo", "12th cycle", "12th-year"
+    m = re.search(r"(\d{1,2})\s*(?:er|do|to|vo|mo|th|st|nd|rd|°|º)?\s*-?\s*" + _PERIODO, t)
     if m:
         return int(m.group(1))
-    m = re.search(r"(" + "|".join(k for k in ORDINALES if len(k) > 2) + r")\s*ciclo", t)
+    # "décimo ciclo", "twelfth cycle"
+    largos = "|".join(k for k in ORDINALES if len(k) > 2)
+    m = re.search(r"\b(" + largos + r")\s*-?\s*" + _PERIODO, t)
     if m:
         return ORDINALES[m.group(1)]
     return None
@@ -106,10 +121,17 @@ def momento_de_carrera(perfil):
     ciclo = _ciclo(t)
     anios = _anios_experiencia(t)
 
-    titulado = bool(re.search(r"\btitulad|licenciad[oa]\b|colegiatura|\bmagister|\bmba\b|maestria", t))
-    bachiller = bool(re.search(r"\bbachiller\b|\bbach\.", t))
-    egresado = bool(re.search(r"\begresad[oa]\b|\bconcluid[oa]s?\b|estudios\s+concluidos", t))
-    estudiando = bool(re.search(r"en\s+curso|cursando|actualmente\s+estudi|estudiante", t)) or ciclo is not None
+    # Las mismas señales en los dos idiomas, por lo dicho arriba.
+    titulado = bool(re.search(
+        r"\btitulad|licenciad[oa]\b|colegiatura|\bmagister|\bmba\b|maestria"
+        r"|\blicensed\b|\battorney\b|master'?s\s+degree", t))
+    bachiller = bool(re.search(r"\bbachiller\b|\bbach\.|bachelor'?s?\s*(degree)?\b", t))
+    egresado = bool(re.search(
+        r"\begresad[oa]\b|\bconcluid[oa]s?\b|estudios\s+concluidos"
+        r"|\bgraduated\b|\bgraduate\b(?!\s+student)", t))
+    estudiando = bool(re.search(
+        r"en\s+curso|cursando|actualmente\s+estudi|estudiante"
+        r"|\bstudent\b|currently\s+studying|in\s+progress|undergraduate", t)) or ciclo is not None
 
     # El orden importa: lo más alto gana, salvo que siga matriculada.
     if estudiando and not (titulado or bachiller or egresado):
@@ -171,8 +193,8 @@ AREAS = [
      ["Ingeniería Industrial", "Mejora Continua", "Calidad", "Producción"]),
     ("Ingeniería Civil", r"ingenieria civil|construccion|autocad|revit|obra|metrados",
      ["Ingeniería Civil", "Obras", "Costos y Presupuestos"]),
-    ("Derecho", r"derecho|abogac|legal|juridic|notarial",
-     ["Derecho", "Legal", "Asistencia Legal"]),
+    ("Derecho", r"derecho|abogac|legal|juridic|notarial|\blaw\b|attorney",
+     ["Derecho", "Legal", "Asuntos Corporativos", "Contrataciones con el Estado"]),
     ("Psicología", r"psicolog|clinica|organizacional",
      ["Psicología", "Psicología Organizacional"]),
     ("Salud", r"enfermeri|medicina|obstetric|nutricion|farmacia|tecnico en salud",
