@@ -113,5 +113,66 @@ check("ordena por más reciente", t[0].puesto === "Analista");
 check("detecta una ya postulada", (await almacen.tracker.yaPostulado("u1")) === true);
 check("no confunde omitida con enviada", (await almacen.tracker.yaPostulado("u2")) === false);
 
+// ---------------------------------------------------------------------
+titulo("HUECOS DE HABILIDADES — nunca se añade nada solo");
+// ---------------------------------------------------------------------
+const huecos = await import(`${BASE}lib/huecos.js`);
+
+const CV_ALI = { secciones: {
+  resumen: ["Estudiante de Marketing en la USIL, ciclo 11."],
+  habilidades: ["Excel intermedio", "Meta Ads", "Google Analytics", "Canva"],
+  idiomas: ["Inglés intermedio"],
+} };
+
+const pide = (reqs) => huecos.detectar({ requisitos: reqs }, CV_ALI).map((h) => h.habilidad);
+
+check("detecta lo que pide y no tiene", pide(["Manejo de Power BI"]).includes("Power BI"));
+check("no pregunta por lo que sí tiene", pide(["Excel intermedio", "Canva"]).length === 0);
+check("ignora el relleno del aviso", pide(["Proactivo y responsable", "Trabajo en equipo"]).length === 0);
+check("una alternativa cubierta no se pregunta", pide(["Canva o Photoshop"]).length === 0);
+check("si no cubre ninguna alternativa, sí pregunta", pide(["Figma o Illustrator"]).length === 2);
+check("distingue deseable de obligatorio",
+  huecos.detectar({ requisitos: ["Deseable: Power BI"] }, CV_ALI)[0].deseable === true);
+check("trae la frase del aviso como contexto",
+  huecos.detectar({ requisitos: ["Conocimientos de SQL"] }, CV_ALI)[0].frase.includes("SQL"));
+check("nunca pregunta más de cuatro cosas",
+  huecos.detectar({ requisitos: ["SQL", "SAP", "Power BI", "Tableau", "Python", "Salesforce"] }, CV_ALI).length <= 4);
+
+const hs = huecos.detectar({ requisitos: ["Power BI", "SQL"] }, CV_ALI);
+check("sin respuesta no se añade nada", huecos.aCompetencias(hs, {}).length === 0);
+check("un NO explícito tampoco añade", huecos.aCompetencias(hs, { "Power BI": false }).length === 0);
+check("solo se añade lo que ella marcó",
+  JSON.stringify(huecos.aCompetencias(hs, { "Power BI": true, SQL: false })) === '["Power BI"]');
+
+// ---------------------------------------------------------------------
+titulo("DISTRITOS — cuánto está dispuesta a viajar");
+// ---------------------------------------------------------------------
+const distritos = await import(`${BASE}lib/distritos.js`);
+
+const OFERTAS = [
+  { ubicacion: "Santiago de Surco, Lima" }, { ubicacion: "La Molina" },
+  { ubicacion: "Los Olivos" }, { ubicacion: "San Isidro" },
+  { ubicacion: "Ate" }, { ubicacion: "" },
+];
+const cuantas = (disp) => distritos.filtrar(OFERTAS, "La Molina", disp).dentro.length;
+
+check("exacto deja solo el distrito (y las sin dato)", cuantas("exacto") === 2);
+check("cerca incluye los que colindan", cuantas("cerca") === 4);
+check("cerca deja fuera un distrito no vecino",
+  distritos.filtrar(OFERTAS, "La Molina", "cerca").fuera.some((v) => v.ubicacion === "San Isidro"));
+check("zona incluye toda Lima Moderna",
+  distritos.filtrar(OFERTAS, "La Molina", "zona").dentro.some((v) => v.ubicacion === "San Isidro"));
+check("zona deja fuera Ate, que es Lima Este",
+  distritos.filtrar(OFERTAS, "La Molina", "zona").fuera.some((v) => v.ubicacion === "Ate"));
+check("lima no filtra nada", cuantas("lima") === OFERTAS.length);
+check("una vacante sin ubicación nunca se descarta",
+  distritos.filtrar(OFERTAS, "La Molina", "exacto").dentro.some((v) => v.ubicacion === ""));
+check("nada se pierde: dentro + fuera = todas",
+  distritos.filtrar(OFERTAS, "La Molina", "cerca").dentro.length
+  + distritos.filtrar(OFERTAS, "La Molina", "cerca").fuera.length === OFERTAS.length);
+check("un distrito desconocido no rompe el filtro",
+  distritos.filtrar(OFERTAS, "Chimbote", "cerca").dentro.length === OFERTAS.length);
+check("sabe la zona de cada distrito", distritos.zonaDe("Los Olivos") === "norte");
+
 console.log(`\n${fallos === 0 ? "TODO OK" : `${fallos} FALLO(S)`}`);
 process.exit(fallos ? 1 : 0);
