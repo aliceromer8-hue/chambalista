@@ -45,3 +45,6 @@ Thumbs.db
 
 # Copias de prueba de la landing servidas desde static/
 static/_*.html
+
+# Paquete de la extensión: se regenera, no se versiona.
+chamba-lista-extension.zip
