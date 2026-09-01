@@ -1,0 +1,49 @@
+# Mantiene despierta la web durante las horas en que alguien la usaría.
+#
+# El plan gratuito de Render duerme el servicio a los 15 minutos sin
+# visitas, y despertarlo tarda unos 30 segundos. Para quien llega por
+# primera vez desde un enlace de WhatsApp, 30 segundos en blanco es
+# irse: ni siquiera sabe que había algo cargando.
+#
+# La cuenta de por qué esto no cuesta nada:
+#
+#   Render regala 750 horas de instancia al mes. Un mes tiene ~730, así
+#   que mantenerla despierta las 24 h cabría — pero por 6 horas de
+#   margen en un mes de 31 días, y si se pasa, el servicio se SUSPENDE
+#   hasta el mes siguiente. No vale la pena el riesgo.
+#
+#   Despertándola solo de 7:00 a 23:00 (hora de Perú) son ~480 horas al
+#   mes. Sobran 270 de colchón, y de madrugada casi nadie busca trabajo:
+#   quien caiga a las 3 a.m. espera los 30 segundos y ya.
+#
+# Perú es UTC-5, así que 07:00–23:00 local es 12:00–04:00 UTC.
+#
+# Ojo con los minutos de Actions: en un repo PÚBLICO esto es gratis e
+# ilimitado. En uno privado consume del cupo de 2 000 minutos al mes y
+# se pasaría. Si el repo va a ser privado, usa cron-job.org (gratis, sin
+# tarjeta) apuntando a la misma URL y borra este fichero.
+
+name: Despertar la web
+
+on:
+  schedule:
+    # Cada 14 minutos (menos que los 15 que tarda en dormirse).
+    - cron: "*/14 12-23 * * *"
+    - cron: "*/14 0-4 * * *"
+  workflow_dispatch:        # para poder lanzarlo a mano y comprobarlo
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Tocar el timbre
+        run: |
+          URL="${{ vars.URL_WEB || 'https://chamba-lista.onrender.com' }}"
+          # /api/estado es la ruta más barata: no genera ningún .docx.
+          codigo=$(curl -s -o /dev/null -w "%{http_code}" --max-time 60 "$URL/api/estado")
+          echo "$URL/api/estado respondió $codigo"
+          # 2xx y 3xx valen. Cualquier otra cosa es que algo se rompió.
+          case "$codigo" in
+            2*|3*) exit 0 ;;
+            *) echo "::error::La web no respondió bien ($codigo)"; exit 1 ;;
+          esac
