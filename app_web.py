@@ -144,6 +144,22 @@ def descargar():
     )
 
 
+@app.post("/api/cv/sugerencias")
+def cv_sugerencias():
+    """Qué puestos buscar, deducidos del CV recién convertido.
+
+    Sin IA y sin coste: son reglas sobre el texto del CV. Cruza el
+    momento de carrera con el área, porque el momento es lo que se suele
+    equivocar — a alguien de ciclo 4 ofrecerle «Analista» es mandarlo a
+    vacantes que lo van a filtrar.
+    """
+    perfil = request.get_json(silent=True)
+    if not perfil:
+        return jsonify({"error": "Falta el perfil."}), 400
+    import sugerencias
+    return jsonify(sugerencias.sugerir(perfil))
+
+
 @app.post("/api/cv/docx")
 def cv_docx():
     """El .docx adaptado a una vacante, en base64, para la extensión.

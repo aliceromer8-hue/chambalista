@@ -28,13 +28,29 @@
 
 <main class="ancho">
 
-  <section class="intro">
-    <h1>Tu CV en el formato que <span class="marca">sí leen</span> los filtros</h1>
-    <p class="bajada">Los portales pasan tu CV por un filtro automático antes de que lo vea una persona. Si el formato confunde al filtro, tu CV no llega. Este lo reescribe al formato Harvard: una columna, sin tablas ni foto, que es el que mejor leen.</p>
+  <section class="intro entra">
+    <div>
+      <p class="antetitulo">Gratis · sin registro</p>
+      <h1>Tu CV en el formato que <span class="marca">sí leen</span> los filtros</h1>
+      <p class="bajada">Los portales pasan tu CV por un filtro automático antes de que lo vea una persona. Si el formato confunde al filtro, tu CV no llega. Este lo reescribe al formato Harvard: una columna, sin tablas ni foto, que es el que mejor leen.</p>
+    </div>
+    <!-- Se enseña el resultado antes de pedir el archivo. -->
+    <div class="intro-arte" aria-hidden="true">
+      <div class="hoja-flotante">
+        <span class="linea larga"></span>
+        <span class="linea corta"></span>
+        <span class="linea acento"></span>
+        <span class="linea"></span>
+        <span class="linea media"></span>
+        <span class="linea"></span>
+        <span class="linea corta"></span>
+      </div>
+      <div class="sello">Harvard<small>formato</small></div>
+    </div>
   </section>
 
   <!-- 1. Subir -->
-  <section class="paso" id="zona-1">
+  <section class="paso entra entra-1" id="zona-1">
     <div class="zona" id="zona">
       <input type="file" id="archivo" accept=".pdf,.docx,.doc,.txt" hidden>
       <p class="grande">Arrastra tu CV aquí</p>
@@ -52,6 +68,7 @@
       <button class="boton principal" id="descargar">Descargar .docx</button>
     </div>
     <p class="detalle">Revísalo. Si algo se leyó mal, corrígelo en tu Word después de descargarlo.</p>
+    <div id="sugerencias" class="sugerencias oculto"></div>
     <div id="preview"></div>
     <div class="acciones">
       <button class="boton secundario" id="otro">Convertir otro CV</button>
@@ -59,7 +76,7 @@
   </section>
 
   <!-- Ajustes de IA -->
-  <section class="paso">
+  <section class="paso entra entra-2">
     <details id="ajustes">
       <summary>Mejorar la lectura del CV con IA <span class="pastilla" id="pastilla-ia">sin configurar</span></summary>
       <p class="detalle">Sin IA el CV se convierte igual, pero si tu CV tiene un diseño poco común algunas secciones pueden salir desordenadas. Con una clave gratuita de Google AI Studio, la lectura mejora bastante.</p>
@@ -75,7 +92,7 @@
     </details>
   </section>
 
-  <section class="privacidad">
+  <section class="privacidad entra entra-3">
     <h2>Qué pasa con tu CV</h2>
     <ul>
       <li>Se procesa <strong>en memoria</strong> y el resultado se te devuelve. No se guarda ningún archivo en el servidor.</li>

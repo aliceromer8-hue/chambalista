@@ -93,6 +93,8 @@ $("#procesar").addEventListener("click", async () => {
     const pj = await prev.json();
     $("#preview").innerHTML = pj.html || "";
 
+    await pintarSugerencias();
+
     $("#estado").textContent = "";
     $("#zona-1").classList.add("oculto");
     $("#zona-2").classList.remove("oculto");
@@ -129,6 +131,50 @@ $("#descargar").addEventListener("click", async () => {
     boton.disabled = false;
   }
 });
+
+// ---------- qué puestos buscar ----------
+// El CV convertido no sirve de nada guardado en Descargas. Esto es el
+// puente: le dice qué buscar y por qué, en el mismo momento en que
+// acaba de ver su CV nuevo y está con ganas.
+//
+// Sale de reglas, no de IA: instantáneo, gratis y explicable. Si no se
+// puede deducir, no se pinta nada — más vale callar que sugerirle
+// puestos donde lo van a filtrar.
+
+const escapar = (t) => String(t ?? "").replace(/[&<>"']/g,
+  (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+
+async function pintarSugerencias() {
+  const caja = $("#sugerencias");
+  caja.classList.add("oculto");
+  caja.innerHTML = "";
+  try {
+    const r = await fetch("/api/cv/sugerencias", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(estado.perfil),
+    });
+    if (!r.ok) return;
+    const s = await r.json();
+    if (!s.puestos?.length) return;
+
+    const fichas = s.puestos.slice(0, 6).map((p) => `
+      <a class="ficha-puesto" target="_blank" rel="noopener"
+         href="https://pe.computrabajo.com/trabajo-de-${encodeURIComponent(p.texto.toLowerCase().replace(/\s+/g, "-"))}">
+        <strong>${escapar(p.texto)}</strong>
+        <span>${escapar(p.razon)}</span>
+      </a>`).join("");
+
+    caja.innerHTML = `
+      <p class="antetitulo">Con este CV puedes buscar</p>
+      <p class="lectura">${escapar(s.explicacion)}</p>
+      <div class="rejilla-puestos">${fichas}</div>
+      <p class="detalle">Si no encaja, busca lo que tú quieras: esto es solo un atajo.</p>`;
+    caja.classList.remove("oculto");
+  } catch {
+    // Que falle no rompe la conversión, que es lo que vino a hacer.
+  }
+}
 
 $("#otro").addEventListener("click", () => {
   estado.archivo = estado.perfil = null;

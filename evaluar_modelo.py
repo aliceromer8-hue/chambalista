@@ -54,7 +54,7 @@ if hasattr(sys.stdout, "reconfigure"):
 PERFIL = {
     "nombre": "Alice Nicoll Romero León",
     "contacto": {
-        "email": "alice.romer8@gmail.com",
+        "email": "alice.ejemplo@correo.pe",
         "telefono": "999888777",
         "ubicacion": "Lima, Perú",
         "linkedin": "linkedin.com/in/alice-romero",
