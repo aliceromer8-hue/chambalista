@@ -237,5 +237,125 @@ check("no duplica una habilidad que ya estaba", j4["anadidas"] == [], str(j4["an
 estado5, _ = cliente.post("/api/cv/docx", json={}).status_code, None
 check("sin perfil devuelve error, no un CV vacío", estado5 == 400)
 
+# ---------------------------------------------------------------------
+titulo("LA PLANTILLA — cada cosa en su sitio")
+# ---------------------------------------------------------------------
+import cv_parser
+import harvard_template
+
+# Las ocho secciones tienen que caer cada una en su clave. Antes
+# "certificaciones" incluía logros, proyectos y voluntariado: las cuatro
+# caían en la misma y la última pisaba a las demás, así que un CV con
+# certificados de verdad los perdía todos.
+titulos = [
+    ("PERFIL PROFESIONAL", "perfil"),
+    ("COMPETENCIAS CLAVE", "competencias"),
+    ("EXPERIENCIA PROFESIONAL", "experiencia"),
+    ("LIDERAZGO & VOLUNTARIADO", "liderazgo"),
+    ("EDUCACIÓN", "educacion"),
+    ("CERTIFICACIONES RELEVANTES", "certificaciones"),
+    ("PROYECTO EN DESARROLLO", "proyectos"),
+    ("LOGROS DESTACADOS", "logros"),
+]
+for texto, esperada in titulos:
+    clave, _ = cv_parser._detectar_seccion(texto)
+    check(f"«{texto[:26]}» → {esperada}", clave == esperada, f"salió {clave}")
+
+check("voluntariado ya no cae en certificaciones",
+      cv_parser._detectar_seccion("VOLUNTARIADO")[0] == "liderazgo")
+check("una frase larga no se confunde con un título",
+      cv_parser._detectar_seccion("Experiencia liderando equipos de cinco personas")[0] is None)
+check("un título desconocido se conserva con su nombre",
+      cv_parser._detectar_seccion("PUBLICACIONES") == (None, "PUBLICACIONES"))
+
+# Las dos formas de cabecera que traen los CV reales.
+con_ciudad = cv_parser._parsear_entradas([
+    "USIL – Market Research Group\tLima, PE",
+    "Practicante de Investigación\tDic 2022 – Ago 2023",
+    "Diseñé y ejecuté 6 estudios.",
+    "Facilité 10 focus groups.",
+])
+check("cabecera con ciudad: una sola entrada", len(con_ciudad) == 1, str(len(con_ciudad)))
+e = con_ciudad[0]
+check("  la organización va en organizacion", e["organizacion"] == "USIL – Market Research Group")
+check("  la ciudad va en lugar", e["lugar"] == "Lima, PE")
+check("  el puesto va en cargo", e["cargo"] == "Practicante de Investigación")
+check("  las fechas van en fechas", e["fechas"] == "Dic 2022 – Ago 2023")
+check("  las funciones van en logros", len(e["logros"]) == 2)
+
+sin_ciudad = cv_parser._parsear_entradas([
+    "SUEL Conciliation Center",
+    "Legal Assistant\tMarch 2021 – March 2022",
+    "Apoyo en procedimientos de conciliación.",
+])
+check("cabecera sin ciudad: también una entrada", len(sin_ciudad) == 1, str(len(sin_ciudad)))
+check("  la organización no se confunde con el cargo",
+      sin_ciudad[0]["organizacion"] == "SUEL Conciliation Center", str(sin_ciudad[0]))
+check("  y el cargo sigue siendo el cargo", sin_ciudad[0]["cargo"] == "Legal Assistant")
+
+dos = cv_parser._parsear_entradas([
+    "Empresa A\tLima, PE", "Analista\t2023 – 2024", "Un logro.",
+    "Empresa B\tCusco, PE", "Asistente\t2021 – 2022", "Otro logro.",
+])
+check("dos trabajos no se funden en uno", len(dos) == 2, str(len(dos)))
+check("  cada uno con su logro", [len(x["logros"]) for x in dos] == [1, 1])
+
+# Competencias y certificaciones.
+comps = cv_parser._parsear_competencias(["Análisis & Herramientas: SPSS · Power BI"])
+check("la categoría se separa de los items",
+      comps[0]["categoria"] == "Análisis & Herramientas" and "SPSS" in comps[0]["items"])
+certs = cv_parser._parsear_lineas_fecha(["Stanford University · Product Management\t2025"])
+check("la certificación conserva su año", certs[0].endswith("\t2025"))
+
+# Vuelta completa sobre un CV sintético: lo que entra tiene que salir.
+sintetico = {
+    "nombre": "Ana Pérez Quispe",
+    "contacto": {"ubicacion": "Lima, Perú", "email": "ana@correo.pe", "telefono": "999111222"},
+    "perfil": ["Estudiante de Administración."],
+    "competencias": [{"categoria": "Herramientas", "items": "Excel · SAP"}],
+    "experiencia": [{"organizacion": "Alicorp", "lugar": "Lima, PE",
+                     "cargo": "Practicante", "fechas": "2024 – 2025",
+                     "logros": ["Apoyé en el área de compras."]}],
+    "educacion": [{"organizacion": "PUCP", "lugar": "Lima, PE",
+                   "cargo": "Administración | Ciclo 8", "fechas": "2021 – Presente"}],
+    "certificaciones": ["Google · Analytics 4\t2024"],
+    "logros": ["Primer puesto en el concurso interno."],
+}
+buffer, _ = harvard_template.documento_en_memoria(sintetico)
+from docx import Document as _Doc
+
+doc = _Doc(buffer)
+texto_doc = "\n".join(p.text for p in doc.paragraphs)
+for pieza in ("Ana Pérez Quispe", "Alicorp", "Practicante", "2024 – 2025",
+              "Apoyé en el área de compras", "PUCP", "Google", "Excel · SAP",
+              "Primer puesto"):
+    check(f"el .docx conserva «{pieza[:30]}»", pieza in texto_doc)
+
+W = "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}"
+
+
+def negrita_de(doc):
+    return {r.text.strip() for p in doc.paragraphs for r in p.runs if r.bold and r.text.strip()}
+
+
+en_negrita = negrita_de(doc)
+check("la organización va en negrita", any("Alicorp" in t for t in en_negrita))
+check("la ciudad NO va en negrita", not any(t == "Lima, PE" for t in en_negrita), str(en_negrita))
+check("las fechas NO van en negrita", not any("2024 – 2025" in t for t in en_negrita))
+check("los títulos de sección sí", "EXPERIENCIA PROFESIONAL" in en_negrita)
+
+divisorias = sum(1 for p in doc.paragraphs
+                 if p._p.find(f"{W}pPr") is not None
+                 and p._p.find(f"{W}pPr").find(f"{W}pBdr") is not None)
+check("cada sección lleva su divisoria", divisorias >= 6, f"{divisorias}")
+
+# Una sección que no conocemos no puede perderse.
+con_extra = dict(sintetico, secciones_extra=[
+    {"titulo": "PUBLICACIONES", "lineas": ["Artículo en la revista X (2025)"]}])
+texto_extra = "\n".join(p.text for p in _Doc(
+    harvard_template.documento_en_memoria(con_extra)[0]).paragraphs)
+check("una sección desconocida se conserva", "PUBLICACIONES" in texto_extra)
+check("  y su contenido también", "Artículo en la revista X" in texto_extra)
+
 print(f"\n{'TODO OK' if fallos == 0 else f'{fallos} FALLO(S)'}")
 sys.exit(1 if fallos else 0)

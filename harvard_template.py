@@ -239,12 +239,17 @@ def _encabezado_entrada(doc, entrada):
         p = _con_tab_derecha(_p(doc, despues=0))
         _run(p, entrada["organizacion"], pt=PT_ENTRADA, negrita=True)
         if entrada["lugar"]:
-            _run(p, "\t" + entrada["lugar"], pt=PT_ENTRADA, negrita=True)
+            # El lugar va SIN negrita: en la línea solo destaca quién, no
+            # dónde. Ponerlo en negrita igualaba el peso de la ciudad al
+            # del empleador y la fila entera se leía como un bloque.
+            _run(p, "\t" + entrada["lugar"], pt=PT_ENTRADA)
     if entrada["cargo"] or entrada["fechas"]:
         p = _con_tab_derecha(_p(doc, despues=1))
+        # La cursiva es solo del cargo. Las fechas van redondas: son un
+        # dato, no parte del nombre del puesto.
         _run(p, entrada["cargo"], pt=PT_ENTRADA, cursiva=True)
         if entrada["fechas"]:
-            _run(p, "\t" + entrada["fechas"], pt=PT_ENTRADA, cursiva=True)
+            _run(p, "\t" + entrada["fechas"], pt=PT_ENTRADA)
 
 
 def _vinetas(doc, lineas):
@@ -310,14 +315,21 @@ def generar_docx(perfil, carpeta_salida, sufijo=None):
                 _run(p, c["items"])
         elif tipo == "lineas_fecha":
             # "Entidad · Certificación" + tabulación + año
+            # Solo la ENTIDAD va en negrita —"Duolingo", "Stanford
+            # University"—, no el nombre del certificado ni el año. Antes
+            # se ponía la línea entera en negrita y una sección de cinco
+            # certificados salía como cinco bloques compitiendo con los
+            # títulos de sección.
             for linea in contenido:
                 p = _con_tab_derecha(_p(doc, despues=1))
                 m = re.match(r"^(.*?)\s*\t\s*(.+)$", linea) or re.match(r"^(.*?)\s{2,}(\d{4}[\d–\-]*)$", linea)
-                if m:
-                    _run(p, m.group(1).strip(), negrita=True)
-                    _run(p, "\t" + m.group(2).strip(), negrita=True)
-                else:
-                    _run(p, linea, negrita=True)
+                izquierda, fecha = (m.group(1).strip(), m.group(2).strip()) if m else (linea, "")
+                entidad, sep, resto = izquierda.partition("·")
+                _run(p, entidad.strip() if sep else izquierda, negrita=True)
+                if sep:
+                    _run(p, f"  ·{resto}")
+                if fecha:
+                    _run(p, "\t" + fecha)
         elif tipo == "texto_negrita":
             # Como en el original: solo la etiqueta antes de los dos puntos
             # va en negrita ("Investigación: " + descripción normal).
