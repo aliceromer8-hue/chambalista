@@ -1,26 +1,54 @@
 # -*- coding: utf-8 -*-
 """Generador del CV en formato Harvard (.docx) y su vista previa.
 
-El formato está calcado del CV real que usa el plugin `empleo-peru`
-(«CV ALICE ROMERO 2026.docx»), medido directamente del archivo:
+La especificación es la plantilla de la oficina de carreras de Harvard,
+no una aproximación. Lo que la define:
 
-- Times New Roman en todo el documento (docDefaults del Word original).
-- Márgenes de 1.91 cm en los cuatro lados.
-- Nombre a 18 pt en negrita, centrado. Debajo, una línea de contacto a
-  9.5 pt centrada con los datos separados por «  ·  ».
-- Títulos de sección a 11 pt, negrita, MAYÚSCULAS. **Sin línea divisoria**
-  (el CV original no la lleva, aunque el término «Harvard» suela asociarse
-  a ella).
-- Cada entrada de experiencia ocupa dos líneas con una tabulación
-  DERECHA a 6.27" (9026 twips), que es lo que alinea el lugar y las
-  fechas contra el margen:
-      Organización                                    Lugar      (10.5 pt, negrita)
-      Cargo                                    Mes Año – Mes Año  (cursiva)
-  y debajo los logros como viñetas.
-- Sin foto, sin colores, sin tablas: una sola columna, compatible con ATS.
+    UNA SOLA COLUMNA, orden cronológico inverso, sin foto, sin colores,
+    sin tablas ni iconos. Serif (Times New Roman) a 10–12 pt. Todo eso
+    no es estética: es lo que hace que un filtro automático lo lea sin
+    equivocarse.
+
+ESTRUCTURA
+
+    Nombre Apellido                                   centrado, 18 pt, negrita
+    Ciudad · correo · teléfono · linkedin             centrado, 9.5 pt
+    ─────────────────────────────────────────────
+
+    TÍTULO DE SECCIÓN                                 11 pt, negrita, versales
+    ─────────────────────────────────────────────
+
+    ORGANIZACIÓN                          Ciudad, PE  org en VERSALES negrita
+    Cargo                        Mes Año – Mes Año    cargo en cursiva
+    • Logro                                           viñeta
+    • Logro
+
+ORDEN DE SECCIONES
+
+    Harvard: cabecera · EDUCATION · EXPERIENCE · LEADERSHIP & ACTIVITIES
+    · SKILLS & INTERESTS. Educación primero porque para un estudiante es
+    el dato que decide; habilidades al final porque es material de apoyo.
+
+QUÉ VA EN NEGRITA, Y NADA MÁS
+
+    el nombre · los títulos de sección · la organización · la categoría
+    de una competencia · la entidad de un certificado · la etiqueta de un
+    proyecto.
+
+    NO van en negrita: la ciudad, el cargo (va en cursiva), las fechas,
+    los logros, los items de una competencia ni el año de un certificado.
+
+GEOMETRÍA
+
+    A4 con márgenes de 0.75". La columna derecha se alinea con una
+    tabulación derecha calculada al ancho del texto, para que las
+    ciudades y las fechas terminen justo donde terminan las divisorias.
+    Las divisorias son párrafos vacíos con borde inferior, no bordes del
+    título: por eso hay una más que secciones.
 
 El perfil se estructura por entradas (no por líneas sueltas) para poder
-reproducir esos encabezados de dos columnas.
+reproducir los encabezados de dos columnas. La taxonomía completa, con
+qué va en cada línea, está en cv_parser.py, que es quien la produce.
 """
 
 import html
@@ -33,7 +61,26 @@ from docx.oxml.ns import qn
 from docx.shared import Cm, Pt, Twips
 
 FUENTE = "Times New Roman"
-TAB_DERECHA = Twips(9026)   # medido del CV original: alinea al margen derecho
+
+# Geometría de la página, en twips (1440 por pulgada).
+#
+# A4 porque es lo que se imprime y se lee en Perú, y márgenes de 0.75",
+# que es lo que pide la plantilla de Harvard.
+ANCHO_A4 = 11906
+ALTO_A4 = 16838
+MARGEN = 1080                       # 0.75 pulgadas
+
+# La tabulación derecha se CALCULA, no se fija a mano.
+#
+# Antes era un 9026 medido del CV de referencia. El problema: ese número
+# dejaba las ciudades y las fechas 1.27 cm antes del margen, mientras que
+# las líneas divisorias —que son bordes de párrafo— sí llegaban hasta el
+# final. El resultado es que las líneas sobresalían por la derecha de todo
+# lo demás, que es lo que se ve como "los subtítulos no están alineados".
+#
+# Derivándola del ancho de texto, la columna derecha termina exactamente
+# donde terminan las divisorias, pase lo que pase con el tamaño de página.
+TAB_DERECHA = Twips(ANCHO_A4 - 2 * MARGEN)
 
 PT_NOMBRE = 18
 PT_CONTACTO = 9.5
@@ -42,15 +89,32 @@ PT_ENTRADA = 10.5
 PT_CUERPO = 10.5
 
 # Orden y títulos de las secciones, tal como aparecen en el CV original.
+# El orden es el de la plantilla de Harvard, no uno cualquiera.
+#
+# Harvard ordena: cabecera · EDUCATION · EXPERIENCE · LEADERSHIP &
+# ACTIVITIES · SKILLS & INTERESTS. Las dos decisiones que más se notan y
+# que antes teníamos al revés:
+#
+#   EDUCACIÓN VA PRIMERO. Para alguien que estudia o acaba de egresar,
+#   la carrera y el ciclo son el dato que decide si pasa el filtro. Un
+#   reclutador de prácticas mira eso antes que nada.
+#
+#   HABILIDADES VA AL FINAL. Es material de apoyo: confirma lo que la
+#   experiencia ya demostró. Ponerlo arriba empuja la experiencia hacia
+#   abajo y hace que el CV se lea como una lista de herramientas.
+#
+# PERFIL es una desviación consciente: la plantilla de Harvard no lleva
+# resumen, pero en Perú se espera y quitarlo sorprendería a la persona.
+# Se queda arriba, que es donde tiene sentido si existe.
 SECCIONES = [
     ("perfil", "PERFIL PROFESIONAL", "texto"),
-    ("competencias", "COMPETENCIAS CLAVE", "competencias"),
-    ("experiencia", "EXPERIENCIA PROFESIONAL", "entradas"),
-    ("liderazgo", "LIDERAZGO & VOLUNTARIADO", "entradas"),
     ("educacion", "EDUCACIÓN", "entradas"),
-    ("certificaciones", "CERTIFICACIONES RELEVANTES", "lineas_fecha"),
+    ("experiencia", "EXPERIENCIA PROFESIONAL", "entradas"),
+    ("liderazgo", "LIDERAZGO Y ACTIVIDADES", "entradas"),
     ("proyectos", "PROYECTO EN DESARROLLO", "texto_negrita"),
+    ("certificaciones", "CERTIFICACIONES", "lineas_fecha"),
     ("logros", "LOGROS DESTACADOS", "vinetas"),
+    ("competencias", "HABILIDADES E INTERESES", "competencias"),
 ]
 
 # Claves del modelo plano antiguo -> claves del modelo estructurado, para
@@ -237,7 +301,12 @@ def _encabezado_entrada(doc, entrada):
     """Las dos líneas con tabulación derecha."""
     if entrada["organizacion"] or entrada["lugar"]:
         p = _con_tab_derecha(_p(doc, despues=0))
-        _run(p, entrada["organizacion"], pt=PT_ENTRADA, negrita=True)
+        # La organización va en VERSALES. Es la marca de la plantilla de
+        # Harvard —HARVARD UNIVERSITY, ORGANIZATION, NAME OF HIGH SCHOOL—
+        # y hace que la vista salte de empleador en empleador sin leer.
+        # Con el nombre en caja mixta, la línea del cargo pesa igual y
+        # las entradas se funden unas con otras.
+        _run(p, entrada["organizacion"].upper(), pt=PT_ENTRADA, negrita=True)
         if entrada["lugar"]:
             # El lugar va SIN negrita: en la línea solo destaca quién, no
             # dónde. Ponerlo en negrita igualaba el peso de la ciudad al
@@ -279,9 +348,14 @@ def generar_docx(perfil, carpeta_salida, sufijo=None):
     normal.font.size = Pt(PT_CUERPO)
     normal.element.rPr.rFonts.set(qn("w:eastAsia"), FUENTE)
 
+    # A4, no Carta. python-docx crea los documentos en tamaño Carta por
+    # defecto (21.59 cm de ancho) y en Perú se imprime y se lee en A4
+    # (21 cm). La diferencia son 328 twips de ancho de texto: suficiente
+    # para que las fechas dejaran de caer donde terminan las divisorias.
     for s in doc.sections:
-        s.top_margin = s.bottom_margin = Cm(1.91)
-        s.left_margin = s.right_margin = Cm(1.91)
+        s.page_width, s.page_height = Twips(11906), Twips(16838)
+        s.top_margin = s.bottom_margin = Twips(MARGEN)
+        s.left_margin = s.right_margin = Twips(MARGEN)
 
     # Cabecera.
     p = _p(doc, despues=1)
@@ -422,13 +496,13 @@ def render_html(perfil):
                 if e["organizacion"] or e["lugar"]:
                     out.append(
                         '<p class="cv-fila"><span class="izq"><strong>'
-                        f'{esc(e["organizacion"])}</strong></span>'
-                        f'<span class="der"><strong>{esc(e["lugar"])}</strong></span></p>'
+                        f'{esc(e["organizacion"].upper())}</strong></span>'
+                        f'<span class="der">{esc(e["lugar"])}</span></p>'
                     )
                 if e["cargo"] or e["fechas"]:
                     out.append(
                         f'<p class="cv-fila"><span class="izq"><em>{esc(e["cargo"])}</em></span>'
-                        f'<span class="der"><em>{esc(e["fechas"])}</em></span></p>'
+                        f'<span class="der">{esc(e["fechas"])}</span></p>'
                     )
                 if e["logros"]:
                     out.append("<ul>" + "".join(f"<li>{esc(l)}</li>" for l in e["logros"]) + "</ul>")

@@ -217,8 +217,10 @@ check("mete la habilidad que ella confirmó", "Power BI" in texto)
 check("y dice cuál añadió", j["anadidas"] == ["Power BI"], str(j["anadidas"]))
 
 # Lo que no puede pasar nunca: que adaptar borre algo del CV original.
+# La organización se pinta en VERSALES (marca de la plantilla de
+# Harvard), así que se compara sin distinguir mayúsculas.
 for pieza in ("Excel", "Meta Ads", "Canva", "Tienda Nube", "USIL", "Alice"):
-    check(f"conserva «{pieza}» del CV original", pieza in texto)
+    check(f"conserva «{pieza}» del CV original", pieza.lower() in texto.lower())
 
 _, j2 = pedir_docx()
 _, texto2 = texto_del_docx(j2["base64"])
@@ -229,7 +231,7 @@ check("sin sufijo, el nombre queda limpio", "Consultora" not in j2["nombre"], j2
 _, j3 = pedir_docx(resumen=[], competencias_extra=[])
 _, texto3 = texto_del_docx(j3["base64"])
 check("una petición vacía no vacía el CV",
-      all(p in texto3 for p in ("Excel", "Tienda Nube", "USIL")))
+      all(p.lower() in texto3.lower() for p in ("Excel", "Tienda Nube", "USIL")))
 
 _, j4 = pedir_docx(competencias_extra=["Excel intermedio"])
 check("no duplica una habilidad que ya estaba", j4["anadidas"] == [], str(j4["anadidas"]))
@@ -329,7 +331,7 @@ texto_doc = "\n".join(p.text for p in doc.paragraphs)
 for pieza in ("Ana Pérez Quispe", "Alicorp", "Practicante", "2024 – 2025",
               "Apoyé en el área de compras", "PUCP", "Google", "Excel · SAP",
               "Primer puesto"):
-    check(f"el .docx conserva «{pieza[:30]}»", pieza in texto_doc)
+    check(f"el .docx conserva «{pieza[:30]}»", pieza.lower() in texto_doc.lower())
 
 W = "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}"
 
@@ -339,7 +341,9 @@ def negrita_de(doc):
 
 
 en_negrita = negrita_de(doc)
-check("la organización va en negrita", any("Alicorp" in t for t in en_negrita))
+check("la organización va en negrita",
+      any("alicorp" in t.lower() for t in en_negrita), str(en_negrita))
+check("la organización va en VERSALES, como en Harvard", "ALICORP" in texto_doc)
 check("la ciudad NO va en negrita", not any(t == "Lima, PE" for t in en_negrita), str(en_negrita))
 check("las fechas NO van en negrita", not any("2024 – 2025" in t for t in en_negrita))
 check("los títulos de sección sí", "EXPERIENCIA PROFESIONAL" in en_negrita)
