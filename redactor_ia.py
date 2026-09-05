@@ -127,11 +127,29 @@ def _con_gemini(prompt, clave):
     r = _pedir(url, {
         "systemInstruction": {"parts": [{"text": INSTRUCCIONES}]},
         "contents": [{"parts": [{"text": prompt}]}],
-        # maxOutputTokens alto a propósito: los modelos flash actuales
-        # razonan antes de responder y ese razonamiento consume del mismo
-        # presupuesto. Con un tope bajo se agota pensando y la respuesta
-        # llega vacía o truncada a media frase.
-        "generationConfig": {"temperature": 0.3, "maxOutputTokens": TOPE_SALIDA},
+        "generationConfig": {
+            "temperature": 0.3,
+            "maxOutputTokens": TOPE_SALIDA,
+            # Razonamiento DESACTIVADO, y no es un ahorro: es lo que hace
+            # que haya respuesta.
+            #
+            # Los modelos flash razonan antes de contestar y ese
+            # razonamiento sale del MISMO presupuesto que la respuesta.
+            # Medido con las ocho preguntas de evaluar_modelo.py:
+            #
+            #   con razonamiento   1916 tokens pensando,  80 de salida
+            #                      -> 0 de 8 respuestas, cortado por MAX_TOKENS
+            #   sin razonamiento      0 pensando,        220 de salida
+            #                      -> 8 de 8, terminado limpio
+            #
+            # Subir el tope no lo arregla: el modelo piensa más y vuelve a
+            # agotarlo. Y aquí no hace falta: no se le pide resolver nada,
+            # se le pide reformular lo que el CV ya dice.
+            #
+            # De paso, los tokens de razonamiento se facturan como salida,
+            # que es la parte cara.
+            "thinkingConfig": {"thinkingBudget": 0},
+        },
     })
     try:
         partes = r["candidates"][0]["content"]["parts"]

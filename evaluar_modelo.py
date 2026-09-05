@@ -133,6 +133,8 @@ def invento(texto):
     mención y se descarta si viene negada.
     """
     t = sin_tildes(texto)
+    if t.strip().startswith(sin_tildes(getattr(redactor_ia, "MARCA_FALTA", "FALTA_DATO:"))):
+        return None
     for trampa in TRAMPAS:
         pos = t.find(sin_tildes(trampa))
         while pos != -1:
@@ -147,7 +149,7 @@ def invento(texto):
 
 def se_calla(texto):
     """¿Dijo que no tiene el dato cuando sí lo tiene?"""
-    marca = getattr(redactor_ia, "SIN_DATO", "NO_DISPONIBLE")
+    marca = getattr(redactor_ia, "MARCA_FALTA", "FALTA_DATO:")
     t = sin_tildes(texto)
     return sin_tildes(str(marca)) in t or "no disponible" in t or "no cuento con esa informacion" in t
 
@@ -314,15 +316,35 @@ def probar_redaccion():
         return None
     tardo = time.time() - t0
 
-    def texto_de(s):
+    # `redactar_varias` devuelve un DICCIONARIO {posicion: (texto, falta)},
+    # no una lista. Recorrerlo con zip iteraba las CLAVES, así que se
+    # evaluaban los números de posición como si fueran las respuestas: la
+    # posición 0 salía "vacía" y las demás como "1", "2", "3"... El banco
+    # daba «pierde información» sobre un modelo que ni siquiera se había
+    # leído. Una prueba que miente es peor que no tenerla.
+    def texto_de(pos):
+        s = salidas.get(pos) if isinstance(salidas, dict) else None
+        if isinstance(s, tuple):
+            texto, falta = s
+            if texto:
+                return texto
+            if not falta:
+                return ""
+            # `falta` puede venir como lista de campos que la interfaz
+            # pintaría; aquí interesa solo la etiqueta legible.
+            if isinstance(falta, (list, tuple)):
+                falta = ", ".join(
+                    (f.get("etiqueta") or f.get("clave") or "") if isinstance(f, dict) else str(f)
+                    for f in falta)
+            return f"{redactor_ia.MARCA_FALTA} {falta}".strip()
         if isinstance(s, dict):
             return s.get("respuesta") or s.get("texto") or ""
-        return str(s or "")
+        return str(s) if s else ""
 
     conteo = {"invencion": 0, "silencio": 0, "idioma": 0, "copia": 0, "vacia": 0, "falta": 0}
 
-    for caso, salida in zip(CASOS_REDACCION, salidas):
-        r = texto_de(salida)
+    for pos, caso in enumerate(CASOS_REDACCION):
+        r = texto_de(pos)
         inv = invento(r) if caso.get("trampa") else None
         cal = se_calla(r) and caso["tiene_dato"]
         idi = otro_idioma(r)
