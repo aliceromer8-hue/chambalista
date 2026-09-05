@@ -144,6 +144,52 @@ def descargar():
     )
 
 
+@app.route("/api/nube/perfil", methods=["GET", "POST"])
+def nube_perfil():
+    """El CV guardado en la nube, para que no se pierda al cambiar de equipo."""
+    import nube
+    if not nube.activa():
+        return jsonify({"error": "El guardado en la nube no está configurado."}), 501
+
+    dispositivo = _dispositivo()
+    if request.method == "GET":
+        return jsonify({"perfil": nube.leer_perfil(dispositivo)})
+
+    perfil = request.get_json(silent=True)
+    if not perfil:
+        return jsonify({"error": "Falta el perfil."}), 400
+    return jsonify({"guardado": nube.guardar_perfil(dispositivo, perfil)})
+
+
+@app.route("/api/nube/postulaciones", methods=["GET", "POST"])
+def nube_postulaciones():
+    """El historial de postulaciones. Es lo que de verdad duele perder."""
+    import nube
+    if not nube.activa():
+        return jsonify({"error": "El guardado en la nube no está configurado."}), 501
+
+    dispositivo = _dispositivo()
+    if request.method == "GET":
+        return jsonify({"postulaciones": nube.leer_postulaciones(dispositivo)})
+
+    datos = request.get_json(silent=True) or {}
+    items = datos.get("postulaciones") or []
+    return jsonify({"guardadas": nube.guardar_postulaciones(dispositivo, items)})
+
+
+@app.delete("/api/nube/todo")
+def nube_borrar():
+    """Borra todo lo guardado de este dispositivo.
+
+    La Ley 29733 da derecho a que le borren a uno sus datos, y ese
+    derecho no vale nada si no hay forma de ejercerlo.
+    """
+    import nube
+    if not nube.activa():
+        return jsonify({"error": "El guardado en la nube no está configurado."}), 501
+    return jsonify({"borrado": nube.borrar_todo(_dispositivo())})
+
+
 @app.get("/extension.zip")
 def descargar_extension():
     """La extensión empaquetada, comprimida al vuelo desde extension/.
