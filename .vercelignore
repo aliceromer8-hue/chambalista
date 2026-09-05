@@ -1,0 +1,30 @@
+# Lo que NO debe subir a Vercel.
+#
+# La versión desplegada es solo app_web.py: convertir el CV, sugerir
+# puestos, el proxy de IA y el paquete de la extensión. Todo lo que
+# necesita un navegador de verdad se queda fuera, porque en un servidor
+# no hay ninguna sesión que usar.
+app.py
+computrabajo.py
+lote.py
+portales.py
+datos_personales.py
+mock_jobs.py
+perfil_navegador/
+uploads/
+generados/
+postulaciones.json
+
+# El requirements de la raíz incluye Playwright; Vercel usa el de api/.
+requirements.txt
+requirements-web.txt
+
+# Pruebas y documentación: no se sirven.
+pruebas.py
+evaluar_modelo.py
+extension/pruebas.mjs
+extension/prueba-*.html
+*.md
+docs/
+.github/
+render.yaml
