@@ -3,7 +3,6 @@
   "name": "Chamba Lista — postula sin escribir lo mismo mil veces",
   "version": "0.1.0",
   "description": "Busca vacantes en los portales peruanos, adapta tu CV a cada una y prepara la postulación. Tú das el último clic.",
-  "default_locale": "es",
   "permissions": [
     "storage",
     "activeTab",

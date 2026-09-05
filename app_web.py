@@ -30,6 +30,11 @@ from werkzeug.utils import secure_filename
 BASE = Path(__file__).parent
 EXTENSIONES = {".pdf", ".docx", ".doc", ".txt"}
 
+# Carpetas y archivos que no viajan en el paquete de la extensión.
+# Lista explícita a propósito: una regla por prefijo es demasiado ancha y
+# ya dejó fuera una carpeta que sí hacía falta.
+EXCLUIR_DEL_PAQUETE = {"__pycache__", "node_modules", "_docx-real.json"}
+
 # Límite: peticiones por IP en una ventana de tiempo. Es una defensa
 # simple contra abuso, no un sistema de cuotas.
 LIMITE_PETICIONES = int(os.environ.get("LIMITE_PETICIONES", "20"))
@@ -215,9 +220,15 @@ def descargar_extension():
         for ruta in sorted(carpeta.rglob("*")):
             if not ruta.is_file():
                 continue
-            # Nada de pruebas ni de artefactos: solo lo que Chrome carga.
             partes = ruta.relative_to(carpeta).parts
-            if any(p.startswith(("_", ".")) for p in partes):
+            # Se excluye por nombre concreto, no por prefijo.
+            #
+            # Antes se saltaba todo lo que empezara por "_", y eso habría
+            # dejado fuera `_locales/`, que es una carpeta legítima de las
+            # extensiones y sin la cual Chrome se niega a cargar si el
+            # manifest declara default_locale. Un prefijo es una regla
+            # demasiado ancha para decidir qué se publica.
+            if any(p in EXCLUIR_DEL_PAQUETE or p.startswith(".") for p in partes):
                 continue
             if ruta.name.startswith("prueba") or ruta.suffix in (".zip", ".md"):
                 continue

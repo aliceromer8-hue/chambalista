@@ -172,6 +172,7 @@ titulo("EL .DOCX ADAPTADO — solo añade, nunca borra")
 # ---------------------------------------------------------------------
 import base64
 import io
+import json
 import re as _re
 import zipfile
 
@@ -360,6 +361,61 @@ texto_extra = "\n".join(p.text for p in _Doc(
     harvard_template.documento_en_memoria(con_extra)[0]).paragraphs)
 check("una sección desconocida se conserva", "PUBLICACIONES" in texto_extra)
 check("  y su contenido también", "Artículo en la revista X" in texto_extra)
+
+# ---------------------------------------------------------------------
+titulo("EL PAQUETE DE LA EXTENSIÓN — ¿lo cargaría Chrome?")
+# ---------------------------------------------------------------------
+# Existe por un fallo real: el manifest declaraba `default_locale` sin
+# que hubiera carpeta _locales, y Chrome se negaba a cargar la extensión
+# con «Default locale was specified, but _locales subtree is missing».
+# La validación anterior comprobaba el service worker, los content
+# scripts y los iconos, pero no esto.
+#
+# La regla general que cierra la familia entera de fallos: TODO lo que el
+# manifest declara tiene que existir dentro del paquete. Da igual si es
+# un script, un icono o una carpeta de traducciones.
+
+paquete = cliente.get("/extension.zip")
+check("el paquete se genera", paquete.status_code == 200)
+
+z = zipfile.ZipFile(io.BytesIO(paquete.data))
+dentro = set(z.namelist())
+carpetas = {n.split("/")[0] for n in dentro if "/" in n}
+manifest = json.loads(z.read("manifest.json"))
+
+check("es manifest v3", manifest.get("manifest_version") == 3)
+check("tiene nombre y versión", bool(manifest.get("name")) and bool(manifest.get("version")))
+
+# La comprobación que faltaba.
+check("si declara default_locale, existe _locales",
+      "default_locale" not in manifest or "_locales" in carpetas,
+      f"declara «{manifest.get('default_locale')}» y _locales no está en el paquete")
+
+sw = manifest.get("background", {}).get("service_worker")
+check("el service worker está", sw in dentro, str(sw))
+
+scripts = [f for cs in manifest.get("content_scripts", []) for f in cs.get("js", [])]
+faltan = [f for f in scripts if f not in dentro]
+check(f"los {len(scripts)} content scripts están", not faltan, str(faltan))
+
+iconos = list(manifest.get("icons", {}).values())
+iconos += list(manifest.get("action", {}).get("default_icon", {}).values())
+faltan_i = [i for i in set(iconos) if i not in dentro]
+check(f"los {len(set(iconos))} iconos están", not faltan_i, str(faltan_i))
+
+popup = manifest.get("action", {}).get("default_popup")
+check("si declara popup, el archivo está", not popup or popup in dentro, str(popup))
+
+# Lo que el service worker importa tiene que viajar con él.
+codigo_sw = z.read(sw).decode("utf-8")
+importa = _re.findall(r'from\s+["\']\./([^"\']+)["\']', codigo_sw)
+faltan_lib = [i for i in importa if i not in dentro]
+check(f"las {len(importa)} librerías que importa están", not faltan_lib, str(faltan_lib))
+
+check("el panel viaja completo",
+      "panel/panel.html" in dentro and "panel/panel.css" in dentro and "panel/panel.js" in dentro)
+check("no se cuela ninguna prueba", not any("prueba" in n for n in dentro))
+check("ni carpetas de caché", "__pycache__" not in carpetas)
 
 print(f"\n{'TODO OK' if fallos == 0 else f'{fallos} FALLO(S)'}")
 sys.exit(1 if fallos else 0)
