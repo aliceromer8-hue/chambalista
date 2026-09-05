@@ -211,6 +211,46 @@ main { padding-bottom: 80px; }
 @media (max-width: 640px) { #preview { padding: 20px 18px; } }
 .acciones { margin-top: 16px; }
 
+/* ══════════ la vista previa del CV ══════════ */
+/* Tiene que verse como el .docx que se descarga, no como el resto de la
+ * página: serif, columna derecha alineada y divisorias bajo cada título.
+ *
+ * Estas reglas faltaban por completo en la web pública —vivían solo en
+ * style.css, que esta página no carga— así que el CV salía con la
+ * tipografía de la interfaz y con la ciudad pegada al nombre de la
+ * empresa. La tensión es deliberada: la app es joven y ruidosa, el
+ * documento es sobrio, porque quien lo lee no es quien lo hace. */
+.cv-preview {
+  font-family: "Times New Roman", Times, serif;
+  color: #131316;
+  background: #fff;
+  line-height: 1.4;
+}
+.cv-preview h1 {
+  text-align: center; font-size: 1.4rem; font-weight: 700;
+  letter-spacing: 0; margin: 0 0 4px;
+}
+.cv-preview .cv-contacto {
+  text-align: center; font-size: .82rem; margin: 0 0 12px; color: #333;
+  border-bottom: 1px solid currentColor; padding-bottom: 8px;
+}
+/* La divisoria va bajo el título, igual que el párrafo vacío con borde
+ * inferior del .docx. */
+.cv-preview h2 {
+  font-size: .88rem; font-weight: 700; text-transform: uppercase;
+  letter-spacing: .02em; margin: 15px 0 6px; padding-bottom: 3px;
+  border-bottom: 1px solid currentColor;
+}
+.cv-preview p { margin: 2px 0; font-size: .86rem; }
+.cv-preview p.just { text-align: justify; }
+.cv-preview ul { margin: 3px 0 6px 20px; padding: 0; }
+.cv-preview li { font-size: .86rem; margin: 2px 0; }
+/* Las dos columnas: es lo que en el .docx hace la tabulación derecha. */
+.cv-preview .cv-fila { display: flex; justify-content: space-between; gap: 14px; }
+.cv-preview .cv-fila .der { text-align: right; white-space: nowrap; }
+.cv-preview strong { font-weight: 700; }
+.cv-preview em { font-style: italic; }
+
 /* ══════════ qué buscar ══════════ */
 /* Va antes de la vista previa: el CV convertido no sirve guardado en
  * Descargas, y este es el momento en que tiene ganas de buscar. */

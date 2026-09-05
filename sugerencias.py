@@ -270,8 +270,13 @@ def sugerir(perfil, tope=6):
         for i, (area, titulos) in enumerate(areas):
             if ronda >= len(titulos):
                 continue
-            prefijo = (PREFIJO_POR_AREA.get((clave, area))
-                       or (prefijos[min(i, len(prefijos) - 1)] if ronda == 0 else prefijos[0]))
+            # Siempre el mismo nivel para todas las áreas. Antes el
+            # prefijo se elegía por la POSICIÓN del área, así que a la
+            # misma persona se le ofrecía "Practicante de Marketing" y
+            # "Asistente de Análisis de Datos" en la misma lista: el
+            # nivel cambiaba según el área, que no significa nada y hace
+            # dudar de si el resto también es al azar.
+            prefijo = PREFIJO_POR_AREA.get((clave, area)) or prefijos[0]
             texto = f"{prefijo} {titulos[ronda]}"
             if texto.lower() in vistos:
                 continue
