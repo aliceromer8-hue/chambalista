@@ -98,6 +98,9 @@ $("#procesar").addEventListener("click", async () => {
     $("#estado").textContent = "";
     $("#zona-1").classList.add("oculto");
     $("#zona-2").classList.remove("oculto");
+    // El paso de instalar solo aparece cuando ya hay un CV convertido:
+    // antes de eso no significa nada y sería una interrupción.
+    $("#zona-3").classList.remove("oculto");
     window.scrollTo({ top: 0, behavior: "smooth" });
   } catch (e) {
     $("#estado").textContent = e.message;
@@ -182,6 +185,7 @@ $("#otro").addEventListener("click", () => {
   $("#nombre-archivo").textContent = "";
   $("#procesar").disabled = true;
   $("#zona-2").classList.add("oculto");
+  $("#zona-3").classList.add("oculto");
   $("#zona-1").classList.remove("oculto");
   window.scrollTo({ top: 0, behavior: "smooth" });
 });

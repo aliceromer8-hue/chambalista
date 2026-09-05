@@ -75,6 +75,39 @@
     </div>
   </section>
 
+  <!-- El paso que cerraba el recorrido.
+       La web promete treinta postulaciones pero no puede postular: eso
+       solo lo hace la extensión, porque necesita la sesión que la persona
+       ya tiene abierta en su navegador. Sin este bloque, alguien convertía
+       su CV y se quedaba sin saber cómo llegar a lo que se le prometió. -->
+  <section class="paso oculto" id="zona-3">
+    <p class="antetitulo">Y ahora sí, lo de postular</p>
+    <h2 class="titulo-instalar">Tu CV ya está listo. Falta la parte que postula por ti.</h2>
+    <p>Esta página convierte tu CV, pero no puede postular: para eso hace falta
+      la sesión que <strong>tú</strong> tienes abierta en Computrabajo, y esa vive en
+      tu navegador, no en un servidor. Por eso la parte que postula es una
+      extensión de Chrome.</p>
+    <p class="detalle"><strong>Nunca vemos tu contraseña.</strong> Tú inicias sesión en cada portal
+      como siempre; la extensión trabaja dentro de tu navegador, con la sesión ya abierta.</p>
+    <div class="acciones-instalar">
+      <a class="boton principal" id="instalar" href="/extension.zip" download>Descargar la extensión</a>
+      <span class="detalle">Gratis · Chrome y Edge</span>
+    </div>
+    <details class="como-instalar">
+      <summary>Cómo instalarla (tres pasos, un minuto)</summary>
+      <ol>
+        <li>Descomprime el archivo que acabas de descargar.</li>
+        <li>En Chrome, entra a <code>chrome://extensions</code> y activa
+          <strong>Modo de desarrollador</strong>, arriba a la derecha.</li>
+        <li>Pulsa <strong>Cargar descomprimida</strong> y elige la carpeta que descomprimiste.</li>
+      </ol>
+      <p class="detalle">Sí, es más engorroso que un clic. Todavía no está en la
+        Chrome Web Store, y mientras no lo esté este es el único camino. El navegador
+        te avisará de que es una extensión en modo desarrollador: es normal, y ese
+        aviso desaparece cuando esté publicada.</p>
+    </details>
+  </section>
+
   <!-- Ajustes de IA -->
   <section class="paso entra entra-2">
     <details id="ajustes">

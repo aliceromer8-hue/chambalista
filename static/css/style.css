@@ -183,7 +183,10 @@ th { color: var(--lila); }
   background: #fff;
   border: 1px solid var(--borde);
   border-radius: 8px;
-  padding: 26px 30px;
+  /* Los márgenes de la hoja, en proporción: en A4 con márgenes de 0.75"
+     el texto ocupa el 82 % del ancho. Con menos, el CV se lee pegado a
+     los bordes y no parece un documento. */
+  padding: 7% 9%;
   margin: 12px 0;
   max-height: 460px;
   overflow-y: auto;

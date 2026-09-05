@@ -144,6 +144,44 @@ def descargar():
     )
 
 
+@app.get("/extension.zip")
+def descargar_extension():
+    """La extensión empaquetada, comprimida al vuelo desde extension/.
+
+    Se arma en cada petición en vez de servir un .zip guardado para que
+    nunca se pueda descargar una versión vieja: el paquete siempre es lo
+    que hay en el repositorio desplegado.
+
+    Esto es el camino provisional mientras no esté en la Chrome Web
+    Store. Obliga a activar el modo desarrollador, que es fricción y
+    además enseña un aviso del navegador — por eso la página lo explica
+    en vez de disimularlo.
+    """
+    import io
+    import zipfile
+
+    carpeta = BASE / "extension"
+    if not carpeta.is_dir():
+        return jsonify({"error": "La extensión no está empaquetada en este despliegue."}), 404
+
+    buffer = io.BytesIO()
+    with zipfile.ZipFile(buffer, "w", zipfile.ZIP_DEFLATED) as z:
+        for ruta in sorted(carpeta.rglob("*")):
+            if not ruta.is_file():
+                continue
+            # Nada de pruebas ni de artefactos: solo lo que Chrome carga.
+            partes = ruta.relative_to(carpeta).parts
+            if any(p.startswith(("_", ".")) for p in partes):
+                continue
+            if ruta.name.startswith("prueba") or ruta.suffix in (".zip", ".md"):
+                continue
+            z.write(ruta, ruta.relative_to(carpeta).as_posix())
+    buffer.seek(0)
+    return send_file(buffer, as_attachment=True,
+                     download_name="chamba-lista-extension.zip",
+                     mimetype="application/zip")
+
+
 @app.post("/api/cv/sugerencias")
 def cv_sugerencias():
     """Qué puestos buscar, deducidos del CV recién convertido.

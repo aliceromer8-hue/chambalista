@@ -203,12 +203,15 @@ main { padding-bottom: 80px; }
   gap: 14px; flex-wrap: wrap; margin-bottom: 6px;
 }
 .cabecera-resultado h2 { font-size: 1.7rem; }
+/* El contenedor es el escritorio; la hoja va dentro. Separarlos deja
+ * que el CV se vea como un papel apoyado y no como texto metido en una
+ * caja. */
 #preview {
   border: 2px solid var(--linea); border-radius: var(--r-chico);
-  background: var(--papel); padding: 32px 38px; margin-top: 16px;
-  max-height: 520px; overflow-y: auto;
+  background: var(--papel-3); padding: 22px; margin-top: 16px;
+  max-height: 560px; overflow-y: auto;
 }
-@media (max-width: 640px) { #preview { padding: 20px 18px; } }
+@media (max-width: 640px) { #preview { padding: 12px; } }
 .acciones { margin-top: 16px; }
 
 /* ══════════ la vista previa del CV ══════════ */
@@ -225,7 +228,17 @@ main { padding-bottom: 80px; }
   color: #131316;
   background: #fff;
   line-height: 1.4;
+  /* El relleno reproduce los márgenes de la hoja. En A4 con márgenes de
+   * 0.75" el texto ocupa el 82 % del ancho, así que queda un 9 % de aire
+   * a cada lado: eso es lo que se ve al imprimirlo y lo que hacía falta
+   * aquí, porque el texto llegaba pegado al borde. */
+  padding: 7% 9%;
+  border-radius: 3px;
+  box-shadow: 0 1px 3px rgba(19, 19, 22, .16), 0 6px 18px -6px rgba(19, 19, 22, .18);
+  max-width: 760px;
+  margin: 0 auto;
 }
+@media (max-width: 640px) { .cv-preview { padding: 24px 20px; } }
 .cv-preview h1 {
   text-align: center; font-size: 1.4rem; font-weight: 700;
   letter-spacing: 0; margin: 0 0 4px;
@@ -280,6 +293,13 @@ main { padding-bottom: 80px; }
 .ficha-puesto:hover span { color: #131316; opacity: .75; }
 @media (prefers-reduced-motion: reduce) { .ficha-puesto:hover { transform: none; } }
 
+/* ══════════ instalar la extensión ══════════ */
+.titulo-instalar { font-size: 1.45rem; margin-bottom: 12px; text-wrap: balance; }
+#zona-3 p { max-width: 62ch; }
+.acciones-instalar {
+  display: flex; align-items: center; gap: 16px; flex-wrap: wrap; margin-top: 20px;
+}
+
 /* ══════════ ajustes de IA ══════════ */
 details summary {
   cursor: pointer; font-weight: 800; display: flex; align-items: center; gap: 10px;
@@ -315,3 +335,15 @@ footer { padding: 26px 24px 60px; color: var(--tinta-2); font-size: 13px; }
 :where(button, a, input, summary):focus-visible {
   outline: 3px solid var(--tinta); outline-offset: 2px;
 }
+
+/* Instrucciones de instalación: van plegadas porque quien ya sabe hacerlo
+ * no las necesita, y quien no, las abre. */
+.como-instalar { margin-top: 18px; }
+.como-instalar ol { margin: 0; padding-left: 22px; font-size: 14px; }
+.como-instalar li { margin-bottom: 7px; }
+.como-instalar code {
+  font-family: var(--mono); font-size: .88em;
+  background: var(--papel-3); border: 1px solid var(--linea);
+  padding: 1px 6px; border-radius: 4px;
+}
+.como-instalar .detalle { margin-top: 12px; max-width: 62ch; }
