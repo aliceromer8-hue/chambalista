@@ -101,7 +101,18 @@ $("#procesar").addEventListener("click", async () => {
     // El paso de instalar solo aparece cuando ya hay un CV convertido:
     // antes de eso no significa nada y sería una interrupción.
     $("#zona-3").classList.remove("oculto");
-    window.scrollTo({ top: 0, behavior: "smooth" });
+
+    // Lo que sobra una vez que ya convirtió: la cadena de cuatro pasos y
+    // «Qué pasa con tu CV» son argumentos para decidirse a subirlo. Ya lo
+    // subió. Dejarlos ahí es hacerle leer el anuncio después de comprar.
+    for (const s of ["#cadena", "#rotulo-subir", "#privacidad"]) {
+      $(s).classList.add("oculto");
+    }
+
+    // Y se lleva la vista AL RESULTADO, no arriba del todo: subir al tope
+    // le enseñaba otra vez el titular en lugar de su CV, y tenía que
+    // buscar dónde había quedado lo que acababa de pedir.
+    $("#zona-2").scrollIntoView({ behavior: "smooth", block: "start" });
   } catch (e) {
     $("#estado").textContent = e.message;
   } finally {
@@ -186,7 +197,9 @@ $("#otro").addEventListener("click", () => {
   $("#procesar").disabled = true;
   $("#zona-2").classList.add("oculto");
   $("#zona-3").classList.add("oculto");
-  $("#zona-1").classList.remove("oculto");
+  for (const s of ["#cadena", "#rotulo-subir", "#privacidad", "#zona-1"]) {
+    $(s).classList.remove("oculto");
+  }
   window.scrollTo({ top: 0, behavior: "smooth" });
 });
 

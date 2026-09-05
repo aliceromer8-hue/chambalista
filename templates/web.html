@@ -36,7 +36,7 @@
     <p class="bajada">Busca en Computrabajo, Bumeran, LinkedIn e Indeed a la vez, adapta tu CV a cada vacante y llena los formularios por ti. Tú das el último clic, siempre.</p>
   </section>
 
-  <section class="cadena-seccion entra entra-1">
+  <section class="cadena-seccion entra entra-1" id="cadena">
     <h2 class="titulo-seccion">Treinta postulaciones mientras tomas desayuno</h2>
     <ol class="cadena">
       <li><span class="paso-num">01</span><b>Encuentra</b><span>Barre cuatro portales a la vez y trae todo lo que salió hoy</span></li>
@@ -48,7 +48,7 @@
   </section>
 
   <!-- 1. Subir -->
-  <p class="antetitulo entra entra-2" style="margin-bottom:10px">Empieza por aquí</p>
+  <p class="antetitulo entra entra-2" id="rotulo-subir" style="margin-bottom:10px">Empieza por aquí</p>
   <section class="paso entra entra-2" id="zona-1">
     <p class="detalle" style="margin-top:0">Antes de postular, tu CV tiene que pasar el filtro automático de los portales. Súbelo y te lo devolvemos en formato Harvard, que es el que mejor leen.</p>
     <div class="zona" id="zona">
@@ -75,36 +75,38 @@
     </div>
   </section>
 
-  <!-- El paso que cerraba el recorrido.
-       La web promete treinta postulaciones pero no puede postular: eso
-       solo lo hace la extensión, porque necesita la sesión que la persona
-       ya tiene abierta en su navegador. Sin este bloque, alguien convertía
-       su CV y se quedaba sin saber cómo llegar a lo que se le prometió. -->
-  <section class="paso oculto" id="zona-3">
-    <p class="antetitulo">Y ahora sí, lo de postular</p>
-    <h2 class="titulo-instalar">Tu CV ya está listo. Falta la parte que postula por ti.</h2>
-    <p>Esta página convierte tu CV, pero no puede postular: para eso hace falta
-      la sesión que <strong>tú</strong> tienes abierta en Computrabajo, y esa vive en
-      tu navegador, no en un servidor. Por eso la parte que postula es una
-      extensión de Chrome.</p>
-    <p class="detalle"><strong>Nunca vemos tu contraseña.</strong> Tú inicias sesión en cada portal
-      como siempre; la extensión trabaja dentro de tu navegador, con la sesión ya abierta.</p>
-    <div class="acciones-instalar">
+  <!-- El paso que cerraba el recorrido: la web promete treinta
+       postulaciones y no puede postular —eso necesita la sesión que la
+       persona ya tiene abierta—, así que sin esto se quedaba sin saber
+       cómo llegar a lo que se le prometió.
+
+       Deliberadamente corto.
+       Aquí la persona ya consiguió lo que vino a buscar y está de salida:
+       tres párrafos explicando por qué es una extensión se leen como un
+       obstáculo. Una frase de qué hace, el botón, y el cómo plegado.
+
+       Y NADA de "nunca vemos tu contraseña". Negar algo lo instala: quien
+       no se lo había preguntado, se lo pregunta. Lo que se dice es lo que
+       la extensión hace —trabajar con las sesiones que ya tienes—, y el
+       bloque de privacidad de abajo sigue estando para quien lo busque. -->
+  <section class="paso compacto oculto" id="zona-3">
+    <div class="fila-instalar">
+      <div>
+        <h2 class="titulo-instalar">Ahora, a postular</h2>
+        <p class="detalle">Busca en los cuatro portales y llena los formularios por ti,
+          con las sesiones que ya tienes abiertas.</p>
+      </div>
       <a class="boton principal" id="instalar" href="/extension.zip" download>Descargar la extensión</a>
-      <span class="detalle">Gratis · Chrome y Edge</span>
     </div>
     <details class="como-instalar">
-      <summary>Cómo instalarla (tres pasos, un minuto)</summary>
+      <summary>Cómo instalarla · 1 minuto</summary>
       <ol>
-        <li>Descomprime el archivo que acabas de descargar.</li>
-        <li>En Chrome, entra a <code>chrome://extensions</code> y activa
-          <strong>Modo de desarrollador</strong>, arriba a la derecha.</li>
-        <li>Pulsa <strong>Cargar descomprimida</strong> y elige la carpeta que descomprimiste.</li>
+        <li>Descomprime el archivo.</li>
+        <li>Entra a <code>chrome://extensions</code> y activa <strong>Modo de desarrollador</strong>.</li>
+        <li>Pulsa <strong>Cargar descomprimida</strong> y elige la carpeta.</li>
       </ol>
-      <p class="detalle">Sí, es más engorroso que un clic. Todavía no está en la
-        Chrome Web Store, y mientras no lo esté este es el único camino. El navegador
-        te avisará de que es una extensión en modo desarrollador: es normal, y ese
-        aviso desaparece cuando esté publicada.</p>
+      <p class="detalle">Chrome avisará de que está en modo desarrollador. Es lo normal
+        hasta que esté publicada en la Chrome Web Store.</p>
     </details>
   </section>
 
@@ -125,7 +127,7 @@
     </details>
   </section>
 
-  <section class="privacidad entra entra-3">
+  <section class="privacidad entra entra-3" id="privacidad">
     <h2>Qué pasa con tu CV</h2>
     <ul>
       <li>Se procesa <strong>en memoria</strong> y el resultado se te devuelve. No se guarda ningún archivo en el servidor.</li>

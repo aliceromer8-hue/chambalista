@@ -294,11 +294,16 @@ main { padding-bottom: 80px; }
 @media (prefers-reduced-motion: reduce) { .ficha-puesto:hover { transform: none; } }
 
 /* ══════════ instalar la extensión ══════════ */
-.titulo-instalar { font-size: 1.45rem; margin-bottom: 12px; text-wrap: balance; }
-#zona-3 p { max-width: 62ch; }
-.acciones-instalar {
-  display: flex; align-items: center; gap: 16px; flex-wrap: wrap; margin-top: 20px;
+/* Un bloque ligero, no otra caja pesada. Después del CV ya hay tres
+ * recuadros con borde grueso apilados; uno más con el mismo peso hace
+ * que la página se lea como una fila de obstáculos. */
+.paso.compacto { padding: 20px 24px; box-shadow: var(--dura-chica); }
+.fila-instalar {
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 20px; flex-wrap: wrap;
 }
+.titulo-instalar { font-size: 1.3rem; margin-bottom: 4px; }
+.fila-instalar .detalle { margin: 0; max-width: 46ch; }
 
 /* ══════════ ajustes de IA ══════════ */
 details summary {
