@@ -1,6 +1,0 @@
-# Apunta al de la raíz para que haya UNA sola lista.
-#
-# Vercel busca requirements.txt en la raíz del proyecto, pero según la
-# configuración también mira junto a la función. Con este puntero, dé
-# donde dé, instala lo mismo y no hay dos listas que se desincronicen.
--r ../requirements.txt
