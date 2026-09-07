@@ -38,7 +38,23 @@ try:
 except ImportError:
     pass
 
-TIEMPO_LIMITE = 60
+# Cuánto se espera al modelo, y cuánto se insiste.
+#
+# En la máquina de la persona da igual esperar: si tarda, tarda. En una
+# función serverless no: hay un tope de ejecución y pasarse devuelve un
+# 504, que es una página en blanco para quien está esperando su CV.
+#
+# Con 60 s de espera y tres reintentos con retroceso, un Gemini saturado
+# —que devuelve 503 -- puede tener la petición colgada casi cuatro
+# minutos antes de rendirse. Y rendirse está bien: hay respaldo por
+# reglas y el CV se convierte igual. Lo que no está bien es tardar tanto
+# en hacerlo.
+#
+# Por eso son configurables: el despliegue web baja el tiempo para caer
+# rápido al respaldo, y en local se deja largo.
+TIEMPO_LIMITE = int(os.environ.get("IA_TIEMPO_LIMITE", "60"))
+IA_REINTENTOS = int(os.environ.get("IA_REINTENTOS", "3"))
+IA_ESPERA = int(os.environ.get("IA_ESPERA", "6"))
 
 # Alias "latest" en vez de una versión fija: las claves nuevas de AI Studio
 # traen cuota gratuita para este alias, mientras que pedir gemini-2.0-flash
@@ -73,7 +89,7 @@ Devuelve solo la respuesta, nada más."""
 # Proveedores
 # ---------------------------------------------------------------------------
 
-def _pedir(url, cuerpo, cabeceras=None, reintentos=3):
+def _pedir(url, cuerpo, cabeceras=None, reintentos=None):
     """POST JSON con reintentos ante 429 y 503.
 
     La capa gratuita limita peticiones por minuto, y una postulación
@@ -81,7 +97,8 @@ def _pedir(url, cuerpo, cabeceras=None, reintentos=3):
     hace caer todo al respaldo por reglas sin explicación visible.
     """
     datos = json.dumps(cuerpo).encode("utf-8")
-    espera = 6
+    reintentos = IA_REINTENTOS if reintentos is None else reintentos
+    espera = IA_ESPERA
     for intento in range(reintentos):
         req = urllib.request.Request(
             url, data=datos, headers={"Content-Type": "application/json", **(cabeceras or {})}
