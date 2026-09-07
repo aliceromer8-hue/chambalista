@@ -17,7 +17,7 @@ const MARCA_FALTA = "FALTA_DATO:";
 // Servidor propio que hace de proxy: así la persona NO necesita crear
 // ninguna clave, igual que Simplify o JobCopilot. Quien tenga su propia
 // clave puede usarla y entonces no consume cuota.
-export const SERVIDOR = "https://chamba-lista.onrender.com";
+export const SERVIDOR = "https://chamba-lista-ali-ab09.vercel.app";
 
 /** Identificador del dispositivo, para llevar la cuenta de la cuota.
  *  No es una cuenta ni un correo: es un número al azar de este navegador. */

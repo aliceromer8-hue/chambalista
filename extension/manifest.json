@@ -9,7 +9,7 @@
     "scripting"
   ],
   "host_permissions": [
-    "https://chamba-lista.onrender.com/*",
+    "https://chamba-lista-ali-ab09.vercel.app/*",
     "https://api.groq.com/*",
     "https://bumeran.com.pe/*",
     "https://candidato.pe.computrabajo.com/*",
