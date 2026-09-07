@@ -1,21 +1,8 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
-
-  "_comentario": [
-    "Todo va a una sola función Flask. No hay rutas estáticas aparte porque",
-    "Flask ya sabe servir /static, y tener la configuración en dos sitios es",
-    "cómo se termina con una versión servida y otra no.",
-    "",
-    "includeFiles es imprescindible: Vercel empaqueta lo que la función",
-    "IMPORTA, y templates/, static/ y extension/ se leen en tiempo de",
-    "ejecución, no se importan. Sin esto el despliegue arranca y luego da",
-    "500 al pedir la portada, que es el peor momento para enterarse."
-  ],
-
   "rewrites": [
     { "source": "/(.*)", "destination": "/api/index" }
   ],
-
   "functions": {
     "api/index.py": {
       "includeFiles": "{templates,static,extension}/**",

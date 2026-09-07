@@ -12,8 +12,24 @@ LOCAL, la que abre un navegador con Playwright para postular. Desplegarla
 sería instalar Playwright en un servidor donde no puede funcionar —no hay
 sesión de nadie que usar— y engordar el paquete para nada.
 
-`vercel.json` manda todas las rutas aquí, incluidos los estáticos, porque
-Flask ya sabe servirlos y así no hay dos sitios donde configurarlo.
+QUÉ HACE `vercel.json`, ya que ahí no se pueden dejar comentarios
+
+Vercel valida ese archivo contra un esquema estricto y rechaza cualquier
+propiedad que no conozca, así que la explicación vive aquí:
+
+- `rewrites` manda TODAS las rutas a esta función, incluidos los
+  estáticos. Flask ya sabe servir /static, y tener la configuración
+  repartida en dos sitios es como se termina con una versión servida y
+  otra no.
+
+- `includeFiles` es imprescindible. Vercel empaqueta lo que la función
+  IMPORTA, y `templates/`, `static/` y `extension/` se LEEN en tiempo de
+  ejecución: nadie los importa. Sin esa línea el despliegue arranca bien
+  y luego devuelve 500 al pedir la portada, que es el peor momento para
+  enterarse.
+
+- `maxDuration` a 30 s porque convertir un PDF grande con pdfplumber
+  puede pasarse del límite por defecto.
 """
 import sys
 from pathlib import Path
