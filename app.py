@@ -599,4 +599,8 @@ if __name__ == "__main__":
         print("  Para usar Computrabajo de verdad:  MODO_REAL=1 python app.py\n")
     # use_reloader=False: el recargador duplica el proceso y dejaría dos
     # navegadores abiertos peleando por el mismo perfil.
-    app.run(debug=True, port=5000, use_reloader=not MODO_REAL)
+    # El puerto sale del entorno, con 5000 por defecto. Escrito a mano,
+    # arrancar fallaba si el puerto ya estaba ocupado —por ejemplo por otra
+    # instancia que quedó viva— en vez de coger otro.
+    app.run(debug=True, port=int(os.environ.get("PORT", 5000)),
+            use_reloader=not MODO_REAL)
