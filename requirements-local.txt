@@ -1,0 +1,7 @@
+# Para la versión local (app.py), la que abre un navegador de verdad y
+# postula con la sesión de la persona.
+#
+#     pip install -r requirements-local.txt
+#     playwright install chromium
+-r requirements.txt
+playwright>=1.40

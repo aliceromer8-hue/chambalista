@@ -5,7 +5,7 @@
   ],
   "functions": {
     "api/index.py": {
-      "includeFiles": "{templates,static,extension}/**",
+      "includeFiles": "{templates,static,extension,supabase}/**",
       "maxDuration": 30
     }
   }

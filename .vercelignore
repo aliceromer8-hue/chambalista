@@ -15,9 +15,9 @@ uploads/
 generados/
 postulaciones.json
 
-# El requirements de la raíz incluye Playwright; Vercel usa el de api/.
-requirements.txt
-requirements-web.txt
+# El requirements de la raíz SÍ se sube: es el que Vercel lee para
+# instalar las dependencias, y ya no lleva Playwright.
+requirements-local.txt
 
 # Pruebas y documentación: no se sirven.
 pruebas.py
