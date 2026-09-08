@@ -161,21 +161,93 @@ def descargar():
     )
 
 
+# ---------------------------------------------------------------------------
+# Cuentas
+#
+# Quien postula manda su nombre y su historial a empresas reales. Eso no
+# puede salir de un identificador de navegador que cualquiera genera.
+# ---------------------------------------------------------------------------
+
+def _token():
+    """El token de sesión que manda el navegador, si lo manda."""
+    cabecera = request.headers.get("Authorization", "")
+    return cabecera[7:].strip() if cabecera.lower().startswith("bearer ") else ""
+
+
+def _sesion_o_401():
+    """Quién pide, o None. Devuelve (usuario, respuesta_de_error)."""
+    import cuentas
+    usuario = cuentas.quien_es(_token())
+    if not usuario:
+        return None, (jsonify({"error": "Inicia sesión para continuar."}), 401)
+    return usuario, None
+
+
+@app.post("/api/cuenta/registrar")
+def cuenta_registrar():
+    import cuentas
+    d = request.get_json(silent=True) or {}
+    ok, r = cuentas.registrar(d.get("correo"), d.get("contrasena"))
+    return (jsonify(r), 200) if ok else (jsonify(r), 400)
+
+
+@app.post("/api/cuenta/entrar")
+def cuenta_entrar():
+    import cuentas
+    d = request.get_json(silent=True) or {}
+    ok, r = cuentas.entrar(d.get("correo"), d.get("contrasena"))
+    return (jsonify(r), 200) if ok else (jsonify(r), 401)
+
+
+@app.post("/api/cuenta/renovar")
+def cuenta_renovar():
+    import cuentas
+    d = request.get_json(silent=True) or {}
+    ok, r = cuentas.renovar(d.get("refresco"))
+    return (jsonify(r), 200) if ok else (jsonify(r), 401)
+
+
+@app.post("/api/cuenta/recuperar")
+def cuenta_recuperar():
+    import cuentas
+    d = request.get_json(silent=True) or {}
+    cuentas.recuperar(d.get("correo"))
+    # Siempre la misma respuesta: decir si un correo está registrado le
+    # confirma a un desconocido quién tiene cuenta aquí.
+    return jsonify({"enviado": True})
+
+
+@app.post("/api/cuenta/salir")
+def cuenta_salir():
+    import cuentas
+    cuentas.salir(_token())
+    return jsonify({"ok": True})
+
+
+@app.get("/api/cuenta/yo")
+def cuenta_yo():
+    import cuentas
+    usuario = cuentas.quien_es(_token())
+    return jsonify({"usuario": usuario}) if usuario else (jsonify({"usuario": None}), 200)
+
+
 @app.route("/api/nube/perfil", methods=["GET", "POST"])
 def nube_perfil():
-    """El CV guardado en la nube, para que no se pierda al cambiar de equipo."""
+    """El CV guardado, para que no se pierda al cambiar de equipo."""
     import nube
     if not nube.activa():
-        return jsonify({"error": "El guardado en la nube no está configurado."}), 501
+        return jsonify({"error": "El guardado no está configurado."}), 501
+    usuario, error = _sesion_o_401()
+    if error:
+        return error
 
-    dispositivo = _dispositivo()
     if request.method == "GET":
-        return jsonify({"perfil": nube.leer_perfil(dispositivo)})
+        return jsonify({"perfil": nube.leer_perfil(_token())})
 
     perfil = request.get_json(silent=True)
     if not perfil:
         return jsonify({"error": "Falta el perfil."}), 400
-    return jsonify({"guardado": nube.guardar_perfil(dispositivo, perfil)})
+    return jsonify({"guardado": nube.guardar_perfil(_token(), usuario["id"], perfil)})
 
 
 @app.route("/api/nube/postulaciones", methods=["GET", "POST"])
@@ -183,28 +255,29 @@ def nube_postulaciones():
     """El historial de postulaciones. Es lo que de verdad duele perder."""
     import nube
     if not nube.activa():
-        return jsonify({"error": "El guardado en la nube no está configurado."}), 501
+        return jsonify({"error": "El guardado no está configurado."}), 501
+    usuario, error = _sesion_o_401()
+    if error:
+        return error
 
-    dispositivo = _dispositivo()
     if request.method == "GET":
-        return jsonify({"postulaciones": nube.leer_postulaciones(dispositivo)})
+        return jsonify({"postulaciones": nube.leer_postulaciones(_token())})
 
     datos = request.get_json(silent=True) or {}
     items = datos.get("postulaciones") or []
-    return jsonify({"guardadas": nube.guardar_postulaciones(dispositivo, items)})
+    return jsonify({"guardadas": nube.guardar_postulaciones(_token(), usuario["id"], items)})
 
 
 @app.delete("/api/nube/todo")
 def nube_borrar():
-    """Borra todo lo guardado de este dispositivo.
-
-    La Ley 29733 da derecho a que le borren a uno sus datos, y ese
-    derecho no vale nada si no hay forma de ejercerlo.
-    """
+    """Borra el CV y el historial de quien lo pide (Ley 29733)."""
     import nube
     if not nube.activa():
-        return jsonify({"error": "El guardado en la nube no está configurado."}), 501
-    return jsonify({"borrado": nube.borrar_todo(_dispositivo())})
+        return jsonify({"error": "El guardado no está configurado."}), 501
+    _, error = _sesion_o_401()
+    if error:
+        return error
+    return jsonify({"borrado": nube.borrar_todo(_token())})
 
 
 @app.get("/extension.zip")

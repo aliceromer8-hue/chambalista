@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Chamba Lista — postula a treinta empleos con un clic</title>
-<meta name="description" content="Busca en Computrabajo, Bumeran, LinkedIn e Indeed a la vez, adapta tu CV a cada vacante y postula sin escribir lo mismo mil veces. Gratis y sin registro.">
+<meta name="description" content="Busca en Computrabajo, Bumeran, LinkedIn e Indeed a la vez, adapta tu CV a cada vacante y postula sin escribir lo mismo mil veces. Convertir tu CV es gratis y sin cuenta.">
 <link rel="stylesheet" href="/static/css/web.css">
 </head>
 <body>
@@ -22,7 +22,12 @@
       </svg>
       Chamba Lista
     </span>
-    <span class="detalle">Gratis · sin registro · tu CV no se guarda</span>
+    <span class="detalle" id="lema">Prácticas y primer empleo en Perú</span>
+    <div class="cuenta" id="cuenta">
+      <span class="detalle" id="quien-soy"></span>
+      <button class="boton chico" id="btn-entrar">Entrar</button>
+      <button class="boton chico oculto" id="btn-salir">Salir</button>
+    </div>
   </div>
 </header>
 
@@ -96,8 +101,12 @@
         <p class="detalle">Busca en los cuatro portales y llena los formularios por ti,
           con las sesiones que ya tienes abiertas.</p>
       </div>
-      <a class="boton principal" id="instalar" href="/extension.zip" download>Descargar la extensión</a>
+      <a class="boton principal oculto" id="instalar" href="/extension.zip" download>Descargar la extensión</a>
+      <button class="boton principal" id="instalar-entrar">Crear cuenta para postular</button>
     </div>
+    <p class="detalle" id="por-que-cuenta">Para postular hace falta una cuenta:
+      lo que se envía va con tu nombre a empresas reales, y tiene que quedar
+      claro de quién es.</p>
     <details class="como-instalar">
       <summary>Cómo instalarla · 1 minuto</summary>
       <ol>
@@ -113,12 +122,14 @@
   <section class="privacidad entra entra-3" id="privacidad">
     <h2>Qué pasa con tu CV</h2>
     <ul>
-      <li><strong>El archivo que subes no se guarda.</strong> Se lee, se convierte y se descarta.</li>
-      <li>No hay registro, ni cuenta, ni correo. No se te pide nada.</li>
-      <li>Si instalas la extensión, tu CV y tu historial de postulaciones
-        <strong>sí se guardan</strong>, para que no los pierdas al cambiar de equipo.
-        Se identifican con un código que genera tu navegador, no con tu nombre.
-        Puedes borrarlo todo cuando quieras desde <em>Mi perfil</em>.</li>
+      <li><strong>Convertir tu CV no pide cuenta.</strong> El archivo se lee,
+        se convierte y se descarta: no se guarda en el servidor.</li>
+      <li><strong>Postular sí la pide.</strong> Lo que se envía lleva tu nombre a
+        empresas reales, y tiene que quedar claro de quién viene. Para eso se
+        guarda tu correo.</li>
+      <li>Con cuenta, tu CV y tu historial de postulaciones se guardan para que
+        no los pierdas al cambiar de equipo. Solo tú puedes verlos, y puedes
+        <strong>borrarlo todo</strong> cuando quieras.</li>
       <!-- Lo rellena web.js con lo que diga el servidor. Fija sería
            mentira en cuanto cambie la configuración de la IA. -->
       <li id="privacidad-ia">Para leer tu CV, su texto se envía a Google.</li>
@@ -126,6 +137,33 @@
   </section>
 
 </main>
+
+<!-- Cuenta. Un solo diálogo para entrar y para registrarse: son el mismo
+     formulario y separarlos obliga a elegir antes de saber si ya tienes
+     cuenta, que es justo lo que la gente no recuerda. -->
+<dialog id="dlg-cuenta">
+  <form method="dialog" id="form-cuenta">
+    <h2 id="titulo-cuenta">Entra a tu cuenta</h2>
+    <p class="detalle" id="sub-cuenta">Tu CV y tus postulaciones te siguen entre dispositivos.</p>
+    <label>Correo
+      <input type="email" id="correo" autocomplete="email" required placeholder="tu@correo.com">
+    </label>
+    <label>Contraseña
+      <input type="password" id="contrasena" autocomplete="current-password" required
+             minlength="8" placeholder="mínimo 8 caracteres">
+    </label>
+    <p class="aviso-cuenta oculto" id="error-cuenta"></p>
+    <div class="acciones-cuenta">
+      <button class="boton principal" id="btn-enviar" value="enviar">Entrar</button>
+      <button class="boton texto" id="btn-cerrar" value="cancelar" type="button">Cancelar</button>
+    </div>
+    <p class="detalle">
+      <button class="enlace" type="button" id="btn-cambiar">¿No tienes cuenta? Créala</button>
+      <br>
+      <button class="enlace" type="button" id="btn-olvide">Olvidé mi contraseña</button>
+    </p>
+  </form>
+</dialog>
 
 <footer class="ancho">
   <p>Chamba Lista — hecho para buscar trabajo en Perú.</p>

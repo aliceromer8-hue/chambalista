@@ -2,56 +2,70 @@
 """Guardado en Supabase, por HTTP y sin dependencias nuevas.
 
 Se habla con PostgREST —la API que Supabase expone sobre la base— con
-`urllib`, en vez de instalar el paquete `supabase`. Dos razones: el
-paquete arrastra httpx, gotrue, storage3 y realtime, que aquí no se usan
-para nada, y el despliegue tiene que seguir siendo pequeño.
+`urllib`, en vez de instalar el paquete `supabase`, que arrastra httpx,
+gotrue, storage3 y realtime para nada.
 
-TODO ESTO ES OPCIONAL. Si no hay variables de entorno configuradas, cada
-función devuelve None o False y el producto sigue funcionando igual que
-antes, con los datos solo en el navegador. Nunca revienta por no tener
-base de datos: perder el guardado no puede impedirle a nadie convertir
-su CV.
+QUIÉN VE QUÉ
 
-CONFIGURACIÓN
+Cada llamada va con el TOKEN DE LA PERSONA, no con la clave de servicio.
+Es la diferencia entre dos formas de separar los datos:
+
+  con la clave de servicio → nuestro código tiene que acordarse de filtrar
+                             por usuario en cada consulta, y el día que se
+                             olvide en una, esa consulta devuelve los CV
+                             de todo el mundo.
+
+  con el token de la persona → las políticas de la base (002-cuentas.sql)
+                               solo dejan ver las filas de su dueño. Un
+                               olvido nuestro no puede filtrar nada.
+
+La segunda es la buena, y es la que se usa aquí. La clave de servicio se
+reserva para lo administrativo, que hoy es solo anotar eventos anónimos.
+
+TODO ESTO ES OPCIONAL. Sin configuración, cada función devuelve None o
+False y el producto sigue funcionando: perder el guardado no puede
+impedirle a nadie convertir su CV.
 
     SUPABASE_URL           https://xxxx.supabase.co
-    SUPABASE_SERVICE_KEY   la clave de servicio (NO la anónima)
-
-La clave de servicio se salta las políticas de RLS, así que solo puede
-vivir en el servidor. Si aparece en el navegador, cualquiera puede leer
-la base entera.
+    SUPABASE_ANON_KEY      la clave anónima (va con el token de la persona)
+    SUPABASE_SERVICE_KEY   la de servicio (solo para eventos anónimos)
 """
-import hashlib
 import json
 import os
 import urllib.error
 import urllib.request
 
 URL = (os.environ.get("SUPABASE_URL") or "").rstrip("/")
-CLAVE = os.environ.get("SUPABASE_SERVICE_KEY") or ""
-TIEMPO = 8          # segundos: si la base tarda más, se sigue sin ella
+ANON = os.environ.get("SUPABASE_ANON_KEY") or ""
+SERVICIO = os.environ.get("SUPABASE_SERVICE_KEY") or ""
+TIEMPO = 8
 
 
 def activa():
     """¿Hay base de datos configurada?"""
-    return bool(URL and CLAVE)
+    return bool(URL and (ANON or SERVICIO))
 
 
-def _pedir(metodo, ruta, cuerpo=None, cabeceras=None):
+def _pedir(metodo, ruta, cuerpo=None, cabeceras=None, token=None):
     """Una llamada a PostgREST. Devuelve el JSON, o None si algo falla.
 
-    Se traga los errores a propósito. El guardado es un extra: si la base
-    está caída, la persona tiene que poder convertir su CV igual.
+    Se traga los errores a propósito: el guardado es un extra, y si la
+    base está caída la persona tiene que poder convertir su CV igual.
     """
-    if not activa():
+    if not URL:
+        return None
+    # Con token de persona se usa la clave anónima; sin él, la de
+    # servicio, que solo debería pasar para los eventos anónimos.
+    clave = ANON if token else SERVICIO
+    if not clave:
         return None
     peticion = urllib.request.Request(
         f"{URL}/rest/v1/{ruta}",
         method=metodo,
         data=json.dumps(cuerpo).encode("utf-8") if cuerpo is not None else None,
         headers={
-            "apikey": CLAVE,
-            "Authorization": f"Bearer {CLAVE}",
+            "apikey": clave,
+            "Authorization": f"Bearer {token or clave}",
             "Content-Type": "application/json",
             **(cabeceras or {}),
         },
@@ -64,47 +78,21 @@ def _pedir(metodo, ruta, cuerpo=None, cabeceras=None):
         return None
 
 
-def _huella(dispositivo):
-    """El identificador del dispositivo, con hash.
-
-    Se guarda el hash y no el original para que un volcado de la base no
-    le sirva a nadie para hacerse pasar por otro. Es lo mismo que se hace
-    con una contraseña, por el mismo motivo.
-    """
-    return hashlib.sha256(f"chamba-lista:{dispositivo}".encode("utf-8")).hexdigest()
-
-
-def _id_dispositivo(dispositivo):
-    """El uuid interno del dispositivo. Lo crea si es la primera vez."""
-    h = _huella(dispositivo)
-    filas = _pedir("POST", "dispositivos?on_conflict=huella",
-                   [{"huella": h, "visto": "now()"}],
-                   {"Prefer": "resolution=merge-duplicates,return=representation"})
-    if filas:
-        return filas[0].get("id")
-    # El upsert puede no devolver nada según la configuración: se consulta.
-    filas = _pedir("GET", f"dispositivos?huella=eq.{h}&select=id")
-    return filas[0]["id"] if filas else None
-
-
 # ---------------------------------------------------------------------
 # El CV
 # ---------------------------------------------------------------------
 
-def guardar_perfil(dispositivo, perfil):
-    """Guarda el CV. Devuelve True si quedó guardado."""
-    ident = _id_dispositivo(dispositivo)
-    if not ident:
-        return False
-    r = _pedir("POST", "perfiles?on_conflict=dispositivo",
-               [{"dispositivo": ident, "datos": perfil, "actualizado": "now()"}],
-               {"Prefer": "resolution=merge-duplicates"})
+def guardar_perfil(token, usuario_id, perfil):
+    """Guarda el CV de quien manda el token."""
+    r = _pedir("POST", "perfiles?on_conflict=usuario",
+               [{"usuario": usuario_id, "datos": perfil, "actualizado": "now()"}],
+               {"Prefer": "resolution=merge-duplicates"}, token=token)
     return r is not None
 
 
-def leer_perfil(dispositivo):
-    """El CV guardado, o None si no hay."""
-    filas = _pedir("GET", f"perfiles?dispositivo=eq.{_id_dispositivo(dispositivo)}&select=datos")
+def leer_perfil(token):
+    """El CV guardado. Las políticas ya limitan a lo suyo."""
+    filas = _pedir("GET", "perfiles?select=datos", token=token)
     return filas[0]["datos"] if filas else None
 
 
@@ -112,18 +100,17 @@ def leer_perfil(dispositivo):
 # Postulaciones
 # ---------------------------------------------------------------------
 
-def guardar_postulaciones(dispositivo, items):
+def guardar_postulaciones(token, usuario_id, items):
     """Sincroniza el historial. Devuelve cuántas se guardaron.
 
-    Se manda todo el historial de golpe y PostgREST resuelve el conflicto
-    por (dispositivo, url): lo que ya estaba se actualiza, lo nuevo entra.
-    Así el navegador manda y no hay que llevar la cuenta de qué cambió.
+    Se manda todo de golpe y PostgREST resuelve el conflicto por
+    (usuario, url): lo que ya estaba se actualiza, lo nuevo entra. Así
+    manda el navegador y no hay que llevar la cuenta de qué cambió.
     """
-    ident = _id_dispositivo(dispositivo)
-    if not ident or not items:
+    if not items:
         return 0
     filas = [{
-        "dispositivo": ident,
+        "usuario": usuario_id,
         "url": i.get("url") or "",
         "titulo": i.get("titulo") or i.get("puesto") or "",
         "empresa": i.get("empresa") or "",
@@ -134,19 +121,15 @@ def guardar_postulaciones(dispositivo, items):
     } for i in items if i.get("url")]
     if not filas:
         return 0
-    r = _pedir("POST", "postulaciones?on_conflict=dispositivo,url", filas,
-               {"Prefer": "resolution=merge-duplicates"})
+    r = _pedir("POST", "postulaciones?on_conflict=usuario,url", filas,
+               {"Prefer": "resolution=merge-duplicates"}, token=token)
     return len(filas) if r is not None else 0
 
 
-def leer_postulaciones(dispositivo):
-    """El historial guardado, de más reciente a más antiguo."""
-    ident = _id_dispositivo(dispositivo)
-    if not ident:
-        return []
-    filas = _pedir("GET", f"postulaciones?dispositivo=eq.{ident}"
-                          "&select=url,titulo,empresa,portal,estado,motivo,actualizado"
-                          "&order=actualizado.desc")
+def leer_postulaciones(token):
+    """El historial, de más reciente a más antiguo."""
+    filas = _pedir("GET", "postulaciones?select=url,titulo,empresa,portal,estado,motivo,actualizado"
+                          "&order=actualizado.desc", token=token)
     return filas or []
 
 
@@ -154,14 +137,13 @@ def leer_postulaciones(dispositivo):
 # Borrado
 # ---------------------------------------------------------------------
 
-def borrar_todo(dispositivo):
-    """Borra el CV y las postulaciones de este dispositivo.
+def borrar_todo(token):
+    """Borra el CV y las postulaciones de quien lo pide.
 
     La Ley 29733 da derecho a que le borren a uno sus datos, y ese
     derecho no sirve de nada si no hay un botón que lo ejerza.
     """
-    r = _pedir("POST", "rpc/borrar_dispositivo", {"huella_dada": _huella(dispositivo)})
-    return r is not None
+    return _pedir("POST", "rpc/borrar_mis_datos", {}, token=token) is not None
 
 
 # ---------------------------------------------------------------------
@@ -169,10 +151,10 @@ def borrar_todo(dispositivo):
 # ---------------------------------------------------------------------
 
 def anotar(tipo, detalle=None):
-    """Un evento anónimo. Sin dispositivo y sin nada que apunte a nadie.
+    """Un evento anónimo: sin usuario y sin nada que apunte a nadie.
 
-    Sirve para saber si el producto se usa y dónde falla el parser, que
-    es lo único que no se puede deducir mirando el código.
+    Es lo único que usa la clave de servicio, porque no hay ninguna
+    persona a cuyo nombre escribirlo.
     """
     _pedir("POST", "eventos", [{"tipo": tipo, "detalle": detalle or {}}],
            {"Prefer": "return=minimal"})

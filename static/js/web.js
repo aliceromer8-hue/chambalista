@@ -210,3 +210,142 @@ $("#otro").addEventListener("click", () => {
 });
 
 pintarPrivacidadIA();
+
+// ---------- cuenta ----------
+// Convertir el CV NO pide cuenta: es el gancho y tiene que seguir sin
+// fricción. Postular SÍ, porque lo que se envía lleva el nombre de la
+// persona a empresas reales y tiene que quedar claro de quién viene.
+//
+// La sesión vive en localStorage. Es lo normal en una web sin servidor
+// de sesiones, y el token caduca solo; si el navegador la pierde, se
+// vuelve a entrar y no se pierde nada, porque los datos están en la nube.
+const SESION = "chamba_sesion";
+
+function sesion() {
+  try { return JSON.parse(localStorage.getItem(SESION) || "null"); } catch { return null; }
+}
+
+function guardarSesion(s) {
+  try {
+    if (s) localStorage.setItem(SESION, JSON.stringify(s));
+    else localStorage.removeItem(SESION);
+  } catch { /* navegación privada */ }
+}
+
+/** Cabecera de autorización, si hay sesión. */
+function conSesion(extra = {}) {
+  const s = sesion();
+  return s?.token ? { ...extra, Authorization: `Bearer ${s.token}` } : extra;
+}
+
+function pintarCuenta() {
+  const s = sesion();
+  const dentro = Boolean(s?.token);
+  $("#quien-soy").textContent = dentro ? s.usuario.correo : "";
+  $("#btn-entrar").classList.toggle("oculto", dentro);
+  $("#btn-salir").classList.toggle("oculto", !dentro);
+  // El paso de postular enseña el botón que toca según haya sesión o no.
+  const instalar = $("#instalar"), pedirCuenta = $("#instalar-entrar"), porque = $("#por-que-cuenta");
+  if (instalar && pedirCuenta) {
+    instalar.classList.toggle("oculto", !dentro);
+    pedirCuenta.classList.toggle("oculto", dentro);
+    if (porque) porque.classList.toggle("oculto", dentro);
+  }
+}
+
+// El diálogo hace las dos cosas: entrar y registrarse. Separarlos obliga
+// a decidir antes de saber si ya tienes cuenta, que es justo lo que la
+// gente no recuerda.
+let modoRegistro = false;
+
+function pintarModo() {
+  $("#titulo-cuenta").textContent = modoRegistro ? "Crea tu cuenta" : "Entra a tu cuenta";
+  $("#sub-cuenta").textContent = modoRegistro
+    ? "Hace falta para postular: lo que se envía va con tu nombre."
+    : "Tu CV y tus postulaciones te siguen entre dispositivos.";
+  $("#btn-enviar").textContent = modoRegistro ? "Crear cuenta" : "Entrar";
+  $("#btn-cambiar").textContent = modoRegistro
+    ? "¿Ya tienes cuenta? Entra"
+    : "¿No tienes cuenta? Créala";
+  $("#contrasena").setAttribute("autocomplete", modoRegistro ? "new-password" : "current-password");
+  errorCuenta("");
+}
+
+function errorCuenta(t) {
+  const p = $("#error-cuenta");
+  p.textContent = t || "";
+  p.classList.toggle("oculto", !t);
+}
+
+function abrirCuenta(registro = false) {
+  modoRegistro = registro;
+  pintarModo();
+  $("#dlg-cuenta").showModal();
+}
+
+$("#btn-entrar").addEventListener("click", () => abrirCuenta(false));
+$("#instalar-entrar")?.addEventListener("click", () => abrirCuenta(true));
+$("#btn-cerrar").addEventListener("click", () => $("#dlg-cuenta").close());
+$("#btn-cambiar").addEventListener("click", () => { modoRegistro = !modoRegistro; pintarModo(); });
+
+$("#btn-olvide").addEventListener("click", async () => {
+  const correo = $("#correo").value.trim();
+  if (!correo) { errorCuenta("Escribe tu correo primero."); return; }
+  await fetch("/api/cuenta/recuperar", {
+    method: "POST", headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ correo }),
+  });
+  // Siempre el mismo mensaje: decir si un correo está registrado le
+  // confirma a un desconocido quién tiene cuenta aquí.
+  errorCuenta("Si ese correo tiene cuenta, te llegará un enlace para cambiar la contraseña.");
+});
+
+$("#form-cuenta").addEventListener("submit", async (ev) => {
+  ev.preventDefault();
+  const correo = $("#correo").value.trim();
+  const contrasena = $("#contrasena").value;
+  const boton = $("#btn-enviar");
+  boton.disabled = true;
+  errorCuenta("");
+  try {
+    const r = await fetch(`/api/cuenta/${modoRegistro ? "registrar" : "entrar"}`, {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ correo, contrasena }),
+    });
+    const j = await r.json();
+    if (!r.ok) { errorCuenta(j.error || "No se pudo completar."); return; }
+    if (j.falta_confirmar) {
+      errorCuenta("Cuenta creada. Confirma el correo que te enviamos y vuelve a entrar.");
+      modoRegistro = false; pintarModo();
+      return;
+    }
+    guardarSesion(j);
+    pintarCuenta();
+    $("#dlg-cuenta").close();
+    $("#contrasena").value = "";
+  } catch (e) {
+    errorCuenta("No se pudo conectar. Inténtalo de nuevo.");
+  } finally {
+    boton.disabled = false;
+  }
+});
+
+$("#btn-salir").addEventListener("click", async () => {
+  try {
+    await fetch("/api/cuenta/salir", { method: "POST", headers: conSesion() });
+  } catch { /* da igual: lo que importa es soltarla de aquí */ }
+  guardarSesion(null);
+  pintarCuenta();
+});
+
+// Al cargar: si el token caducó, se limpia en vez de dejar una sesión
+// muerta que falla en la primera petición sin explicar por qué.
+(async () => {
+  pintarCuenta();
+  if (!sesion()?.token) return;
+  try {
+    const r = await fetch("/api/cuenta/yo", { headers: conSesion() });
+    const j = await r.json();
+    if (!j.usuario) { guardarSesion(null); pintarCuenta(); }
+  } catch { /* sin red: se deja como está */ }
+})();

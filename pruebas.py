@@ -204,6 +204,7 @@ titulo("EL .DOCX ADAPTADO — solo añade, nunca borra")
 import base64
 import io
 import json
+import pathlib
 import re as _re
 import zipfile
 
@@ -447,6 +448,69 @@ check("el panel viaja completo",
       "panel/panel.html" in dentro and "panel/panel.css" in dentro and "panel/panel.js" in dentro)
 check("no se cuela ninguna prueba", not any("prueba" in n for n in dentro))
 check("ni carpetas de caché", "__pycache__" not in carpetas)
+
+# ---------------------------------------------------------------------
+titulo("CUENTAS — la puerta de postular")
+# ---------------------------------------------------------------------
+# Convertir el CV NO pide cuenta: es el gancho y tiene que seguir sin
+# fricción. Todo lo que guarda o manda algo en nombre de la persona SÍ,
+# porque eso llega a empresas reales y tiene que quedar claro de quién es.
+import cuentas
+
+check("convertir el CV sigue abierto",
+      cliente.post("/api/cv/preview", json=CV).status_code == 200)
+check("sugerir puestos sigue abierto",
+      cliente.post("/api/cv/sugerencias", json=CV).status_code == 200)
+
+# Lo que toca datos guardados exige sesión. 501 si no hay base
+# configurada, 401 si la hay: lo que NUNCA puede salir es un 200.
+for metodo, ruta in (("GET", "/api/nube/perfil"),
+                     ("POST", "/api/nube/perfil"),
+                     ("GET", "/api/nube/postulaciones"),
+                     ("POST", "/api/nube/postulaciones"),
+                     ("DELETE", "/api/nube/todo")):
+    r = cliente.open(ruta, method=metodo, json={} if metodo == "POST" else None)
+    check(f"sin sesión se cierra: {metodo} {ruta.split('/')[-1]}",
+          r.status_code in (401, 501), f"devolvió {r.status_code}")
+
+# Un token inventado no puede pasar por bueno.
+r = cliente.get("/api/nube/perfil", headers={"Authorization": "Bearer inventado"})
+check("un token falso no abre nada", r.status_code in (401, 501), str(r.status_code))
+
+# La validación se hace aquí antes de molestar a Supabase.
+for correo, contra, motivo in [
+    ("noesuncorreo", "12345678", "correo sin arroba"),
+    ("a@b", "12345678", "dominio incompleto"),
+    ("a@b.pe", "1234567", "contraseña de 7"),
+    ("", "", "todo vacío"),
+]:
+    ok, r = cuentas.registrar(correo, contra)
+    check(f"rechaza {motivo}", not ok and bool(r.get("error")))
+
+check("la contraseña mínima son 8", cuentas.MINIMO_CONTRASENA >= 8)
+
+# Los errores de Supabase llegan en inglés y de un servicio que la
+# persona no sabe que existe.
+check("traduce «invalid login credentials»",
+      "no coinciden" in cuentas._en_castellano({"msg": "Invalid login credentials"}))
+check("traduce «user already registered»",
+      "ya tiene una cuenta" in cuentas._en_castellano({"msg": "User already registered"}))
+check("un error desconocido no sale vacío",
+      bool(cuentas._en_castellano({})))
+
+# Recuperar contraseña responde igual exista o no la cuenta: decir «ese
+# correo no está registrado» le confirma a un desconocido quién tiene
+# cuenta aquí.
+ok1, _ = cuentas.recuperar("existe@correo.pe")
+ok2, _ = cuentas.recuperar("noexiste@correo.pe")
+check("recuperar no revela si el correo tiene cuenta", ok1 == ok2)
+
+# La página no puede seguir prometiendo lo contrario.
+_html = (BASE_HTML := pathlib.Path("templates/web.html").read_text(encoding="utf-8"))
+check("la página ya no promete «sin registro»",
+      "sin registro" not in _html.lower(), "sigue diciéndolo")
+check("y explica por qué postular pide cuenta",
+      "postular sí la pide" in _html.lower())
 
 print(f"\n{'TODO OK' if fallos == 0 else f'{fallos} FALLO(S)'}")
 sys.exit(1 if fallos else 0)

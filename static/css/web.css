@@ -362,3 +362,35 @@ footer { padding: 26px 24px 60px; color: var(--tinta-2); font-size: 13px; }
   font: inherit; font-size: 14px; background: var(--papel); color: var(--tinta);
 }
 .buscador-libre input:focus { outline: none; box-shadow: var(--dura-chica); }
+
+/* ══════════ cuenta ══════════ */
+.cuenta { margin-left: auto; display: flex; align-items: center; gap: 10px; }
+#lema { margin-left: auto; margin-bottom: 0; }
+.cuenta + #lema, #lema + .cuenta { margin-left: 0; }
+.boton.chico { padding: 7px 14px; font-size: 13px; }
+#quien-soy { margin: 0; max-width: 22ch; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+@media (max-width: 720px) { #lema { display: none; } .cuenta { margin-left: auto; } }
+
+dialog#dlg-cuenta {
+  border: 2px solid var(--linea); border-radius: var(--r);
+  box-shadow: var(--dura); background: var(--papel-2); color: var(--tinta);
+  padding: 28px 30px; max-width: 420px; width: calc(100% - 32px);
+}
+dialog#dlg-cuenta::backdrop { background: rgba(19, 19, 22, .55); }
+dialog#dlg-cuenta h2 { font-size: 1.5rem; margin-bottom: 6px; }
+dialog#dlg-cuenta label {
+  display: block; margin-top: 16px; font-size: 13px; font-weight: 700;
+}
+dialog#dlg-cuenta input {
+  display: block; width: 100%; margin-top: 6px; padding: 11px 13px;
+  border: 2px solid var(--linea); border-radius: var(--r-chico);
+  font: inherit; font-size: 14px; background: var(--papel); color: var(--tinta);
+}
+dialog#dlg-cuenta input:focus { outline: none; box-shadow: var(--dura-chica); }
+.acciones-cuenta { display: flex; gap: 10px; margin: 20px 0 12px; }
+.acciones-cuenta .boton { flex: 1; }
+.aviso-cuenta {
+  margin: 14px 0 0; padding: 10px 12px; font-size: 13px;
+  background: var(--coral-suave); border: 2px solid var(--coral);
+  border-radius: var(--r-chico);
+}
