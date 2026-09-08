@@ -426,3 +426,10 @@ dialog#dlg-cuenta input:focus { outline: none; box-shadow: var(--dura-chica); }
 }
 .tabla-legal th { font-size: 11px; text-transform: uppercase; letter-spacing: .1em; color: var(--tinta-2); }
 .volver { margin-top: 40px; }
+
+/* Aviso de que lo que se ve viene de una visita anterior. Encontrarse la
+ * página ya avanzada sin explicación desconcierta más que ayudar. */
+.nota-vuelta {
+  background: var(--menta-suave); border: 2px solid var(--menta);
+  border-radius: var(--r-chico); padding: 9px 13px; margin-top: 10px;
+}

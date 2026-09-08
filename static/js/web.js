@@ -3,6 +3,40 @@
 
 const $ = (s) => document.querySelector(s);
 const estado = { archivo: null, perfil: null };
+
+// ---------- no perder lo hecho ----------
+// El CV convertido se guarda en el navegador. Sin esto, salir a mirar una
+// vacante —que es justo lo que la página invita a hacer— borraba todo el
+// trabajo: al volver había que subir el CV otra vez y esperar de nuevo a
+// que la IA lo leyera. Perder el progreso por seguir un enlace nuestro es
+// el peor momento posible para perderlo.
+//
+// Se guarda solo el perfil ya convertido, no el archivo original: es lo
+// que cuesta obtener, y el archivo lo tiene ella en su disco.
+const TRABAJO = "chamba_trabajo";
+
+function guardarTrabajo() {
+  try {
+    if (estado.perfil) {
+      localStorage.setItem(TRABAJO, JSON.stringify({
+        perfil: estado.perfil,
+        cuando: Date.now(),
+      }));
+    } else {
+      localStorage.removeItem(TRABAJO);
+    }
+  } catch { /* navegación privada: se sigue sin guardar */ }
+}
+
+function trabajoGuardado() {
+  try {
+    const t = JSON.parse(localStorage.getItem(TRABAJO) || "null");
+    // Una semana. Más allá, el CV probablemente ya cambió y restaurarlo
+    // sería enseñarle algo viejo sin que sepa de dónde salió.
+    if (!t?.perfil || Date.now() - (t.cuando || 0) > 7 * 24 * 3600 * 1000) return null;
+    return t.perfil;
+  } catch { return null; }
+}
 // ---------- qué se dice sobre la IA ----------
 // La frase de privacidad NO va fija en el HTML: depende de si la clave de
 // Gemini tiene facturación activada. En el plan gratuito, Google usa lo
@@ -84,6 +118,8 @@ $("#procesar").addEventListener("click", async () => {
     $("#preview").innerHTML = pj.html || "";
 
     await pintarSugerencias();
+
+    guardarTrabajo();
 
     $("#estado").textContent = "";
     $("#zona-1").classList.add("oculto");
@@ -198,6 +234,7 @@ async function pintarSugerencias() {
 
 $("#otro").addEventListener("click", () => {
   estado.archivo = estado.perfil = null;
+  guardarTrabajo();          // al vaciarse el perfil, esto lo borra
   input.value = "";
   $("#nombre-archivo").textContent = "";
   $("#procesar").disabled = true;
@@ -209,7 +246,43 @@ $("#otro").addEventListener("click", () => {
   window.scrollTo({ top: 0, behavior: "smooth" });
 });
 
+// Al volver, se recupera lo que ya estaba hecho.
+//
+// Se repinta desde el perfil guardado en vez de rehacer la conversión:
+// no se vuelve a subir nada, no se vuelve a llamar a la IA y no se vuelve
+// a esperar. La vista previa y las sugerencias sí se piden otra vez,
+// porque son baratas y así reflejan cualquier cambio del formato.
+async function restaurarTrabajo() {
+  const perfil = trabajoGuardado();
+  if (!perfil) return;
+  estado.perfil = perfil;
+
+  try {
+    const prev = await fetch("/api/cv/preview", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(perfil),
+    });
+    $("#preview").innerHTML = (await prev.json()).html || "";
+  } catch { /* sin red: se enseña igual lo demás */ }
+
+  await pintarSugerencias();
+
+  $("#zona-1").classList.add("oculto");
+  $("#zona-2").classList.remove("oculto");
+  $("#zona-3").classList.remove("oculto");
+  for (const sel of ["#cadena", "#rotulo-subir", "#privacidad"]) {
+    $(sel).classList.add("oculto");
+  }
+
+  // Se avisa de que esto viene de antes. Encontrarse la página ya
+  // avanzada sin explicación desconcierta más que ayudar.
+  const nota = $("#nota-restaurado");
+  if (nota) nota.classList.remove("oculto");
+}
+
 pintarPrivacidadIA();
+restaurarTrabajo();
 
 // ---------- cuenta ----------
 // Convertir el CV NO pide cuenta: es el gancho y tiene que seguir sin
