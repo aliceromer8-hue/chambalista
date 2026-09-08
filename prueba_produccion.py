@@ -115,10 +115,12 @@ c, r = pedir("/api/cv/procesar", "POST", archivo=("cv_prueba.docx", contenido))
 if not check("el CV se lee", c == 200, r.get("error")):
     sys.exit(1)
 perfil = r["perfil"]
-print(f"      leído con: {r.get('leido_con', '?')}")
+print(f"      analizado con: {perfil.get('analizado_con')}")
 check("saca el nombre", "MARIANA" in (perfil.get("nombre") or "").upper(), perfil.get("nombre"))
 sec = perfil.get("secciones") or {}
 check("y las secciones", len(sec) >= 3, ", ".join(sec)[:60])
+check("lo leyó el modelo, no el respaldo por reglas",
+      perfil.get("analizado_con") == "ia", perfil.get("analizado_con"))
 plano = json.dumps(perfil, ensure_ascii=False).lower()
 check("conserva las herramientas que declara el CV",
       "power bi" in plano and "excel" in plano)

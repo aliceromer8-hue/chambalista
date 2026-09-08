@@ -102,12 +102,39 @@ def _ciclo(t):
     return None
 
 
+def texto_de_experiencia(perfil):
+    """Solo los bloques de trabajo, con sus fechas.
+
+    Separado del CV entero a propósito. `_anios_experiencia` leía todo el
+    documento y contaba «Bachiller en Administración | 2021 - 2026» —los
+    años de la CARRERA— como cinco años trabajando. A una estudiante de
+    décimo ciclo le salían vacantes de analista senior, que es justo el
+    aviso donde la van a filtrar.
+    """
+    partes = []
+    for clave in ("experiencia", "liderazgo"):
+        for e in perfil.get(clave) or []:
+            if isinstance(e, str):
+                partes.append(e)
+            elif isinstance(e, dict):
+                partes.append(" ".join(filter(None, [
+                    e.get("organizacion"), e.get("cargo"),
+                    e.get("fechas"), *(e.get("logros") or []),
+                ])))
+    # El modelo a veces deja la experiencia en `secciones` en vez de en
+    # entradas. Se miran las dos formas para no quedarse a ciegas.
+    for nombre, bloque in (perfil.get("secciones") or {}).items():
+        if re.search(r"experien|laboral|trabajo|work", _plano(nombre)):
+            partes.extend(str(x) for x in (bloque or []))
+    return " \n ".join(partes)
+
+
 def _anios_experiencia(t):
-    """Años de experiencia declarados, o los que se deducen de las fechas."""
-    m = re.search(r"(\d{1,2})\s*a[nñ]os?\s*de\s*experiencia", t)
-    if m:
-        return int(m.group(1))
-    # Rangos tipo "2023 - 2025" o "2023 - actualidad".
+    """Años de experiencia deducidos de los rangos de fechas del texto dado.
+
+    Ojo con qué texto se le pasa: mide lo que reciba. Para el momento de
+    carrera se le pasa SOLO la experiencia, nunca el CV entero.
+    """
     total = 0
     for ini, fin in re.findall(r"(20\d{2})\s*[-–—a]{1,3}\s*(20\d{2}|actualidad|presente|actual)", t):
         cierre = 2026 if not fin.isdigit() else int(fin)
@@ -115,11 +142,17 @@ def _anios_experiencia(t):
     return total
 
 
+def _anios_declarados(t):
+    """«5 años de experiencia» dicho con todas las letras, en cualquier parte."""
+    m = re.search(r"(\d{1,2})\s*a[nñ]os?\s*de\s*experiencia", t)
+    return int(m.group(1)) if m else 0
+
+
 def momento_de_carrera(perfil):
     """Dónde está la persona. Devuelve (clave, explicación para ella)."""
     t = _plano(texto_del_cv(perfil))
     ciclo = _ciclo(t)
-    anios = _anios_experiencia(t)
+    anios = max(_anios_declarados(t), _anios_experiencia(_plano(texto_de_experiencia(perfil))))
 
     # Las mismas señales en los dos idiomas, por lo dicho arriba.
     titulado = bool(re.search(
@@ -132,6 +165,19 @@ def momento_de_carrera(perfil):
     estudiando = bool(re.search(
         r"en\s+curso|cursando|actualmente\s+estudi|estudiante"
         r"|\bstudent\b|currently\s+studying|in\s+progress|undergraduate", t)) or ciclo is not None
+
+    # Un ciclo declarado gana a la palabra «bachiller».
+    #
+    # En los CV peruanos la carrera se escribe «Bachiller en
+    # Administración de Empresas»: es el NOMBRE del programa, y lo pone
+    # igual quien lo está cursando que quien ya lo terminó. Un ciclo, en
+    # cambio, solo lo escribe quien está matriculado ahora mismo. Cuando
+    # las dos señales chocan, manda la que habla del presente.
+    #
+    # «Titulado» sigue ganando: ahí no hay ambigüedad posible.
+    if ciclo is not None and not titulado:
+        bachiller = egresado = False
+        estudiando = True
 
     # El orden importa: lo más alto gana, salvo que siga matriculada.
     if estudiando and not (titulado or bachiller or egresado):

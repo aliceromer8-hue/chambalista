@@ -681,5 +681,65 @@ check("cuando el modelo falla, queda anotado por qué",
 check("y el servidor anota con qué se leyó cada CV",
       "CV leído con" in pathlib.Path("app_web.py").read_text(encoding="utf-8"))
 
+# ---------------------------------------------------------------------
+titulo("SENIORITY — «si sigue en la u, no puede ser analista»")
+# ---------------------------------------------------------------------
+# Los dos fallos que hacían que a una estudiante de décimo ciclo le
+# saliera «Analista Senior». Sugerirle a alguien puestos donde lo van a
+# filtrar es peor que no sugerirle nada: gasta su tiempo y su ánimo.
+
+import sugerencias as _sug
+
+# 1) «Bachiller en Administración» es el NOMBRE de la carrera, y lo
+#    escribe igual quien la cursa que quien la terminó. Un ciclo solo lo
+#    escribe quien está matriculado ahora.
+_estudiante = {
+    "educacion": [{"organizacion": "UNMSM", "cargo": "Bachiller en Administración de Empresas",
+                   "fechas": "2021 - 2026", "logros": ["Décimo ciclo. Tercio superior."]}],
+    "experiencia": [{"organizacion": "Comercial Andina", "cargo": "Practicante de Análisis",
+                     "fechas": "Enero 2025 - Diciembre 2025", "logros": ["Reportes en Power BI."]}],
+}
+_m, _ = _sug.momento_de_carrera(_estudiante)
+check("un ciclo declarado gana a la palabra «bachiller»", _m == "estudiante-final", _m)
+_puestos = [p["texto"] for p in _sug.sugerir(_estudiante).get("puestos") or []]
+check("y entonces le ofrece prácticas, no análisis senior",
+      all(p.lower().startswith("practicante") for p in _puestos), " · ".join(_puestos[:3]))
+
+# 2) Los años de la CARRERA no son años de trabajo. «2021 - 2026» en
+#    educación daba cinco años de experiencia y la ascendía a profesional.
+check("las fechas de la carrera no cuentan como experiencia",
+      _sug._anios_experiencia(_sug._plano(_sug.texto_de_experiencia(_estudiante))) <= 1,
+      str(_sug._anios_experiencia(_sug._plano(_sug.texto_de_experiencia(_estudiante)))))
+# El caso tal y como llegaba de verdad: el modelo deja el CV en
+# `secciones` planas, con las fechas de la carrera dentro. Ahí es donde
+# `_anios_experiencia` las leía como años trabajados.
+_plano_estudiante = {"secciones": {
+    "educacion": ["UNMSM — Bachiller en Administración de Empresas | 2021 - 2026",
+                  "Décimo ciclo. Tercio superior."],
+    "experiencia": ["Comercial Andina — Practicante | Enero 2025 - Diciembre 2025"],
+}}
+check("con el CV en secciones planas, tampoco se confunde",
+      _sug.momento_de_carrera(_plano_estudiante)[0] == "estudiante-final",
+      _sug.momento_de_carrera(_plano_estudiante)[0])
+check("y ahí estaba el fallo: el CV entero sí trae las fechas de la carrera",
+      _sug._anios_experiencia(_sug._plano(_sug.texto_del_cv(_plano_estudiante))) >= 4)
+
+# 3) Sin romper a quien SÍ tiene años: cinco años de trabajo de verdad
+#    siguen dando profesional.
+_veterana = {
+    "educacion": [{"organizacion": "UNMSM", "cargo": "Bachiller en Administración",
+                   "fechas": "2014 - 2019", "logros": []}],
+    "experiencia": [{"organizacion": "Empresa", "cargo": "Analista de Marketing",
+                     "fechas": "2020 - actualidad", "logros": ["Campañas."]}],
+}
+_m2, _ = _sug.momento_de_carrera(_veterana)
+check("quien lleva años trabajando sigue siendo profesional", _m2 == "profesional", _m2)
+
+# 4) Un título gana siempre: ahí no hay ambigüedad que resolver.
+_titulada = dict(_estudiante)
+_titulada["perfil"] = ["Licenciada en Administración, colegiada."]
+_m3, _ = _sug.momento_de_carrera(_titulada)
+check("y un título gana incluso si se menciona un ciclo", _m3 == "profesional", _m3)
+
 print(f"\n{'TODO OK' if fallos == 0 else f'{fallos} FALLO(S)'}")
 sys.exit(1 if fallos else 0)
