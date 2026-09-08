@@ -173,7 +173,13 @@ AREAS = [
      ["Marketing", "Marketing Digital", "Investigación de Mercados", "Trade Marketing"]),
     ("Comunicaciones", r"comunicacion|periodis|audiovisual|contenidos|prensa",
      ["Comunicaciones", "Contenidos", "Comunicación Interna"]),
-    ("Administración", r"administracion|gestion|procesos|asistente administrativ",
+    # "gestión" a secas no vale: en un CV de marketing sale en "gestión de
+    # campañas", "gestión de contenido", "gestioné la estrategia" —todo
+    # trabajo de marketing— y hacía que Administración pareciera un área
+    # respaldada cuando no había ni una línea de administración. El verbo
+    # es demasiado común en español para servir de señal por sí solo.
+    ("Administración", r"administracion|asistente administrativ|gestion (?:administrativa|de procesos)"
+                       r"|mejora de procesos|tramite|archivo documentario|back ?office",
      ["Administración", "Gestión", "Procesos"]),
     ("Contabilidad", r"contabilidad|contable|tributari|sunat|plame|concar|finanzas|tesoreria",
      ["Contabilidad", "Finanzas", "Tesorería", "Tributación"]),
@@ -183,7 +189,11 @@ AREAS = [
      ["Ventas", "Comercial", "Atención al Cliente"]),
     ("Logística", r"logistic|almacen|abastecimiento|compras|supply|distribucion|inventario",
      ["Logística", "Almacén", "Compras", "Abastecimiento"]),
-    ("Sistemas", r"sistemas|software|desarrollo web|programacion|soporte tecnico|\bti\b|redes",
+    # "redes" a secas salía en cualquier CV de marketing por «redes
+    # sociales», y le sugería puestos de Sistemas a gente de marketing.
+    # Aquí solo cuentan las redes de la otra clase.
+    ("Sistemas", r"sistemas|software|desarrollo web|programaci[oó]n|soporte t[eé]cnico"
+                 r"|\bti\b|redes (?:inform|de datos|y comunicaciones)|infraestructura",
      ["Sistemas", "Soporte Técnico", "Desarrollo", "TI"]),
     ("Datos", r"analisis de datos|data|power bi|\bsql\b|estadistic|business intelligence",
      ["Análisis de Datos", "Business Intelligence"]),
@@ -208,16 +218,33 @@ AREAS = [
 ]
 
 
+# Por debajo de este porcentaje del área líder, un área es ruido.
+#
+# Un CV de marketing menciona "gestión" o "análisis" de pasada y eso hacía
+# aparecer Administración o Datos como si fueran alternativas de verdad.
+# No lo son: si un área tiene la sexta parte de las menciones que la
+# principal, sugerir puestos suyos manda a la persona a vacantes donde su
+# CV no compite.
+UMBRAL_RUIDO = 0.18
+
+
 def areas_del_cv(perfil, tope=3):
-    """Las áreas que el CV respalda, de más a menos evidencia."""
+    """Las áreas que el CV respalda, con su peso, de más a menos.
+
+    Devuelve (nombre, puestos, golpes). El peso importa: no es lo mismo un
+    CV repartido entre dos áreas que uno donde uno manda claramente.
+    """
     t = _plano(texto_del_cv(perfil))
     puntuadas = []
     for nombre, patron, puestos in AREAS:
         golpes = len(re.findall(patron, t))
         if golpes:
             puntuadas.append((golpes, nombre, puestos))
+    if not puntuadas:
+        return []
     puntuadas.sort(key=lambda x: -x[0])
-    return [(n, p) for _, n, p in puntuadas[:tope]]
+    lider = puntuadas[0][0]
+    return [(n, p, g) for g, n, p in puntuadas[:tope] if g >= lider * UMBRAL_RUIDO]
 
 
 # ---------------------------------------------------------------------
@@ -262,33 +289,56 @@ def sugerir(perfil, tope=6):
         }
 
     prefijos = PREFIJOS[clave]
-    puestos, vistos = [], set()
+    total = sum(g for _, _, g in areas)
 
-    # Se recorre por rondas para que la primera sugerencia de cada área
-    # salga antes que la segunda de la primera área.
-    for ronda in range(4):
-        for i, (area, titulos) in enumerate(areas):
-            if ronda >= len(titulos):
-                continue
-            # Siempre el mismo nivel para todas las áreas. Antes el
-            # prefijo se elegía por la POSICIÓN del área, así que a la
-            # misma persona se le ofrecía "Practicante de Marketing" y
-            # "Asistente de Análisis de Datos" en la misma lista: el
-            # nivel cambiaba según el área, que no significa nada y hace
-            # dudar de si el resto también es al azar.
-            prefijo = PREFIJO_POR_AREA.get((clave, area)) or prefijos[0]
-            texto = f"{prefijo} {titulos[ronda]}"
+    # El reparto es PROPORCIONAL a lo que el CV respalda.
+    #
+    # Antes se daba una sugerencia por área en la primera ronda, así que
+    # un CV con 44 menciones de marketing y 12 de administración recibía
+    # una de cada, como si fueran igual de sólidas. No lo son: la persona
+    # ve en segundo lugar un puesto donde su CV apenas compite, y eso le
+    # resta confianza a la lista entera.
+    #
+    # Ahora cada área recibe plazas según su peso, con un mínimo de una
+    # para las que pasaron el umbral de ruido. Un CV concentrado en un
+    # área recibe casi solo puestos de esa área, que es lo correcto.
+    plazas = {}
+    for nombre, titulos, golpes in areas:
+        cuota = round(tope * golpes / total) if total else 0
+        plazas[nombre] = max(1, min(cuota, len(titulos)))
+
+    # Si la suma se pasó del tope, se recorta por abajo: pierde plazas
+    # primero el área con menos respaldo.
+    while sum(plazas.values()) > tope:
+        for nombre, _, _ in reversed(areas):
+            if plazas[nombre] > 1:
+                plazas[nombre] -= 1
+                break
+        else:
+            plazas.pop(areas[-1][0], None)
+            areas = areas[:-1]
+            if not areas:
+                break
+
+    puestos, vistos = [], set()
+    for nombre, titulos, golpes in areas:
+        prefijo = PREFIJO_POR_AREA.get((clave, nombre)) or prefijos[0]
+        cuanto = round(100 * golpes / total) if total else 0
+        for i, titulo in enumerate(titulos[:plazas.get(nombre, 0)]):
+            texto = f"{prefijo} {titulo}"
             if texto.lower() in vistos:
                 continue
             vistos.add(texto.lower())
             puestos.append({
                 "texto": texto,
-                "area": area,
-                "razon": (f"tu CV respalda {area.lower()}" if ronda == 0
-                          else f"otra salida dentro de {area.lower()}"),
+                "area": nombre,
+                "peso": cuanto,
+                "razon": (f"es lo que más respalda tu CV ({cuanto} %)" if i == 0 and nombre == areas[0][0]
+                          else f"tu CV respalda {nombre.lower()} ({cuanto} %)" if i == 0
+                          else f"otra salida dentro de {nombre.lower()}"),
             })
-            if len(puestos) >= tope:
-                return {"momento": clave, "explicacion": explicacion,
-                        "puestos": puestos, "nota": ""}
+
+    puestos.sort(key=lambda x: -x["peso"])
+    puestos = puestos[:tope]
 
     return {"momento": clave, "explicacion": explicacion, "puestos": puestos, "nota": ""}

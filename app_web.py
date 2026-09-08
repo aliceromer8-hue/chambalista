@@ -75,9 +75,21 @@ def index():
 
 @app.get("/api/estado")
 def estado():
+    # Si la clave de Gemini tiene facturación activada.
+    #
+    # No es un detalle técnico: en la capa GRATUITA, Google usa lo que se
+    # le envía para mejorar sus productos y revisores humanos pueden
+    # leerlo. Lo que se envía aquí son CVs de otras personas, con sus
+    # nombres, teléfonos e historial laboral.
+    #
+    # Al activar facturación eso deja de pasar. La página lee este dato
+    # para decir la verdad en cada caso, en vez de llevar una frase fija
+    # que se vuelve mentira en cuanto cambia la configuración.
     return jsonify({
         "modo": "web",
         "ia_del_usuario": True,
+        "ia_facturada": os.environ.get("GEMINI_FACTURACION", "").lower() in ("1", "true", "si", "sí"),
+        "ia_activa": bool(os.environ.get("GEMINI_API_KEY")),
         "limite": LIMITE_PETICIONES,
         "ventana_horas": round(VENTANA_SEGUNDOS / 3600, 1),
         "max_mb": 6,

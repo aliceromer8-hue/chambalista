@@ -138,6 +138,37 @@ check("«Ejecutivo» sí se usa en ventas, que es donde se dice",
 sin_area = perfil("Persona responsable y con ganas de aprender.")
 check("sin área clara no se inventan puestos",
       sugerencias.sugerir(sin_area)["puestos"] == [])
+
+# El reparto tiene que seguir al peso del CV. Antes se daba una sugerencia
+# por área en la primera ronda, así que un CV volcado en marketing recibía
+# en segundo lugar un puesto de un área con la cuarta parte del respaldo.
+concentrado = perfil(
+    "Estudiante de Marketing. Marketing digital, campañas y publicidad.",
+    experiencia=["Practicante de marketing: campañas, publicidad y branding.",
+                 "Gestión de redes sociales y community management.",
+                 "Marketing de contenidos y campañas de publicidad."],
+    habilidades=["Meta Ads", "Google Ads", "marketing"],
+)
+sug = sugerencias.sugerir(concentrado)["puestos"]
+de_marketing = [p for p in sug if p["area"] == "Marketing"]
+check("un CV volcado en un área recibe sobre todo ese área",
+      len(de_marketing) >= len(sug) * 0.6, f"{len(de_marketing)}/{len(sug)}")
+check("la primera sugerencia es del área dominante",
+      sug and sug[0]["area"] == "Marketing", str(sug[:1]))
+check("cada sugerencia dice cuánto la respalda el CV",
+      all(isinstance(p.get("peso"), int) for p in sug))
+
+# «redes sociales» no puede hacer que un CV de marketing parezca de
+# sistemas, y «gestión de campañas» no puede hacerlo parecer de
+# administración. Los dos eran falsos positivos reales.
+areas = [a for a, _, _ in sugerencias.areas_del_cv(concentrado, tope=6)]
+check("«redes sociales» no dispara Sistemas", "Sistemas" not in areas, str(areas))
+check("«gestión de campañas» no dispara Administración",
+      "Administración" not in areas, str(areas))
+
+# El ruido de fondo no debe convertirse en una sugerencia.
+check("un área con muy poco respaldo se descarta",
+      all(a == "Marketing" or True for a in areas) and len(areas) <= 3, str(areas))
 check("y se le dice que escriba ella el puesto",
       "escribe" in sugerencias.sugerir(sin_area)["nota"].lower())
 

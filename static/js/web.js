@@ -3,39 +3,33 @@
 
 const $ = (s) => document.querySelector(s);
 const estado = { archivo: null, perfil: null };
-const CLAVE_LS = "chamba_ia_key";
-
-// ---------- clave de IA (vive solo en este navegador) ----------
-function claveGuardada() {
-  try { return localStorage.getItem(CLAVE_LS) || ""; } catch { return ""; }
-}
-
-function pintarEstadoClave() {
-  const p = $("#pastilla-ia");
-  if (claveGuardada()) {
-    p.textContent = "activa";
-    p.className = "pastilla ok";
-  } else {
-    p.textContent = "sin configurar";
-    p.className = "pastilla";
-  }
-}
-
-$("#guardar-clave").addEventListener("click", () => {
-  const v = $("#clave-ia").value.trim();
+// ---------- qué se dice sobre la IA ----------
+// La frase de privacidad NO va fija en el HTML: depende de si la clave de
+// Gemini tiene facturación activada. En el plan gratuito, Google usa lo
+// que se le envía para mejorar sus productos y personal suyo puede
+// llegar a leerlo — y lo que se envía son CVs con nombres y teléfonos de
+// otras personas. Con facturación eso deja de pasar.
+//
+// Se pregunta al servidor en vez de escribirlo a mano porque una frase
+// fija se convierte en mentira en cuanto cambia la configuración, y esta
+// en concreto es una promesa de privacidad.
+async function pintarPrivacidadIA() {
+  const li = $("#privacidad-ia");
+  if (!li) return;
   try {
-    if (v) localStorage.setItem(CLAVE_LS, v);
-    else localStorage.removeItem(CLAVE_LS);
-  } catch { /* navegación privada: se sigue sin guardar */ }
-  $("#clave-ia").value = "";
-  pintarEstadoClave();
-});
-
-$("#borrar-clave").addEventListener("click", () => {
-  try { localStorage.removeItem(CLAVE_LS); } catch {}
-  $("#clave-ia").value = "";
-  pintarEstadoClave();
-});
+    const e = await (await fetch("/api/estado")).json();
+    if (!e.ia_activa) {
+      li.textContent = "Tu CV se lee aquí mismo, sin enviarlo a ningún otro sitio.";
+    } else if (e.ia_facturada) {
+      li.innerHTML = "Para leer tu CV, su texto se envía a <strong>Google</strong>, "
+        + "que lo procesa y no lo usa para entrenar sus modelos.";
+    } else {
+      li.innerHTML = "Para leer tu CV, su texto se envía a <strong>Google</strong>. "
+        + "Hoy va por su plan gratuito, y en ese plan Google puede usarlo para "
+        + "mejorar sus productos y personal suyo puede llegar a leerlo.";
+    }
+  } catch { /* si falla, queda la frase corta del HTML */ }
+}
 
 // ---------- subir ----------
 const zona = $("#zona");
@@ -69,18 +63,14 @@ $("#procesar").addEventListener("click", async () => {
   const boton = $("#procesar");
   boton.disabled = true;
   boton.textContent = "Convirtiendo…";
-  $("#estado").textContent = claveGuardada()
-    ? "Leyendo tu CV con IA, esto tarda unos segundos…"
-    : "Leyendo tu CV…";
+  $("#estado").textContent = "Leyendo tu CV, esto tarda unos segundos…";
 
   try {
+    // Sin cabecera de clave: la IA la pone el servidor. La persona no
+    // tiene que crear ninguna cuenta en Google para usar esto.
     const datos = new FormData();
     datos.append("cv", estado.archivo);
-    const cabeceras = {};
-    const clave = claveGuardada();
-    if (clave) cabeceras["X-IA-Key"] = clave;
-
-    const resp = await fetch("/api/cv/procesar", { method: "POST", body: datos, headers: cabeceras });
+    const resp = await fetch("/api/cv/procesar", { method: "POST", body: datos });
     const json = await resp.json();
     if (!resp.ok) throw new Error(json.error);
     estado.perfil = json.perfil;
@@ -183,7 +173,23 @@ async function pintarSugerencias() {
       <p class="antetitulo">Con este CV puedes buscar</p>
       <p class="lectura">${escapar(s.explicacion)}</p>
       <div class="rejilla-puestos">${fichas}</div>
-      <p class="detalle">Si no encaja, busca lo que tú quieras: esto es solo un atajo.</p>`;
+      <p class="detalle">¿No encaja ninguno? Escribe el que tú quieras:</p>
+      <form class="buscador-libre" id="buscador-libre">
+        <input type="text" id="puesto-libre" autocomplete="off"
+               placeholder="Enfermera, cajero, practicante de derecho, chef…">
+        <button class="boton principal" type="submit">Buscar</button>
+      </form>`;
+
+    // Antes esto solo DECÍA que buscara lo que quisiera y no había dónde
+    // escribirlo: la persona tenía que ir a Computrabajo por su cuenta.
+    caja.querySelector("#buscador-libre").addEventListener("submit", (ev) => {
+      ev.preventDefault();
+      const q = caja.querySelector("#puesto-libre").value.trim();
+      if (!q) return;
+      const ruta = q.toLowerCase().replace(/\s+/g, "-");
+      window.open(`https://pe.computrabajo.com/trabajo-de-${encodeURIComponent(ruta)}`,
+                  "_blank", "noopener");
+    });
     caja.classList.remove("oculto");
   } catch {
     // Que falle no rompe la conversión, que es lo que vino a hacer.
@@ -203,4 +209,4 @@ $("#otro").addEventListener("click", () => {
   window.scrollTo({ top: 0, behavior: "smooth" });
 });
 
-pintarEstadoClave();
+pintarPrivacidadIA();

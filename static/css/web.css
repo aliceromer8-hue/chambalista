@@ -352,3 +352,13 @@ footer { padding: 26px 24px 60px; color: var(--tinta-2); font-size: 13px; }
   padding: 1px 6px; border-radius: 4px;
 }
 .como-instalar .detalle { margin-top: 12px; max-width: 62ch; }
+
+/* Buscador libre: las sugerencias son un atajo, no una jaula. Antes solo
+ * se DECÍA que buscara lo que quisiera y no había dónde escribirlo. */
+.buscador-libre { display: flex; gap: 8px; margin-top: 8px; flex-wrap: wrap; }
+.buscador-libre input {
+  flex: 1; min-width: 200px; padding: 11px 13px;
+  border: 2px solid var(--linea); border-radius: var(--r-chico);
+  font: inherit; font-size: 14px; background: var(--papel); color: var(--tinta);
+}
+.buscador-libre input:focus { outline: none; box-shadow: var(--dura-chica); }

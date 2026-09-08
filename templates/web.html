@@ -110,23 +110,6 @@
     </details>
   </section>
 
-  <!-- Ajustes de IA -->
-  <section class="paso entra entra-2">
-    <details id="ajustes">
-      <summary>Mejorar la lectura del CV con IA <span class="pastilla" id="pastilla-ia">sin configurar</span></summary>
-      <p class="detalle">Sin IA el CV se convierte igual, pero si tu CV tiene un diseño poco común algunas secciones pueden salir desordenadas. Con una clave gratuita de Google AI Studio, la lectura mejora bastante.</p>
-      <ol class="detalle">
-        <li>Entra a <a href="https://aistudio.google.com/apikey" target="_blank" rel="noopener">aistudio.google.com/apikey</a> y crea una clave gratis.</li>
-        <li>Pégala aquí abajo. Se guarda <strong>solo en tu navegador</strong>, nunca en el servidor.</li>
-      </ol>
-      <div class="fila-clave">
-        <input type="password" id="clave-ia" placeholder="Pega tu clave aquí" autocomplete="off">
-        <button class="boton secundario" id="guardar-clave">Guardar</button>
-        <button class="boton texto" id="borrar-clave">Borrar</button>
-      </div>
-    </details>
-  </section>
-
   <section class="privacidad entra entra-3" id="privacidad">
     <h2>Qué pasa con tu CV</h2>
     <ul>
@@ -136,7 +119,9 @@
         <strong>sí se guardan</strong>, para que no los pierdas al cambiar de equipo.
         Se identifican con un código que genera tu navegador, no con tu nombre.
         Puedes borrarlo todo cuando quieras desde <em>Mi perfil</em>.</li>
-      <li>Si activas la IA con tu clave, el texto de tu CV viaja a Google para analizarlo. Sin clave, no sale de aquí.</li>
+      <!-- Lo rellena web.js con lo que diga el servidor. Fija sería
+           mentira en cuanto cambie la configuración de la IA. -->
+      <li id="privacidad-ia">Para leer tu CV, su texto se envía a Google.</li>
     </ul>
   </section>
 
