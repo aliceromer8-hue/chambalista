@@ -31,6 +31,18 @@ import re
 import urllib.error
 import urllib.request
 
+# Igual que en redactor_ia y nube: algunos antivirus y proxies
+# corporativos interceptan TLS con un certificado que el almacén de
+# Python rechaza. `truststore` delega la verificación al almacén del
+# sistema operativo, donde ese certificado sí está. Se sigue verificando:
+# no se desactiva nada. Faltaba aquí, y este módulo también sale a la red.
+try:
+    import truststore
+
+    truststore.inject_into_ssl()
+except ImportError:
+    pass
+
 URL = (os.environ.get("SUPABASE_URL") or "").rstrip("/")
 ANON = os.environ.get("SUPABASE_ANON_KEY") or ""
 TIEMPO = 12

@@ -533,12 +533,19 @@ check("un «acepta: false» explícito tampoco pasa", r.status_code == 400)
 r = cliente.get("/privacidad")
 check("la política de privacidad se sirve", r.status_code == 200)
 _pol = r.get_data(as_text=True)
+# Estructura y tono del sector, pero sin perder ninguna de las cosas que
+# tienen que estar. Si alguna se cae al reescribir el texto, salta aquí.
 for pieza, que in [
-    ("Ley 29733", "cita la ley peruana"),
-    ("Google", "dice que el CV va a Google"),
-    ("borrar", "explica cómo borrar los datos"),
-    ("no garantiza", "aclara que no garantiza que te contraten"),
+    ("29733", "cita la ley peruana de datos personales"),
+    ("Google", "declara que el CV se envía a Google"),
+    ("eliminar", "explica cómo eliminar los datos"),
+    ("no garantizamos", "aclara que no garantiza conseguir trabajo"),
     ("18 años", "pone la edad mínima"),
+    ("no vendemos", "declara que no vende los datos"),
+    ("flujo transfronterizo", "advierte del tratamiento en el extranjero"),
+    ("consentimiento", "identifica la base legal"),
+    ("credenciales", "aclara que no accede a las cuentas de los portales"),
+    ("diez (10) días", "da el plazo de respuesta"),
 ]:
     check(f"la política {que}", pieza.lower() in _pol.lower())
 
