@@ -120,6 +120,7 @@ $("#procesar").addEventListener("click", async () => {
     await pintarSugerencias();
 
     guardarTrabajo();
+    subirPerfil();          // a la cuenta, si la hay. No se espera.
 
     $("#estado").textContent = "";
     $("#zona-1").classList.add("oculto");
@@ -252,16 +253,12 @@ $("#otro").addEventListener("click", () => {
 // no se vuelve a subir nada, no se vuelve a llamar a la IA y no se vuelve
 // a esperar. La vista previa y las sugerencias sí se piden otra vez,
 // porque son baratas y así reflejan cualquier cambio del formato.
-async function restaurarTrabajo() {
-  const perfil = trabajoGuardado();
-  if (!perfil) return;
-  estado.perfil = perfil;
-
+async function repintarResultado() {
   try {
     const prev = await fetch("/api/cv/preview", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(perfil),
+      body: JSON.stringify(estado.perfil),
     });
     $("#preview").innerHTML = (await prev.json()).html || "";
   } catch { /* sin red: se enseña igual lo demás */ }
@@ -274,6 +271,13 @@ async function restaurarTrabajo() {
   for (const sel of ["#cadena", "#rotulo-subir", "#privacidad"]) {
     $(sel).classList.add("oculto");
   }
+}
+
+async function restaurarTrabajo() {
+  const perfil = trabajoGuardado();
+  if (!perfil) return;
+  estado.perfil = perfil;
+  await repintarResultado();
 
   // Se avisa de que esto viene de antes. Encontrarse la página ya
   // avanzada sin explicación desconcierta más que ayudar.
@@ -300,9 +304,55 @@ function sesion() {
 
 function guardarSesion(s) {
   try {
-    if (s) localStorage.setItem(SESION, JSON.stringify(s));
-    else localStorage.removeItem(SESION);
+    if (s) {
+      // Se anota CUÁNDO caduca, no solo cuánto duraba: al recargar la
+      // página horas después, «expira_en: 3600» ya no dice nada.
+      if (s.expira_en) s.caduca = Date.now() + (s.expira_en - 60) * 1000;
+      localStorage.setItem(SESION, JSON.stringify(s));
+    } else {
+      localStorage.removeItem(SESION);
+    }
   } catch { /* navegación privada */ }
+}
+
+// El token de Supabase dura una hora. Sin esto, a la hora justa la
+// sesión moría y la página echaba a la persona sin decir por qué, en
+// mitad de lo que estuviera haciendo. Se cambia por uno nuevo con el
+// token de refresco, que dura mucho más y para eso lo guardamos.
+let renovando = null;
+
+async function renovarSesion() {
+  const s = sesion();
+  if (!s?.refresco) return null;
+  // Si dos llamadas piden renovar a la vez, una sola petición: dos
+  // renovaciones en paralelo invalidan la una a la otra.
+  renovando = renovando || (async () => {
+    try {
+      const r = await fetch("/api/cuenta/renovar", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ refresco: s.refresco }),
+      });
+      const j = await r.json();
+      if (!r.ok || !j.token) { guardarSesion(null); pintarCuenta(); return null; }
+      guardarSesion(j);
+      pintarCuenta();
+      return j;
+    } catch { return null; }
+    finally { renovando = null; }
+  })();
+  return renovando;
+}
+
+/** Como fetch, pero con la sesión puesta y renovándola si hizo falta. */
+async function conCuenta(url, opciones = {}) {
+  const s = sesion();
+  if (s?.caduca && Date.now() > s.caduca) await renovarSesion();
+  const ir = () => fetch(url, { ...opciones, headers: conSesion(opciones.headers || {}) });
+  let r = await ir();
+  // Un 401 después de renovar es una sesión de verdad muerta; uno antes
+  // puede ser solo un token vencido antes de lo previsto.
+  if (r.status === 401 && sesion()?.refresco && await renovarSesion()) r = await ir();
+  return r;
 }
 
 /** Cabecera de autorización, si hay sesión. */
@@ -324,6 +374,7 @@ function pintarCuenta() {
     pedirCuenta.classList.toggle("oculto", dentro);
     if (porque) porque.classList.toggle("oculto", dentro);
   }
+  pintarDatos();
 }
 
 // El diálogo hace las dos cosas: entrar y registrarse. Separarlos obliga
@@ -405,6 +456,10 @@ $("#form-cuenta").addEventListener("submit", async (ev) => {
     pintarCuenta();
     $("#dlg-cuenta").close();
     $("#contrasena").value = "";
+    // Si ya venía trabajando sin cuenta, ese CV es el bueno y se sube.
+    // Si llega en blanco, se baja el que tuviera guardado. Así entrar
+    // hace algo por ella, que era justo lo que no pasaba.
+    if (estado.perfil) subirPerfil(); else bajarPerfil();
   } catch (e) {
     errorCuenta("No se pudo conectar. Inténtalo de nuevo.");
   } finally {
@@ -420,14 +475,126 @@ $("#btn-salir").addEventListener("click", async () => {
   pintarCuenta();
 });
 
-// Al cargar: si el token caducó, se limpia en vez de dejar una sesión
-// muerta que falla en la primera petición sin explicar por qué.
+// ---------- el CV, en la nube ----------
+// El diálogo prometía «tu CV y tus postulaciones te siguen entre
+// dispositivos» y no era verdad: la sesión se abría y no se subía nada.
+// Entrar no servía absolutamente para nada. Esto es lo que lo cumple.
+//
+// El guardado es un extra silencioso: si falla, no se avisa ni se
+// interrumpe. La copia del navegador sigue estando y es la que se usa.
+
+async function subirPerfil() {
+  if (!estado.perfil || !sesion()?.token) return;
+  try {
+    await conCuenta("/api/nube/perfil", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(estado.perfil),
+    });
+  } catch { /* silencioso a propósito */ }
+}
+
+async function bajarPerfil() {
+  if (!sesion()?.token || estado.perfil) return;   // lo de aquí manda
+  try {
+    const r = await conCuenta("/api/nube/perfil");
+    if (!r.ok) return;
+    const perfil = (await r.json()).perfil;
+    if (!perfil) return;
+    estado.perfil = perfil;
+    guardarTrabajo();
+    await repintarResultado();
+    const nota = $("#nota-restaurado");
+    if (nota) {
+      nota.textContent = "Este es el CV que tenías guardado en tu cuenta.";
+      nota.classList.remove("oculto");
+    }
+  } catch { /* sin red: se sigue sin ello */ }
+}
+
+// ---------- mis datos ----------
+function pintarDatos() {
+  const s = sesion();
+  const zona = $("#zona-datos");
+  if (!zona) return;
+  zona.classList.toggle("oculto", !s?.token);
+  if (s?.token) $("#datos-correo").textContent = s.usuario.correo;
+}
+
+function avisoDatos(t) {
+  const p = $("#aviso-datos");
+  if (!p) return;
+  p.textContent = t || "";
+  p.classList.toggle("oculto", !t);
+}
+
+// Derecho de acceso: llevarse una copia, en un formato que se pueda
+// abrir en cualquier sitio. Se arma en el navegador con lo que ya
+// devuelven las dos rutas; no hace falta pedirle nada a nadie.
+$("#btn-descargar-datos")?.addEventListener("click", async () => {
+  avisoDatos("Preparando…");
+  try {
+    const [p, q] = await Promise.all([
+      conCuenta("/api/nube/perfil"),
+      conCuenta("/api/nube/postulaciones"),
+    ]);
+    const datos = {
+      cuenta: sesion()?.usuario?.correo || null,
+      exportado: new Date().toISOString(),
+      cv: p.ok ? (await p.json()).perfil : null,
+      postulaciones: q.ok ? (await q.json()).postulaciones : [],
+    };
+    const url = URL.createObjectURL(
+      new Blob([JSON.stringify(datos, null, 2)], { type: "application/json" }));
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "mis-datos-chamba-lista.json";
+    a.click();
+    URL.revokeObjectURL(url);
+    avisoDatos("");
+  } catch {
+    avisoDatos("No se pudo preparar la descarga. Inténtalo de nuevo.");
+  }
+});
+
+// Derecho de cancelación, ejercido en el acto. Se confirma porque no
+// tiene vuelta atrás, y se dice exactamente qué desaparece: «¿estás
+// seguro?» no le dice a nadie qué está a punto de perder.
+$("#btn-borrar-todo")?.addEventListener("click", async () => {
+  const correo = sesion()?.usuario?.correo || "tu cuenta";
+  const seguro = confirm(
+    `Se va a borrar ${correo}, tu CV guardado y todo tu historial de postulaciones.`
+    + `
+
+No se puede deshacer y no guardamos copia. ¿Seguimos?`);
+  if (!seguro) return;
+  avisoDatos("Borrando…");
+  try {
+    const r = await conCuenta("/api/cuenta", { method: "DELETE" });
+    const j = await r.json().catch(() => ({}));
+    if (!r.ok) { avisoDatos(j.error || "No se pudo borrar."); return; }
+    // Se limpia también lo del navegador: dejar el CV en localStorage
+    // después de borrar la cuenta sería no haber borrado nada.
+    guardarSesion(null);
+    try { localStorage.removeItem(TRABAJO); } catch {}
+    alert("Listo. Tu cuenta y tus datos se han borrado.");
+    location.reload();
+  } catch {
+    avisoDatos("No se pudo conectar. Inténtalo de nuevo.");
+  }
+});
+
+// Al cargar: si el token caducó, se renueva; si ya no hay forma, se
+// limpia en vez de dejar una sesión muerta que falla en la primera
+// petición sin explicar por qué.
 (async () => {
   pintarCuenta();
+  pintarDatos();
   if (!sesion()?.token) return;
   try {
-    const r = await fetch("/api/cuenta/yo", { headers: conSesion() });
+    const r = await conCuenta("/api/cuenta/yo");
     const j = await r.json();
-    if (!j.usuario) { guardarSesion(null); pintarCuenta(); }
+    if (!j.usuario) { guardarSesion(null); pintarCuenta(); pintarDatos(); return; }
+    await bajarPerfil();
   } catch { /* sin red: se deja como está */ }
 })();

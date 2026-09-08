@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Nueva contraseña — Chamba Lista</title>
+<meta name="robots" content="noindex">
+<link rel="stylesheet" href="/static/css/web.css">
+</head>
+<body>
+
+<header class="cabecera">
+  <div class="ancho">
+    <a class="logo" href="/">
+      <svg width="22" height="24" viewBox="0 0 24 26" fill="none" aria-hidden="true">
+        <rect x="1.5" y="1.5" width="21" height="23" rx="2" stroke="currentColor" stroke-width="1.6"/>
+        <line x1="6" y1="7.5" x2="18" y2="7.5" stroke="currentColor" stroke-width="1.6"/>
+        <line x1="6" y1="12" x2="12" y2="12" stroke="currentColor" stroke-width="1.6"/>
+        <line x1="6" y1="16" x2="12" y2="16" stroke="currentColor" stroke-width="1.6"/>
+      </svg>
+      Chamba Lista
+    </a>
+    <span class="detalle">Nueva contraseña</span>
+  </div>
+</header>
+
+<main class="ancho paso" style="max-width:460px;margin-top:32px">
+  <h1 style="font-size:1.4rem">Elige tu contraseña nueva</h1>
+
+  <form id="form-clave" class="oculto">
+    <label class="campo">
+      <span>Contraseña nueva</span>
+      <input type="password" id="clave" autocomplete="new-password" required
+             minlength="8" placeholder="Al menos 8 caracteres">
+    </label>
+    <label class="campo">
+      <span>Repítela</span>
+      <input type="password" id="clave2" autocomplete="new-password" required minlength="8">
+    </label>
+    <p class="aviso-cuenta oculto" id="aviso"></p>
+    <button class="boton principal ancho-total" id="enviar" type="submit">Guardar</button>
+  </form>
+
+  <p class="detalle" id="sin-enlace">
+    Comprobando el enlace…
+  </p>
+
+  <p class="volver" style="margin-top:24px"><a href="/">← Volver a Chamba Lista</a></p>
+</main>
+
+<script>
+// El token viene en el FRAGMENTO de la URL (#access_token=…), no en la
+// ruta ni en la query. Es a propósito de Supabase y está bien: el
+// navegador nunca manda el fragmento al servidor, así que la credencial
+// no queda escrita en los registros de acceso de nadie. Lo lee esta
+// página y lo usa una vez.
+const $ = (s) => document.querySelector(s);
+const parametros = new URLSearchParams(location.hash.slice(1));
+const token = parametros.get("access_token");
+const tipo = parametros.get("type");
+
+function aviso(t, malo = true) {
+  const p = $("#aviso");
+  p.textContent = t || "";
+  p.classList.toggle("oculto", !t);
+  p.style.color = malo ? "" : "var(--tinta)";
+}
+
+if (token && tipo === "recovery") {
+  // Se borra el token de la barra de direcciones en cuanto se lee: si no,
+  // se queda en el historial del navegador y en cualquier captura.
+  history.replaceState(null, "", location.pathname);
+  $("#sin-enlace").classList.add("oculto");
+  $("#form-clave").classList.remove("oculto");
+} else {
+  $("#sin-enlace").textContent =
+    "Este enlace no es válido o ya caducó. Vuelve a pedir uno desde «Olvidé mi contraseña».";
+}
+
+$("#form-clave").addEventListener("submit", async (ev) => {
+  ev.preventDefault();
+  const a = $("#clave").value, b = $("#clave2").value;
+  if (a !== b) { aviso("Las dos contraseñas no coinciden."); return; }
+  if (a.length < 8) { aviso("Necesita al menos 8 caracteres."); return; }
+  const boton = $("#enviar");
+  boton.disabled = true;
+  aviso("");
+  try {
+    const r = await fetch("/api/cuenta/clave-nueva", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+      body: JSON.stringify({ contrasena: a }),
+    });
+    const j = await r.json();
+    if (!r.ok) { aviso(j.error || "No se pudo cambiar."); return; }
+    // La sesión vieja del navegador ya no vale nada: se limpia para que
+    // no quede una sesión a medias con la contraseña anterior.
+    try { localStorage.removeItem("chamba_sesion"); } catch {}
+    $("#form-clave").classList.add("oculto");
+    $("#sin-enlace").classList.remove("oculto");
+    $("#sin-enlace").textContent = "Listo. Ya puedes entrar con tu contraseña nueva.";
+  } catch {
+    aviso("No se pudo conectar. Inténtalo de nuevo.");
+  } finally {
+    boton.disabled = false;
+  }
+});
+</script>
+</body>
+</html>

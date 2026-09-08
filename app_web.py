@@ -45,6 +45,14 @@ app.config["MAX_CONTENT_LENGTH"] = 6 * 1024 * 1024   # 6 MB
 
 _historial = defaultdict(deque)
 
+# Intentos de contraseña, contados aparte de los CV. Sin esto, probar
+# contraseñas contra un correo conocido salía gratis desde nuestra API:
+# el límite de CVs no cubría /api/cuenta/entrar, que es justo el que
+# alguien intentaría a lo bruto.
+LIMITE_CUENTA = int(os.environ.get("LIMITE_CUENTA", "10"))
+VENTANA_CUENTA = int(os.environ.get("VENTANA_CUENTA", "900"))
+_intentos = defaultdict(deque)
+
 
 def _ip():
     # Detrás de un proxy (Render, Railway) la IP real va en la cabecera.
@@ -52,15 +60,30 @@ def _ip():
     return reenviada.split(",")[0].strip() or request.remote_addr or "?"
 
 
-def _pasa_limite():
+def _pasa(cubo, tope, ventana):
+    """¿Esta IP sigue por debajo del tope en esta ventana?
+
+    En Vercel cada instancia tiene su propia memoria, así que esto frena
+    el abuso torpe, no a alguien decidido. Aun así se queda: subir el
+    coste de probar contraseñas una por una vale la pena, y Supabase
+    pone su propio límite detrás.
+    """
     ahora = time.time()
-    cola = _historial[_ip()]
-    while cola and ahora - cola[0] > VENTANA_SEGUNDOS:
+    cola = cubo[_ip()]
+    while cola and ahora - cola[0] > ventana:
         cola.popleft()
-    if len(cola) >= LIMITE_PETICIONES:
+    if len(cola) >= tope:
         return False
     cola.append(ahora)
     return True
+
+
+def _pasa_limite():
+    return _pasa(_historial, LIMITE_PETICIONES, VENTANA_SEGUNDOS)
+
+
+def _pasa_cuenta():
+    return _pasa(_intentos, LIMITE_CUENTA, VENTANA_CUENTA)
 
 
 def _clave_del_usuario():
@@ -76,6 +99,19 @@ def index():
 @app.get("/privacidad")
 def privacidad():
     return render_template("privacidad.html")
+
+
+@app.get("/recuperar")
+def recuperar_pagina():
+    """Donde aterriza el enlace del correo de recuperación.
+
+    Sin esta página, «Olvidé mi contraseña» mandaba un correo cuyo enlace
+    no llevaba a ningún sitio donde escribir la contraseña nueva: la
+    persona se quedaba fuera de su cuenta para siempre. El token viene en
+    el fragmento de la URL, que el navegador no manda al servidor, así
+    que lo lee el JavaScript de la página.
+    """
+    return render_template("recuperar.html")
 
 
 @app.get("/api/estado")
@@ -200,7 +236,16 @@ def cuenta_registrar():
     if not d.get("acepta"):
         return jsonify({"error": "Tienes que aceptar la política de privacidad "
                                  "y las condiciones para crear tu cuenta."}), 400
+    if not _pasa_cuenta():
+        return jsonify({"error": "Demasiados intentos. Espera unos minutos."}), 429
     ok, r = cuentas.registrar(d.get("correo"), d.get("contrasena"))
+    if ok:
+        # Se anota DESPUÉS de que la cuenta exista, porque la constancia
+        # apunta a un id de usuario. Si esto falla, la cuenta ya está
+        # creada y no se le va a impedir entrar: se pierde la prueba, no
+        # el servicio. Queda registrado en el log del servidor.
+        if not cuentas.anotar_aceptacion((r.get("usuario") or {}).get("id")):
+            app.logger.warning("no se pudo anotar la aceptación de la política")
     return (jsonify(r), 200) if ok else (jsonify(r), 400)
 
 
@@ -208,6 +253,8 @@ def cuenta_registrar():
 def cuenta_entrar():
     import cuentas
     d = request.get_json(silent=True) or {}
+    if not _pasa_cuenta():
+        return jsonify({"error": "Demasiados intentos. Espera unos minutos."}), 429
     ok, r = cuentas.entrar(d.get("correo"), d.get("contrasena"))
     return (jsonify(r), 200) if ok else (jsonify(r), 401)
 
@@ -224,6 +271,8 @@ def cuenta_renovar():
 def cuenta_recuperar():
     import cuentas
     d = request.get_json(silent=True) or {}
+    if not _pasa_cuenta():
+        return jsonify({"enviado": True})
     cuentas.recuperar(d.get("correo"))
     # Siempre la misma respuesta: decir si un correo está registrado le
     # confirma a un desconocido quién tiene cuenta aquí.
@@ -235,6 +284,34 @@ def cuenta_salir():
     import cuentas
     cuentas.salir(_token())
     return jsonify({"ok": True})
+
+
+@app.post("/api/cuenta/clave-nueva")
+def cuenta_clave_nueva():
+    """Cambia la contraseña con el token del correo de recuperación."""
+    import cuentas
+    if not _pasa_cuenta():
+        return jsonify({"error": "Demasiados intentos. Espera unos minutos."}), 429
+    d = request.get_json(silent=True) or {}
+    ok, r = cuentas.cambiar_contrasena(_token(), d.get("contrasena"))
+    return (jsonify(r), 200) if ok else (jsonify(r), 400)
+
+
+@app.delete("/api/cuenta")
+def cuenta_borrar():
+    """Elimina la cuenta y, por cascade, todo lo que cuelga de ella.
+
+    Es el derecho de cancelación de la Ley 29733 ejercido en el acto, sin
+    escribir a nadie ni esperar diez días. La política lo promete; esto
+    es lo que lo cumple.
+    """
+    import cuentas
+    usuario, error = _sesion_o_401()
+    if error:
+        return error
+    if not cuentas.borrar_cuenta(usuario["id"]):
+        return jsonify({"error": "No se pudo borrar la cuenta. Escríbenos y lo hacemos."}), 500
+    return jsonify({"borrada": True})
 
 
 @app.get("/api/cuenta/yo")

@@ -202,5 +202,25 @@ check("sin cuenta, subir postulaciones devuelve 0",
 check("sin cuenta, bajar postulaciones devuelve lista vacia",
   (await sesion.bajarPostulaciones()).length === 0);
 
+
+titulo("RENOVAR — la sesion no se muere a la hora");
+
+{
+  // El caso real: una tanda de postulaciones dura mas de una hora. Antes,
+  // al caducar el token la extension se encontraba un 401, borraba la
+  // sesion y dejaba a medias lo que estuviera enviando.
+  const fuente = await (await import("node:fs/promises"))
+    .readFile(new URL("lib/sesion.js", BASE), "utf8");
+  check("existe el renovador", fuente.includes("async function renovar()"));
+  check("y una peticion que lo usa", fuente.includes("async function conCuenta("));
+  check("se reintenta una vez tras un 401",
+        fuente.includes("r.status === 401 && await renovar()"));
+  check("dos renovaciones a la vez no se pisan", fuente.includes("renovando = renovando ||"));
+  check("ya no quedan fetch sueltos a la nube",
+        !/fetch\(`\$\{SERVIDOR\}\/api\/nube/.test(fuente));
+  check("ni a la ruta de quien soy",
+        !/fetch\(`\$\{SERVIDOR\}\/api\/cuenta\/yo/.test(fuente));
+}
+
 console.log(`\n${fallos === 0 ? "TODO OK" : `${fallos} FALLO(S)`}`);
 process.exit(fallos ? 1 : 0);

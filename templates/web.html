@@ -63,7 +63,7 @@
       <p class="detalle" id="nombre-archivo"></p>
     </div>
     <button class="boton principal ancho-total" id="procesar" disabled>Convertir mi CV</button>
-    <p class="detalle centro" id="estado"></p>
+    <p class="detalle centro" id="estado" role="status" aria-live="polite"></p>
   </section>
 
   <!-- 2. Resultado -->
@@ -173,6 +173,25 @@
     </p>
   </form>
 </dialog>
+
+<!-- Mis datos. La política dice que se puede borrar todo «desde tu
+     perfil»; sin este panel esa frase era una promesa sin sitio donde
+     cumplirse, y la única vía real era escribir un correo y esperar. -->
+<section class="ancho mis-datos-zona oculto" id="zona-datos">
+  <details class="mis-datos">
+    <summary>Mis datos y mi cuenta</summary>
+    <div class="cuerpo">
+      <p>Estás dentro como <strong id="datos-correo"></strong>.</p>
+      <p class="detalle">Puedes llevarte tus datos o borrarlos cuando quieras. No
+        hace falta que nos escribas ni que expliques por qué.</p>
+      <div class="acciones-cuenta">
+        <button class="boton secundario" id="btn-descargar-datos">Descargar mis datos</button>
+        <button class="boton peligro" id="btn-borrar-todo">Borrar mi cuenta</button>
+      </div>
+      <p class="detalle oculto" id="aviso-datos"></p>
+    </div>
+  </details>
+</section>
 
 <footer class="ancho">
   <p>Chamba Lista — hecho para buscar trabajo en Perú · <a href="/privacidad">Privacidad y condiciones</a></p>

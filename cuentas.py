@@ -29,6 +29,7 @@ import json
 import os
 import re
 import urllib.error
+import urllib.parse
 import urllib.request
 
 # Igual que en redactor_ia y nube: algunos antivirus y proxies
@@ -45,7 +46,18 @@ except ImportError:
 
 URL = (os.environ.get("SUPABASE_URL") or "").rstrip("/")
 ANON = os.environ.get("SUPABASE_ANON_KEY") or ""
+SERVICIO = os.environ.get("SUPABASE_SERVICE_KEY") or ""
 TIEMPO = 12
+
+# A dónde vuelve la persona desde el correo de recuperación. Si no está
+# puesta, Supabase manda a su URL por defecto, que no es esta página y
+# deja el enlace sin servir para nada.
+SITIO = (os.environ.get("SITIO_URL") or "").rstrip("/")
+
+# Versión de la política que se acepta al registrarse. Cambia cuando
+# cambie el documento: sin esto, «aceptó» no dice QUÉ aceptó, y una
+# aceptación que no se puede fechar ni ubicar no demuestra nada.
+VERSION_POLITICA = "2026-09-07"
 
 CORREO = re.compile(r"^[^@\s]+@[^@\s]+\.[a-z]{2,}$", re.I)
 MINIMO_CONTRASENA = 8
@@ -177,7 +189,83 @@ def recuperar(correo):
     """Manda el correo para restablecer la contraseña."""
     if not CORREO.match((correo or "").strip()):
         return False, {"error": "Escribe un correo válido."}
-    ok, d = _pedir("recover", {"email": correo.strip().lower()})
+    ruta = "recover"
+    if SITIO:
+        ruta += "?redirect_to=" + urllib.parse.quote(f"{SITIO}/recuperar", safe="")
+    ok, d = _pedir(ruta, {"email": correo.strip().lower()})
     # Se responde igual exista o no la cuenta: decir "ese correo no está
     # registrado" le confirma a un desconocido quién tiene cuenta aquí.
     return (True, {}) if ok else (True, {})
+
+
+def cambiar_contrasena(token, nueva):
+    """Pone una contraseña nueva usando el token del correo de recuperación.
+
+    El token viene en el enlace que Supabase manda al correo, así que
+    demuestra que quien lo usa tiene acceso a ese buzón. Es el mismo
+    endpoint que serviría para cambiarla estando dentro.
+    """
+    if len(nueva or "") < MINIMO_CONTRASENA:
+        return False, {"error": f"La contraseña necesita al menos {MINIMO_CONTRASENA} caracteres."}
+    if not token:
+        return False, {"error": "El enlace no es válido o ya caducó. Pide otro."}
+    ok, d = _pedir("user", {"password": nueva}, token=token, metodo="PUT")
+    return (True, {"ok": True}) if ok else (False, d)
+
+
+def borrar_cuenta(id_usuario):
+    """Elimina la cuenta entera, no solo sus datos.
+
+    Hace falta la clave de SERVICIO: borrar una cuenta es una operación
+    administrativa y el token de la persona no alcanza. Al caer la fila
+    de auth.users, el `on delete cascade` de 002-cuentas.sql se lleva el
+    CV y el historial con ella.
+
+    Se hace de verdad porque la política promete que se puede. Una
+    política que promete un borrado que el sistema no sabe ejecutar es
+    exactamente el papel que no protege a nadie.
+    """
+    if not (URL and SERVICIO and id_usuario):
+        return False
+    peticion = urllib.request.Request(
+        f"{URL}/auth/v1/admin/users/{id_usuario}",
+        method="DELETE",
+        headers={"apikey": SERVICIO, "Authorization": f"Bearer {SERVICIO}"},
+    )
+    try:
+        with urllib.request.urlopen(peticion, timeout=TIEMPO):
+            return True
+    except (urllib.error.HTTPError, urllib.error.URLError, TimeoutError, OSError):
+        return False
+
+
+def anotar_aceptacion(id_usuario, version=VERSION_POLITICA):
+    """Deja constancia de que esta cuenta aceptó, cuándo y qué versión.
+
+    El servidor ya comprobaba la casilla antes de crear la cuenta, pero
+    comprobarla y olvidarla no es lo mismo que poder demostrarla. La Ley
+    29733 pide consentimiento «previo, expreso e informado»; si alguien
+    reclama, lo que se enseña es esta fila.
+
+    Se escribe con la clave de servicio a propósito: la persona no debe
+    poder editar ni borrar el registro de su propio consentimiento.
+    """
+    if not (URL and SERVICIO and id_usuario):
+        return False
+    cuerpo = json.dumps({"usuario": id_usuario, "version": version}).encode("utf-8")
+    peticion = urllib.request.Request(
+        f"{URL}/rest/v1/consentimientos",
+        method="POST",
+        data=cuerpo,
+        headers={
+            "apikey": SERVICIO,
+            "Authorization": f"Bearer {SERVICIO}",
+            "Content-Type": "application/json",
+            "Prefer": "resolution=merge-duplicates",
+        },
+    )
+    try:
+        with urllib.request.urlopen(peticion, timeout=TIEMPO):
+            return True
+    except (urllib.error.HTTPError, urllib.error.URLError, TimeoutError, OSError):
+        return False

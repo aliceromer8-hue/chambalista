@@ -378,15 +378,15 @@ dialog#dlg-cuenta {
 }
 dialog#dlg-cuenta::backdrop { background: rgba(19, 19, 22, .55); }
 dialog#dlg-cuenta h2 { font-size: 1.5rem; margin-bottom: 6px; }
-dialog#dlg-cuenta label {
+dialog#dlg-cuenta label, .campo {
   display: block; margin-top: 16px; font-size: 13px; font-weight: 700;
 }
-dialog#dlg-cuenta input {
+dialog#dlg-cuenta input, .campo input {
   display: block; width: 100%; margin-top: 6px; padding: 11px 13px;
   border: 2px solid var(--linea); border-radius: var(--r-chico);
   font: inherit; font-size: 14px; background: var(--papel); color: var(--tinta);
 }
-dialog#dlg-cuenta input:focus { outline: none; box-shadow: var(--dura-chica); }
+dialog#dlg-cuenta input:focus, .campo input:focus { outline: none; box-shadow: var(--dura-chica); }
 .acciones-cuenta { display: flex; gap: 10px; margin: 20px 0 12px; }
 .acciones-cuenta .boton { flex: 1; }
 .aviso-cuenta {
@@ -433,3 +433,25 @@ dialog#dlg-cuenta input:focus { outline: none; box-shadow: var(--dura-chica); }
   background: var(--menta-suave); border: 2px solid var(--menta);
   border-radius: var(--r-chico); padding: 9px 13px; margin-top: 10px;
 }
+
+
+/* ══════════ mis datos ══════════ */
+/* El panel donde se ejerce el derecho de cancelación. La política lo
+ * promete «desde tu perfil», así que tiene que existir un perfil. */
+.mis-datos { margin-top: 14px; }
+.mis-datos summary {
+  cursor: pointer; font-size: 13px; font-weight: 700; color: var(--tinta-2);
+  list-style: none; padding: 6px 0;
+}
+.mis-datos summary::-webkit-details-marker { display: none; }
+.mis-datos summary::before { content: "▸ "; }
+.mis-datos[open] summary::before { content: "▾ "; }
+.mis-datos .cuerpo {
+  border: 2px solid var(--linea); border-radius: var(--r-chico);
+  padding: 14px 16px; margin-top: 8px; background: var(--papel);
+}
+.mis-datos p { font-size: 13px; margin: 0 0 10px; }
+.boton.peligro {
+  background: var(--coral-suave); border-color: var(--coral); color: var(--tinta);
+}
+.boton.peligro:hover { background: var(--coral); }

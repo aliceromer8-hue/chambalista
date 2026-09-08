@@ -552,5 +552,72 @@ for pieza, que in [
 check("la página enlaza a la política", "/privacidad" in BASE_HTML)
 check("la casilla está en el formulario", 'id="acepta"' in BASE_HTML)
 
+# ---------------------------------------------------------------------
+titulo("DERECHOS — lo que la política promete, el producto lo hace")
+# ---------------------------------------------------------------------
+# Cada una de estas comprobaciones nació de un hueco real: la política
+# decía que se podían borrar los datos «desde tu perfil» cuando no había
+# ningún perfil, y el correo de recuperación llevaba a una página que no
+# existía. Prometer un derecho que el sistema no sabe ejercer es peor
+# que no prometerlo.
+
+check("existe la ruta que borra la cuenta entera",
+      any(str(r) == "/api/cuenta" and "DELETE" in r.methods
+          for r in app_web.app.url_map.iter_rules()))
+check("y sin sesión no borra nada",
+      cliente.delete("/api/cuenta").status_code in (401, 501))
+
+r = cliente.get("/recuperar")
+check("el enlace del correo aterriza en una página real", r.status_code == 200)
+_rec = r.get_data(as_text=True)
+check("que pide la contraseña nueva", 'id="clave"' in _rec)
+check("y no se indexa", "noindex" in _rec)
+check("el token no se queda en la barra de direcciones",
+      "history.replaceState" in _rec)
+
+check("cambiar la contraseña exige el token del correo",
+      cliente.post("/api/cuenta/clave-nueva",
+                   json={"contrasena": "unaquesirva"}).status_code == 400)
+check("y no acepta una contraseña corta",
+      not cuentas.cambiar_contrasena("loquesea", "123")[0])
+
+check("el panel de mis datos está en la página", 'id="zona-datos"' in BASE_HTML)
+check("con la descarga de mis datos", 'id="btn-descargar-datos"' in BASE_HTML)
+check("y el borrado de la cuenta", 'id="btn-borrar-todo"' in BASE_HTML)
+
+_js = pathlib.Path("static/js/web.js").read_text(encoding="utf-8")
+check("entrar sirve para algo: el CV sube a la cuenta", "subirPerfil()" in _js)
+check("y baja al entrar desde otro equipo", "bajarPerfil()" in _js)
+check("la sesión se renueva sola antes de caducar", "renovarSesion" in _js)
+check("y se reintenta una vez tras un 401", "r.status === 401" in _js)
+check("al borrar la cuenta se limpia también el navegador",
+      "localStorage.removeItem(TRABAJO)" in _js)
+
+# La constancia del consentimiento. Comprobar la casilla y olvidarla no
+# es lo mismo que poder demostrarla.
+check("hay una versión de política que se acepta",
+      bool(getattr(cuentas, "VERSION_POLITICA", "")))
+check("la política publicada lleva esa misma versión",
+      cuentas.VERSION_POLITICA in _pol, cuentas.VERSION_POLITICA)
+check("sin clave de servicio, anotar no revienta",
+      cuentas.anotar_aceptacion(None) is False)
+_sql = pathlib.Path("supabase/003-consentimiento.sql").read_text(encoding="utf-8")
+check("la tabla de consentimientos guarda versión y fecha",
+      "version" in _sql and "cuando" in _sql)
+check("y nadie puede editar su propia aceptación",
+      "for select" in _sql and "for all" not in _sql)
+
+# ---------------------------------------------------------------------
+titulo("LÍMITES — probar contraseñas no puede salir gratis")
+# ---------------------------------------------------------------------
+app_web._intentos.clear()
+_codigos = [cliente.post("/api/cuenta/entrar",
+                         json={"correo": "a@b.pe", "contrasena": "x" * 9}).status_code
+            for _ in range(app_web.LIMITE_CUENTA + 2)]
+check("tras varios intentos seguidos, se corta", 429 in _codigos, str(_codigos[-1]))
+check("el límite de CVs y el de contraseñas son cubos distintos",
+      app_web._historial is not app_web._intentos)
+app_web._intentos.clear()
+
 print(f"\n{'TODO OK' if fallos == 0 else f'{fallos} FALLO(S)'}")
 sys.exit(1 if fallos else 0)

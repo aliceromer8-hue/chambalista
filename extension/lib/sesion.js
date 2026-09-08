@@ -34,6 +34,46 @@ export async function cabecera(extra = {}) {
 }
 
 /**
+ * Cambia el token caducado por uno nuevo con el de refresco.
+ *
+ * Sin esto, a la hora justa la sesión moría en mitad de una tanda de
+ * postulaciones: la extensión se encontraba un 401, borraba la sesión y
+ * dejaba a medias lo que estuviera enviando, sin decir por qué.
+ */
+let renovando = null;
+
+async function renovar() {
+  const s = await obtener();
+  if (!s?.refresco) return null;
+  // Dos renovaciones a la vez se invalidan la una a la otra.
+  renovando = renovando || (async () => {
+    try {
+      const r = await fetch(`${SERVIDOR}/api/cuenta/renovar`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ refresco: s.refresco }),
+      });
+      const j = await r.json();
+      if (!r.ok || !j.token) { await guardar(null); return null; }
+      await guardar(j);
+      return j;
+    } catch { return null; }
+    finally { renovando = null; }
+  })();
+  return renovando;
+}
+
+/** Como fetch, con la sesión puesta y renovándola si hace falta. */
+async function conCuenta(ruta, opciones = {}) {
+  const ir = async () => fetch(`${SERVIDOR}${ruta}`, {
+    ...opciones, headers: await cabecera(opciones.headers || {}),
+  });
+  let r = await ir();
+  if (r.status === 401 && await renovar()) r = await ir();
+  return r;
+}
+
+/**
  * Entra con correo y contraseña.
  *
  * No se registra desde aquí a propósito: crear cuenta obliga a aceptar la
@@ -76,7 +116,7 @@ export async function verificar() {
   const s = await obtener();
   if (!s?.token) return null;
   try {
-    const r = await fetch(`${SERVIDOR}/api/cuenta/yo`, { headers: await cabecera() });
+    const r = await conCuenta("/api/cuenta/yo");
     const j = await r.json();
     if (j.usuario) return j.usuario;
   } catch {
@@ -99,9 +139,9 @@ export const URL_CUENTA = `${SERVIDOR}/`;
 export async function subirPerfil(perfil) {
   if (!(await hayCuenta()) || !perfil) return false;
   try {
-    const r = await fetch(`${SERVIDOR}/api/nube/perfil`, {
+    const r = await conCuenta("/api/nube/perfil", {
       method: "POST",
-      headers: await cabecera({ "Content-Type": "application/json" }),
+      headers: { "Content-Type": "application/json" },
       body: JSON.stringify(perfil),
     });
     return r.ok;
@@ -111,7 +151,7 @@ export async function subirPerfil(perfil) {
 export async function bajarPerfil() {
   if (!(await hayCuenta())) return null;
   try {
-    const r = await fetch(`${SERVIDOR}/api/nube/perfil`, { headers: await cabecera() });
+    const r = await conCuenta("/api/nube/perfil");
     return r.ok ? (await r.json()).perfil : null;
   } catch { return null; }
 }
@@ -119,9 +159,9 @@ export async function bajarPerfil() {
 export async function subirPostulaciones(items) {
   if (!(await hayCuenta()) || !items?.length) return 0;
   try {
-    const r = await fetch(`${SERVIDOR}/api/nube/postulaciones`, {
+    const r = await conCuenta("/api/nube/postulaciones", {
       method: "POST",
-      headers: await cabecera({ "Content-Type": "application/json" }),
+      headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ postulaciones: items }),
     });
     return r.ok ? (await r.json()).guardadas || 0 : 0;
@@ -131,7 +171,7 @@ export async function subirPostulaciones(items) {
 export async function bajarPostulaciones() {
   if (!(await hayCuenta())) return [];
   try {
-    const r = await fetch(`${SERVIDOR}/api/nube/postulaciones`, { headers: await cabecera() });
+    const r = await conCuenta("/api/nube/postulaciones");
     return r.ok ? (await r.json()).postulaciones || [] : [];
   } catch { return []; }
 }
