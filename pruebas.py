@@ -512,5 +512,38 @@ check("la página ya no promete «sin registro»",
 check("y explica por qué postular pide cuenta",
       "postular sí la pide" in _html.lower())
 
+# ---------------------------------------------------------------------
+titulo("ACEPTACIÓN — no se puede crear cuenta sin aceptar")
+# ---------------------------------------------------------------------
+# La casilla del formulario no basta: se puede desmarcar desde las
+# herramientas del navegador. Si el servidor no lo comprueba, existiría
+# una cuenta que nunca aceptó nada, y un consentimiento que no se puede
+# demostrar no sirve para lo que existe.
+
+r = cliente.post("/api/cuenta/registrar",
+                 json={"correo": "prueba@correo.pe", "contrasena": "12345678"})
+check("sin aceptar, el servidor rechaza", r.status_code == 400, str(r.status_code))
+check("y dice por qué", "acept" in (r.get_json() or {}).get("error", "").lower())
+
+r = cliente.post("/api/cuenta/registrar",
+                 json={"correo": "prueba@correo.pe", "contrasena": "12345678", "acepta": False})
+check("un «acepta: false» explícito tampoco pasa", r.status_code == 400)
+
+# La política tiene que existir y ser alcanzable desde la página.
+r = cliente.get("/privacidad")
+check("la política de privacidad se sirve", r.status_code == 200)
+_pol = r.get_data(as_text=True)
+for pieza, que in [
+    ("Ley 29733", "cita la ley peruana"),
+    ("Google", "dice que el CV va a Google"),
+    ("borrar", "explica cómo borrar los datos"),
+    ("no garantiza", "aclara que no garantiza que te contraten"),
+    ("18 años", "pone la edad mínima"),
+]:
+    check(f"la política {que}", pieza.lower() in _pol.lower())
+
+check("la página enlaza a la política", "/privacidad" in BASE_HTML)
+check("la casilla está en el formulario", 'id="acepta"' in BASE_HTML)
+
 print(f"\n{'TODO OK' if fallos == 0 else f'{fallos} FALLO(S)'}")
 sys.exit(1 if fallos else 0)

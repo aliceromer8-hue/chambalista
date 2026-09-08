@@ -268,6 +268,11 @@ function pintarModo() {
     ? "¿Ya tienes cuenta? Entra"
     : "¿No tienes cuenta? Créala";
   $("#contrasena").setAttribute("autocomplete", modoRegistro ? "new-password" : "current-password");
+  // La casilla solo al crear cuenta: quien ya entra la aceptó en su día,
+  // y volver a pedirla en cada inicio de sesión la convierte en un
+  // trámite que se marca sin leer.
+  $("#fila-acepta").classList.toggle("oculto", !modoRegistro);
+  $("#acepta").checked = false;
   errorCuenta("");
 }
 
@@ -305,12 +310,16 @@ $("#form-cuenta").addEventListener("submit", async (ev) => {
   const correo = $("#correo").value.trim();
   const contrasena = $("#contrasena").value;
   const boton = $("#btn-enviar");
+  if (modoRegistro && !$("#acepta").checked) {
+    errorCuenta("Marca la casilla para aceptar la política de privacidad y las condiciones.");
+    return;
+  }
   boton.disabled = true;
   errorCuenta("");
   try {
     const r = await fetch(`/api/cuenta/${modoRegistro ? "registrar" : "entrar"}`, {
       method: "POST", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ correo, contrasena }),
+      body: JSON.stringify({ correo, contrasena, acepta: $("#acepta").checked }),
     });
     const j = await r.json();
     if (!r.ok) { errorCuenta(j.error || "No se pudo completar."); return; }

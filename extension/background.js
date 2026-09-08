@@ -10,6 +10,7 @@ import * as respuestas from "./lib/respuestas.js";
 import * as ia from "./lib/ia.js";
 import * as cv from "./lib/cv.js";
 import * as huecos from "./lib/huecos.js";
+import * as sesion from "./lib/sesion.js";
 
 const TOPE_POR_TANDA = 15;
 const PAUSA_ENTRE_VACANTES = 2500;
@@ -155,6 +156,17 @@ async function adjuntarCVAdaptado(tabId, perfil, vacante, resumen, competenciasE
 }
 
 async function prepararUna(vacante, perfil, guardados, respuestasPersona) {
+  // Postular exige cuenta. Lo que se envía lleva el nombre de la persona
+  // a una empresa real: tiene que quedar claro de quién viene, y eso no
+  // sale de un navegador anónimo. Buscar y ver vacantes sigue abierto.
+  if (!(await sesion.hayCuenta())) {
+    return {
+      url: vacante.url, completados: [], pendientes: [], preguntas: [], cambiosCV: [],
+      requiereCuenta: true,
+      nota: "Para postular necesitas una cuenta. Créala en la web y vuelve aquí.",
+    };
+  }
+
   const tabId = await pestanaDeTrabajo();
   const reporte = { url: vacante.url, completados: [], pendientes: [], preguntas: [], cambiosCV: [] };
 

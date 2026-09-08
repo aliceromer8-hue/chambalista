@@ -73,6 +73,11 @@ def index():
     return render_template("web.html")
 
 
+@app.get("/privacidad")
+def privacidad():
+    return render_template("privacidad.html")
+
+
 @app.get("/api/estado")
 def estado():
     # Si la clave de Gemini tiene facturación activada.
@@ -187,6 +192,14 @@ def _sesion_o_401():
 def cuenta_registrar():
     import cuentas
     d = request.get_json(silent=True) or {}
+    # La aceptación se comprueba en el SERVIDOR, no solo en el formulario.
+    # Una casilla marcada en el navegador la puede saltar cualquiera con
+    # las herramientas de desarrollo, y entonces existiría una cuenta que
+    # nunca aceptó nada. Un consentimiento que no se puede demostrar no
+    # sirve para lo que existe.
+    if not d.get("acepta"):
+        return jsonify({"error": "Tienes que aceptar la política de privacidad "
+                                 "y las condiciones para crear tu cuenta."}), 400
     ok, r = cuentas.registrar(d.get("correo"), d.get("contrasena"))
     return (jsonify(r), 200) if ok else (jsonify(r), 400)
 

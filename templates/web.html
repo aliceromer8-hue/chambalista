@@ -152,6 +152,13 @@
       <input type="password" id="contrasena" autocomplete="current-password" required
              minlength="8" placeholder="mínimo 8 caracteres">
     </label>
+    <label class="casilla oculto" id="fila-acepta">
+      <input type="checkbox" id="acepta">
+      <span>He leído y acepto la
+        <a href="/privacidad" target="_blank" rel="noopener">política de privacidad
+        y las condiciones</a>. Entiendo que mi CV se envía a Google para leerlo
+        y que esto no garantiza que me contraten.</span>
+    </label>
     <p class="aviso-cuenta oculto" id="error-cuenta"></p>
     <div class="acciones-cuenta">
       <button class="boton principal" id="btn-enviar" value="enviar">Entrar</button>
@@ -166,7 +173,7 @@
 </dialog>
 
 <footer class="ancho">
-  <p>Chamba Lista — hecho para buscar trabajo en Perú.</p>
+  <p>Chamba Lista — hecho para buscar trabajo en Perú · <a href="/privacidad">Privacidad y condiciones</a></p>
 </footer>
 
 <script src="/static/js/web.js"></script>

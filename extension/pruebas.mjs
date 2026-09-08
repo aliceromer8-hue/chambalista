@@ -174,5 +174,33 @@ check("un distrito desconocido no rompe el filtro",
   distritos.filtrar(OFERTAS, "Chimbote", "cerca").dentro.length === OFERTAS.length);
 check("sabe la zona de cada distrito", distritos.zonaDe("Los Olivos") === "norte");
 
+// ---------------------------------------------------------------------
+titulo("SESION — postular necesita cuenta");
+// ---------------------------------------------------------------------
+// Buscar y ver vacantes sigue abierto. Postular no: lo que se envia lleva
+// el nombre de la persona a una empresa real y tiene que quedar claro de
+// quien viene.
+const sesion = await import(`${BASE}lib/sesion.js`);
+
+check("sin sesion guardada, no hay cuenta", (await sesion.hayCuenta()) === false);
+check("sin cuenta, la cabecera va sin token",
+  !("Authorization" in (await sesion.cabecera())));
+
+await sesion.guardar({ token: "abc123", usuario: { correo: "a@b.pe" } });
+check("con sesion, si hay cuenta", (await sesion.hayCuenta()) === true);
+const cab = await sesion.cabecera({ "Content-Type": "application/json" });
+check("y la cabecera lleva el token", cab.Authorization === "Bearer abc123");
+check("sin romper lo que ya traia", cab["Content-Type"] === "application/json");
+
+await sesion.guardar(null);
+check("al salir, la sesion se borra", (await sesion.obtener()) === null);
+
+check("sin cuenta, subir el perfil no hace nada", (await sesion.subirPerfil({ n: 1 })) === false);
+check("sin cuenta, bajar el perfil devuelve null", (await sesion.bajarPerfil()) === null);
+check("sin cuenta, subir postulaciones devuelve 0",
+  (await sesion.subirPostulaciones([{ url: "x" }])) === 0);
+check("sin cuenta, bajar postulaciones devuelve lista vacia",
+  (await sesion.bajarPostulaciones()).length === 0);
+
 console.log(`\n${fallos === 0 ? "TODO OK" : `${fallos} FALLO(S)`}`);
 process.exit(fallos ? 1 : 0);
