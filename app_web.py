@@ -356,7 +356,14 @@ def nube_postulaciones():
         return error
 
     if request.method == "GET":
-        return jsonify({"postulaciones": nube.leer_postulaciones(_token())})
+        historial = nube.leer_postulaciones(_token())
+        if historial is None:
+            # 503, no una lista vacía: decirle «no tienes postulaciones»
+            # a quien lleva semanas postulando, porque la base tardó un
+            # segundo de más, es mentirle en el peor momento.
+            return jsonify({"error": "No pudimos leer tu historial ahora mismo. "
+                                     "Vuelve a intentarlo en un momento."}), 503
+        return jsonify({"postulaciones": historial})
 
     datos = request.get_json(silent=True) or {}
     items = datos.get("postulaciones") or []

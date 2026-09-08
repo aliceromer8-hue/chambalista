@@ -31,6 +31,7 @@ impedirle a nadie convertir su CV.
     SUPABASE_SERVICE_KEY   la de servicio (solo para eventos anónimos)
 """
 import json
+import logging
 import os
 import urllib.error
 import urllib.request
@@ -39,6 +40,8 @@ URL = (os.environ.get("SUPABASE_URL") or "").rstrip("/")
 ANON = os.environ.get("SUPABASE_ANON_KEY") or ""
 SERVICIO = os.environ.get("SUPABASE_SERVICE_KEY") or ""
 TIEMPO = 8
+
+log = logging.getLogger("chamba.nube")
 
 
 def activa():
@@ -74,7 +77,15 @@ def _pedir(metodo, ruta, cuerpo=None, cabeceras=None, token=None):
         with urllib.request.urlopen(peticion, timeout=TIEMPO) as r:
             crudo = r.read()
             return json.loads(crudo) if crudo else []
-    except (urllib.error.URLError, TimeoutError, json.JSONDecodeError, OSError):
+    except (urllib.error.URLError, TimeoutError, json.JSONDecodeError, OSError) as e:
+        detalle = ""
+        if isinstance(e, urllib.error.HTTPError):
+            try:
+                detalle = (e.read() or b"")[:200].decode("utf-8", "replace")
+            except Exception:                                   # noqa: BLE001
+                pass
+        log.warning("supabase %s %s falló (%s): %s",
+                    metodo, ruta.split("?")[0], type(e).__name__, detalle or str(e)[:150])
         return None
 
 
@@ -127,10 +138,17 @@ def guardar_postulaciones(token, usuario_id, items):
 
 
 def leer_postulaciones(token):
-    """El historial, de más reciente a más antiguo."""
-    filas = _pedir("GET", "postulaciones?select=url,titulo,empresa,portal,estado,motivo,actualizado"
-                          "&order=actualizado.desc", token=token)
-    return filas or []
+    """El historial, de más reciente a más antiguo. None si no se pudo leer.
+
+    La diferencia entre `[]` y `None` importa mucho más de lo que parece:
+    `[]` significa «no has postulado a nada» y `None` significa «no
+    pudimos preguntarlo». Antes las dos cosas se devolvían igual, así que
+    un fallo de red de un segundo se le enseñaba a la persona como que su
+    historial estaba vacío. Ver desaparecido lo que llevas semanas
+    acumulando es un susto que no hay por qué darle a nadie.
+    """
+    return _pedir("GET", "postulaciones?select=url,titulo,empresa,portal,estado,motivo,actualizado"
+                         "&order=actualizado.desc", token=token)
 
 
 # ---------------------------------------------------------------------

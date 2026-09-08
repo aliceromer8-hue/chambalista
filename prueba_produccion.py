@@ -75,6 +75,52 @@ def pedir(ruta, metodo="GET", cuerpo=None, token=None, archivo=None):
         return None, {"error": str(e)[:120]}
 
 
+def _cv_de_prueba():
+    """Un CV inventado, en .docx y en memoria.
+
+    Inventado a propósito: esta prueba manda el texto a Google y lo
+    guarda en la base de datos real. No hay ninguna razón para pasear por
+    ahí el CV de una persona que existe.
+
+    Los datos están elegidos para que la prueba signifique algo: décimo
+    ciclo con «Bachiller en Administración» como nombre de carrera —el
+    caso que hacía que le salieran vacantes de analista— y herramientas
+    concretas que tienen que sobrevivir al viaje.
+    """
+    import io
+
+    from docx import Document
+
+    d = Document()
+    for linea in [
+        "MARIANA QUISPE TORRES",
+        "mariana.prueba@ejemplo.pe | 999 888 777 | Lima, Perú",
+        "",
+        "PERFIL PROFESIONAL",
+        "Estudiante de Administración de décimo ciclo, con prácticas en análisis de "
+        "datos comerciales y manejo de Excel avanzado y Power BI.",
+        "",
+        "EDUCACIÓN",
+        "UNIVERSIDAD NACIONAL MAYOR DE SAN MARCOS — Lima, Perú",
+        "Bachiller en Administración de Empresas | 2021 - 2026",
+        "Décimo ciclo. Tercio superior.",
+        "",
+        "EXPERIENCIA PROFESIONAL",
+        "COMERCIAL ANDINA SAC — Lima, Perú",
+        "Practicante de Análisis Comercial | Enero 2025 - Diciembre 2025",
+        "Automatizó el reporte semanal de ventas en Power BI, que antes se hacía a mano.",
+        "Depuró la base de 12 000 clientes y bajó los duplicados de 8% a 0.4%.",
+        "",
+        "HABILIDADES E INTERESES",
+        "Herramientas: Excel avanzado, Power BI, SQL básico",
+        "Idiomas: Español (nativo), Inglés (intermedio)",
+    ]:
+        d.add_paragraph(linea)
+    memoria = io.BytesIO()
+    d.save(memoria)
+    return memoria.getvalue()
+
+
 print(f"Sitio:  {SITIO}")
 print(f"Cuenta: {CORREO}")
 
@@ -108,8 +154,7 @@ token = r3.get("token") or token
 # ---------------------------------------------------------------------
 titulo("CV — subir, convertir y que no se pierda")
 # ---------------------------------------------------------------------
-with open("cv_prueba.docx", "rb") as f:
-    contenido = f.read()
+contenido = _cv_de_prueba()
 
 c, r = pedir("/api/cv/procesar", "POST", archivo=("cv_prueba.docx", contenido))
 if not check("el CV se lee", c == 200, r.get("error")):
@@ -127,8 +172,14 @@ check("conserva las herramientas que declara el CV",
 
 c, r = pedir("/api/cv/sugerencias", "POST", perfil)
 check("sugiere puestos", c == 200 and bool(r.get("puestos")))
-if r.get("puestos"):
-    print(f"      {' · '.join(p['texto'] for p in r['puestos'][:3])}")
+_textos = [p["texto"] for p in r.get("puestos") or []]
+if _textos:
+    print(f"      {' · '.join(_textos[:3])}")
+# El CV es de décimo ciclo. Si aquí sale «Analista», está mandando a la
+# persona a avisos donde la van a filtrar.
+check("y a una estudiante le ofrece prácticas, no análisis senior",
+      bool(_textos) and all(t.lower().startswith("practicante") for t in _textos),
+      " · ".join(_textos[:3]))
 
 c, r = pedir("/api/cv/descargar", "POST", perfil)
 check("y genera el .docx", c == 200 and isinstance(r, bytes) and r[:2] == b"PK",

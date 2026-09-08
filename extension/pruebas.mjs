@@ -27,6 +27,8 @@ const datos = await import(`${BASE}lib/datos.js`);
 const respuestas = await import(`${BASE}lib/respuestas.js`);
 const almacen = await import(`${BASE}lib/almacen.js`);
 
+const fs2 = await import("node:fs");
+
 let fallos = 0;
 const check = (nombre, ok, extra = "") => {
   console.log(`${ok ? "OK   " : "FALLA"} ${nombre}${extra ? " — " + extra : ""}`);
@@ -201,6 +203,9 @@ check("sin cuenta, subir postulaciones devuelve 0",
   (await sesion.subirPostulaciones([{ url: "x" }])) === 0);
 check("sin cuenta, bajar postulaciones devuelve lista vacia",
   (await sesion.bajarPostulaciones()).length === 0);
+check("pero un fallo de lectura devuelve null, no lista vacia",
+  /if \(!r\.ok\) return null/.test(
+    fs2.readFileSync(new URL("lib/sesion.js", BASE), "utf8")));
 
 
 titulo("RENOVAR — la sesion no se muere a la hora");

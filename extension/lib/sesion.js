@@ -168,10 +168,22 @@ export async function subirPostulaciones(items) {
   } catch { return 0; }
 }
 
+/**
+ * El historial de la nube. Lista si se pudo leer, null si no.
+ *
+ * La diferencia importa: `[]` es «no has postulado a nada» y `null` es
+ * «no pudimos preguntarlo». Quien use esto para pintar una pantalla o,
+ * peor, para decidir qué guardar, tiene que poder distinguirlas — dar
+ * por vacío lo que solo era un fallo de red es como se borran cosas.
+ *
+ * Sin cuenta sí devuelve lista vacía: ahí no hay nada que leer y no es
+ * ningún fallo.
+ */
 export async function bajarPostulaciones() {
   if (!(await hayCuenta())) return [];
   try {
     const r = await conCuenta("/api/nube/postulaciones");
-    return r.ok ? (await r.json()).postulaciones || [] : [];
-  } catch { return []; }
+    if (!r.ok) return null;
+    return (await r.json()).postulaciones || [];
+  } catch { return null; }
 }
