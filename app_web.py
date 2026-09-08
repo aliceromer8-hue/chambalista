@@ -172,6 +172,11 @@ def procesar():
             else:
                 os.environ["GEMINI_API_KEY"] = previa
 
+    # Se anota con qué se leyó. Durante un día entero la web convirtió
+    # CVs por reglas porque el modelo estaba degradado, y no había forma
+    # de saberlo sin cronometrar a mano desde fuera: el respaldo por
+    # reglas hace que un fallo del modelo se vea igual que un acierto.
+    app.logger.info("CV leído con %s", perfil.get("analizado_con", "?"))
     return jsonify({"perfil": perfil})
 
 

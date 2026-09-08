@@ -619,5 +619,67 @@ check("el límite de CVs y el de contraseñas son cubos distintos",
       app_web._historial is not app_web._intentos)
 app_web._intentos.clear()
 
+# ---------------------------------------------------------------------
+titulo("MODELO — que un fallo del modelo no vuelva a ser invisible")
+# ---------------------------------------------------------------------
+# Historia: la web pasó un día convirtiendo CVs por reglas, en 102
+# segundos, porque «gemini-flash-latest» se degradó y el código se caía
+# al respaldo sin decir nada. El respaldo es correcto —perder el modelo
+# no puede romper el producto— pero callárselo convierte una avería en
+# algo que solo se descubre cronometrando a mano desde fuera.
+
+import os
+import redactor_ia
+
+check("hay un modelo suplente si el primero falla",
+      len(redactor_ia.MODELOS_GEMINI) >= 2, str(redactor_ia.MODELOS_GEMINI))
+check("no se depende de un alias que Google mueve",
+      not any(m.endswith("-latest") for m in redactor_ia.MODELOS_GEMINI),
+      str(redactor_ia.MODELOS_GEMINI))
+check("GEMINI_MODEL fija uno solo cuando se pone",
+      (os.environ.__setitem__("GEMINI_MODEL", "uno-concreto"),
+       redactor_ia._modelos_gemini() == ["uno-concreto"],
+       os.environ.pop("GEMINI_MODEL"))[1])
+check("sin GEMINI_MODEL se prueban todos", len(redactor_ia._modelos_gemini()) >= 2)
+
+check("leer un CV tiene su propio presupuesto, más corto que el del lote",
+      redactor_ia.TIEMPO_ANALISIS < redactor_ia.TIEMPO_LIMITE,
+      f"{redactor_ia.TIEMPO_ANALISIS}s vs {redactor_ia.TIEMPO_LIMITE}s")
+check("y no reintenta tres veces con alguien esperando delante",
+      redactor_ia.REINTENTOS_ANALISIS < redactor_ia.IA_REINTENTOS)
+check("lo que espera la persona cabe en medio minuto",
+      redactor_ia.TIEMPO_ANALISIS * redactor_ia.REINTENTOS_ANALISIS <= 30,
+      f"{redactor_ia.TIEMPO_ANALISIS * redactor_ia.REINTENTOS_ANALISIS}s")
+
+# Que el fallo se anote, no que se anote bonito.
+import logging as _logging
+
+class _Cazador(_logging.Handler):
+    def __init__(self):
+        super().__init__()
+        self.dichos = []
+
+    def emit(self, r):
+        self.dichos.append(r.getMessage())
+
+_caza = _Cazador()
+redactor_ia.log.addHandler(_caza)
+_clave_previa = os.environ.get("GEMINI_API_KEY")
+os.environ["GEMINI_API_KEY"] = "clave-que-no-vale"
+os.environ["GEMINI_MODEL"] = "modelo-que-no-existe"
+redactor_ia._llamar("hola", "responde", tope=10, tiempo=5, reintentos=1)
+os.environ.pop("GEMINI_MODEL")
+if _clave_previa is None:
+    os.environ.pop("GEMINI_API_KEY", None)
+else:
+    os.environ["GEMINI_API_KEY"] = _clave_previa
+redactor_ia.log.removeHandler(_caza)
+check("cuando el modelo falla, queda anotado por qué",
+      any("no respondió" in d or "falló" in d for d in _caza.dichos),
+      str(_caza.dichos)[:120])
+
+check("y el servidor anota con qué se leyó cada CV",
+      "CV leído con" in pathlib.Path("app_web.py").read_text(encoding="utf-8"))
+
 print(f"\n{'TODO OK' if fallos == 0 else f'{fallos} FALLO(S)'}")
 sys.exit(1 if fallos else 0)

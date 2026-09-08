@@ -20,6 +20,7 @@ responde la persona siempre.
 """
 
 import json
+import logging
 import os
 import re
 import time
@@ -52,14 +53,61 @@ except ImportError:
 #
 # Por eso son configurables: el despliegue web baja el tiempo para caer
 # rápido al respaldo, y en local se deja largo.
+# Un registro de verdad. Antes cada fallo del modelo se tragaba en
+# silencio y el producto caía al parseo por reglas sin dejar rastro: en
+# producción se veía «tardó cien segundos y no usó IA» sin ninguna forma
+# de saber por qué. Un error que no se anota cuesta una tarde de dar
+# palos de ciego cada vez que aparece.
+log = logging.getLogger("chamba.ia")
+
 TIEMPO_LIMITE = int(os.environ.get("IA_TIEMPO_LIMITE", "60"))
+
+# Leer un CV es INTERACTIVO: hay una persona mirando la pantalla. El
+# presupuesto de esa llamada no puede ser el mismo que el de responder
+# preguntas en lote, donde nadie espera delante. Con los valores de lote
+# —60 s por intento y tres intentos— una conversión llegó a tardar 102
+# segundos en producción para acabar usando las reglas igualmente: lo
+# peor de las dos opciones, la espera del modelo y el resultado sin él.
+TIEMPO_ANALISIS = int(os.environ.get("IA_TIEMPO_ANALISIS", "22"))
+REINTENTOS_ANALISIS = int(os.environ.get("IA_REINTENTOS_ANALISIS", "1"))
 IA_REINTENTOS = int(os.environ.get("IA_REINTENTOS", "3"))
 IA_ESPERA = int(os.environ.get("IA_ESPERA", "6"))
 
 # Alias "latest" en vez de una versión fija: las claves nuevas de AI Studio
 # traen cuota gratuita para este alias, mientras que pedir gemini-2.0-flash
 # por su nombre exacto devuelve 429 con "limit: 0".
-MODELO_GEMINI = "gemini-flash-latest"
+# El modelo, y su suplente.
+#
+# POR QUÉ HAY UNA LISTA Y NO UN NOMBRE
+#
+# Esto estaba fijado en «gemini-flash-latest», un alias que Google mueve
+# cuando quiere. El 2026-09-08 ese alias tardaba 85 segundos en responder
+# «listo» —una frase de tres letras— y a ratos devolvía 503. Como el
+# código se caía al parseo por reglas en silencio, el producto siguió
+# funcionando: convertía CVs sin IA, en 102 segundos, y nadie se enteró.
+#
+# Un alias que apunta a donde Google decida es una dependencia sobre la
+# que no se tiene ningún control. Con una lista, si el primero está
+# degradado se pasa al siguiente en vez de dejar a la persona esperando.
+#
+# Medido con el mismo CV el 2026-09-08 (calidad idéntica en los tres:
+# cero invenciones, todo lo del CV conservado; lo que cambia es el reloj):
+#
+#     gemini-3.1-flash-lite     9.4 s
+#     gemini-3.5-flash         14.2 s
+#     gemini-3.8-flash         38.6 s
+#     gemini-flash-latest     100 s y timeout   <- el que estaba puesto
+#
+# Vuelve a medirlo con evaluar_modelo.py antes de cambiar el orden: lo
+# barato y rápido solo sirve si sigue sin inventarse cosas.
+MODELOS_GEMINI = ["gemini-3.1-flash-lite", "gemini-3.5-flash"]
+MODELO_GEMINI = MODELOS_GEMINI[0]
+
+
+def _modelos_gemini():
+    """Los modelos a probar, en orden. GEMINI_MODEL fija uno y solo uno."""
+    fijado = os.environ.get("GEMINI_MODEL")
+    return [fijado] if fijado else MODELOS_GEMINI
 
 # Tope de tokens de salida. Los modelos flash razonan antes de responder y
 # ese razonamiento sale del mismo presupuesto, así que un tope bajo devuelve
@@ -108,9 +156,17 @@ def _pedir(url, cuerpo, cabeceras=None, reintentos=None):
                 return json.load(r)
         except urllib.error.HTTPError as e:
             if e.code in (429, 503) and intento < reintentos - 1:
+                log.warning("modelo %s: reintento %d/%d tras %ds",
+                            e.code, intento + 1, reintentos, espera)
                 time.sleep(espera)
                 espera *= 2
                 continue
+            cuerpo = ""
+            try:
+                cuerpo = (e.read() or b"")[:300].decode("utf-8", "replace")
+            except Exception:                                   # noqa: BLE001
+                pass
+            log.warning("modelo %s en %s: %s", e.code, url.split("?")[0], cuerpo)
             raise
     return {}
 
@@ -139,7 +195,20 @@ def _con_ollama(prompt, modelo):
 
 
 def _con_gemini(prompt, clave):
-    modelo = os.environ.get("GEMINI_MODEL", MODELO_GEMINI)
+    """Pide al primer modelo que conteste. Si uno falla, prueba el siguiente."""
+    modelos = _modelos_gemini()
+    for i, modelo in enumerate(modelos):
+        try:
+            return _gemini_una_vez(prompt, clave, modelo)
+        except (urllib.error.URLError, urllib.error.HTTPError, TimeoutError, OSError) as e:
+            if i == len(modelos) - 1:
+                raise
+            log.warning("gemini %s falló (%s), se prueba con %s",
+                        modelo, type(e).__name__, modelos[i + 1])
+    return ""
+
+
+def _gemini_una_vez(prompt, clave, modelo):
     url = f"https://generativelanguage.googleapis.com/v1beta/models/{modelo}:generateContent?key={clave}"
     r = _pedir(url, {
         "systemInstruction": {"parts": [{"text": INSTRUCCIONES}]},
@@ -203,7 +272,7 @@ def proveedor():
     if modelo:
         return "ollama", modelo
     if os.environ.get("GEMINI_API_KEY"):
-        return "gemini", os.environ.get("GEMINI_MODEL", MODELO_GEMINI)
+        return "gemini", _modelos_gemini()[0]
     if os.environ.get("GROQ_API_KEY"):
         return "groq", os.environ.get("GROQ_MODEL", "llama-3.3-70b-versatile")
     return None, "sin proveedor configurado"
@@ -383,24 +452,39 @@ def _extraer_json(texto):
         return None
 
 
-def _llamar(prompt, instrucciones, tope=2000):
-    """Llamada genérica al proveedor disponible. Devuelve texto o None."""
+def _llamar(prompt, instrucciones, tope=2000, tiempo=None, reintentos=None):
+    """Llamada genérica al proveedor disponible. Devuelve texto o None.
+
+    `tiempo` y `reintentos` permiten que quien llama fije su propio
+    presupuesto: no es lo mismo una persona esperando a que le lean su CV
+    que un lote de respuestas corriendo sin nadie delante.
+    """
     nombre, detalle = proveedor()
     if not nombre:
         return None
-    global INSTRUCCIONES, TOPE_SALIDA
+    global INSTRUCCIONES, TOPE_SALIDA, TIEMPO_LIMITE, IA_REINTENTOS
     previas, tope_previo = INSTRUCCIONES, TOPE_SALIDA
+    tiempo_previo, reint_previo = TIEMPO_LIMITE, IA_REINTENTOS
     INSTRUCCIONES, TOPE_SALIDA = instrucciones, tope
+    if tiempo:
+        TIEMPO_LIMITE = tiempo
+    if reintentos:
+        IA_REINTENTOS = reintentos
     try:
         if nombre == "ollama":
             return _con_ollama(prompt, detalle)
         if nombre == "gemini":
             return _con_gemini(prompt, os.environ["GEMINI_API_KEY"])
         return _con_groq(prompt, os.environ["GROQ_API_KEY"])
-    except (urllib.error.URLError, urllib.error.HTTPError, TimeoutError, OSError, ValueError):
+    except (urllib.error.URLError, urllib.error.HTTPError, TimeoutError, OSError, ValueError) as e:
+        # Se sigue devolviendo None —el respaldo por reglas es lo que hace
+        # que perder el modelo no rompa el producto— pero ahora queda
+        # anotado por qué, que es lo que faltaba.
+        log.warning("%s no respondió (%s): %s", nombre, type(e).__name__, str(e)[:200])
         return None
     finally:
         INSTRUCCIONES, TOPE_SALIDA = previas, tope_previo
+        TIEMPO_LIMITE, IA_REINTENTOS = tiempo_previo, reint_previo
 
 
 def analizar_cv(texto_crudo):
@@ -415,7 +499,8 @@ def analizar_cv(texto_crudo):
         return None
     # maxOutputTokens amplio: un CV completo en JSON es largo y el modelo
     # además razona antes de responder, del mismo presupuesto.
-    salida = _llamar(f"Texto del CV:\n\n{texto_crudo[:14000]}", INSTRUCCIONES_ANALISIS, tope=6000)
+    salida = _llamar(f"Texto del CV:\n\n{texto_crudo[:14000]}", INSTRUCCIONES_ANALISIS,
+                     tope=6000, tiempo=TIEMPO_ANALISIS, reintentos=REINTENTOS_ANALISIS)
     datos = _extraer_json(salida)
     if not isinstance(datos, dict):
         return None
