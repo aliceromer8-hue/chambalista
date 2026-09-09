@@ -552,6 +552,7 @@ def _dispositivo():
 
 
 @app.get("/api/ia/cuota")
+@con_sesion
 def cuota_ia():
     import proxy_ia
     datos = proxy_ia.consultar_cuota(_dispositivo())
@@ -560,6 +561,7 @@ def cuota_ia():
 
 
 @app.post("/api/ia/<operacion>")
+@con_sesion
 def operacion_ia(operacion):
     """Ejecuta una operación de IA con la clave del servidor.
 

@@ -127,29 +127,18 @@ main { padding-bottom: 80px; }
 .titulo-seccion {
   font-family: var(--mono); font-size: 11.5px; letter-spacing: .18em;
   text-transform: uppercase; color: var(--tinta-2); font-weight: 400;
-  margin-bottom: 4px;
+  margin-bottom: 18px;
 }
-.cadena { list-style: none; margin: 0; padding: 0; }
-.cadena li {
-  display: grid; grid-template-columns: 40px minmax(120px, 190px) 1fr;
-  gap: 14px; align-items: baseline;
-  padding: 17px 0; border-bottom: 1px solid var(--papel-3);
+
+/* El alcance real, debajo del camino. Va en su propio recuadro y no en
+ * letra gris al fondo: lo que limita lo que acabas de prometer se pone
+ * donde se lee, no donde se pueda decir que estaba puesto. */
+.alcance {
+  margin: 22px 0 0; padding: 11px 14px; font-size: 13.5px;
+  color: var(--tinta-2); background: var(--papel-2);
+  border: 2px solid var(--linea); border-radius: var(--r-chico);
 }
-@media (max-width: 620px) {
-  .cadena li { grid-template-columns: 34px 1fr; }
-  .cadena li > span:last-child { grid-column: 2; }
-}
-.paso-num { font-family: var(--mono); font-size: 12px; color: var(--tinta-2); }
-.cadena b { font-size: 1.5rem; font-weight: 800; letter-spacing: -.04em; }
-.cadena li > span:last-child { color: var(--tinta-2); font-size: 14px; }
-.tuyo {
-  margin: 20px 0 0; font-size: 14.5px; font-weight: 600;
-  display: flex; align-items: center; gap: 11px; flex-wrap: wrap;
-}
-.marca-tuyo {
-  background: var(--lima); color: #131316; border: 2px solid #131316;
-  border-radius: 99px; padding: 3px 13px; font-size: 12.5px; font-weight: 800;
-}
+.alcance b { color: var(--tinta); }
 
 /* ══════════ bloques ══════════ */
 .paso, .privacidad {
@@ -350,34 +339,23 @@ details > *:not(summary) { margin-top: 14px; }
 }
 .fila-clave input:focus { outline: none; box-shadow: var(--dura-chica); }
 
-/* ══════════ el viaje del CV ══════════ */
-/* Era una lista de cuatro frases largas sobre privacidad, justo donde la
- * persona ya tiene lo que vino a buscar y está de salida. Nadie las leía.
+/* ══════════ el camino ══════════ */
+/* Cuatro paradas y una línea que las recorre encendiéndolas. Vive arriba
+ * porque describe lo que nos distingue —que postula sola—, y eso es lo
+ * primero que alguien tiene que entender de este producto.
  *
- * Ahora es un camino: cuatro paradas, dos palabras cada una, y una línea
- * que las recorre al aparecer. Dice lo mismo, pero se MIRA en dos
- * segundos en vez de leerse en veinte. La versión larga sigue en
- * /privacidad, que es donde se busca cuando se busca. */
+ * El estado por defecto es el camino YA RECORRIDO: si el JavaScript no
+ * llega, se ve correcto y quieto. La animación es un extra, no el único
+ * modo en que la sección se entiende. */
 
-.privacidad .titulo-seccion { margin-bottom: 18px; }
 .ruta-envoltura { position: relative; }
-
-/* El riel apagado va de la primera parada a la última; el avance lo
- * recorre por encima. Los dos son elementos de verdad: en pseudo-
- * elementos la animación queda a merced de cada navegador y no hay forma
- * de medirla desde una prueba. */
 .riel {
   position: absolute; left: 12.5%; right: 12.5%; top: 18px;
   height: 2px; background: var(--papel-3);
 }
-/* El estado por defecto es el camino YA RECORRIDO: línea entera y
- * paradas encendidas. Si el JavaScript no llega —o el navegador no tiene
- * IntersectionObserver— esto es lo que se ve, y es correcto. La animación
- * es un extra, no el único modo en que la sección se entiende.
- *
- * Se anima la ESCALA, no el ancho: animar `height: 0 -> 100%` contra un
- * padre que saca su altura de top/bottom no arranca, y escalar va por el
- * compositor en vez de remaquetar sesenta veces por segundo. */
+/* Se anima la ESCALA, no el tamaño: `height: 0 -> 100%` contra un padre
+ * que saca su altura de top/bottom no arranca —la línea se quedaba a
+ * cero en móvil— y escalar va por el compositor. */
 .riel-avance {
   display: block; width: 100%; height: 100%; background: var(--tinta);
   transform: scaleX(1); transform-origin: left center;
@@ -397,7 +375,7 @@ details > *:not(summary) { margin-top: 14px; }
   display: grid; place-items: center; width: 38px; height: 38px;
   margin: 0 auto 12px;
   border: 2px solid var(--linea); border-radius: 99px;
-  background: var(--papel); box-shadow: var(--dura-chica);
+  box-shadow: var(--dura-chica);
   font-family: var(--mono); font-size: 13px; font-weight: 700;
   background: var(--lima); color: #131316;
 }
@@ -416,15 +394,12 @@ details > *:not(summary) { margin-top: 14px; }
 }
 
 .parada b {
-  display: block; font-size: 1.05rem; font-weight: 800;
+  display: block; font-size: 1.15rem; font-weight: 800;
   letter-spacing: -.03em; line-height: 1.25;
 }
 .parada .texto > span {
   display: block; color: var(--tinta-2); font-size: 12.5px; margin-top: 3px;
 }
-
-.cierre-ruta { margin-top: 26px; padding-top: 18px; border-top: 1px solid var(--papel-3); }
-.enlace-legal { color: var(--tinta-2); font-weight: 400; font-size: 13px; margin-left: auto; }
 
 /* En móvil el camino se pone de pie: cuatro paradas en fila no caben sin
  * partir las palabras, y partirlas mata justo lo que se buscaba. */
@@ -439,14 +414,9 @@ details > *:not(summary) { margin-top: 14px; }
     align-items: center; text-align: left; padding: 0;
   }
   .marca { margin: 0; }
-  .cierre-ruta { margin-top: 22px; }
-  .enlace-legal { margin-left: 0; }
 }
 @keyframes recorrer-alto { from { transform: scaleY(0); } to { transform: scaleY(1); } }
 
-/* Sin movimiento, el camino aparece ya recorrido. El JavaScript ni
- * siquiera marca el bloque en ese caso, pero esto lo asegura por si
- * acaso: un camino sin recorrer y sin explicación no dice nada. */
 @media (prefers-reduced-motion: reduce) {
   .ruta-envoltura.por-recorrer .riel-avance,
   .ruta-envoltura.recorriendo .riel-avance { animation: none; transform: none; }
@@ -454,6 +424,20 @@ details > *:not(summary) { margin-top: 14px; }
   .ruta-envoltura.recorriendo .marca {
     animation: none; background: var(--lima); color: #131316;
   }
+}
+
+/* ══════════ tus datos ══════════ */
+/* Tres hechos y el enlace al documento largo. Ni una lista con viñetas
+ * ni un párrafo: lo que hay que decir, dicho y fuera. */
+.datos-linea {
+  display: flex; flex-wrap: wrap; gap: 6px 18px;
+  font-size: 13.5px; color: var(--tinta-2); margin: 0;
+}
+.datos-linea b { color: var(--tinta); }
+.enlace-legal { color: var(--tinta-2); text-decoration: underline; margin-left: auto; }
+@media (max-width: 620px) {
+  .datos-linea { flex-direction: column; gap: 7px; }
+  .enlace-legal { margin-left: 0; }
 }
 
 footer { padding: 26px 24px 60px; color: var(--tinta-2); font-size: 13px; }

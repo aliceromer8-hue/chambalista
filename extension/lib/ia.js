@@ -1,8 +1,11 @@
 // Llamadas al modelo. La clave es de la persona y vive en su navegador.
 //
 // Notas que costaron depuración con Gemini:
-// - El alias `gemini-flash-latest` sí tiene cuota gratuita; pedir
-//   `gemini-2.0-flash` por su nombre exacto devuelve 429 con "limit: 0".
+// - NO usar alias tipo `gemini-flash-latest`: Google los mueve cuando
+//   quiere y el 2026-09-08 ese tardaba 85 segundos en contestar «listo»
+//   y devolvía 503 a ratos. El servidor ya se cambió por esto mismo
+//   (ver MODELOS_GEMINI en redactor_ia.py); aquí se pone el mismo, para
+//   que quien traiga su propia clave no se lleve el modelo malo.
 // - Estos modelos razonan antes de responder y ese razonamiento sale del
 //   mismo presupuesto de tokens, así que un maxOutputTokens bajo devuelve
 //   texto truncado o vacío.
@@ -10,7 +13,7 @@
 
 import { claveIA, leer, guardar } from "./almacen.js";
 
-const MODELO_GEMINI = "gemini-flash-latest";
+const MODELO_GEMINI = "gemini-3.1-flash-lite";
 const MODELO_GROQ = "llama-3.3-70b-versatile";
 const MARCA_FALTA = "FALTA_DATO:";
 

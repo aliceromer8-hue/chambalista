@@ -771,29 +771,34 @@ _m3, _ = _sug.momento_de_carrera(_titulada)
 check("y un título gana incluso si se menciona un ciclo", _m3 == "profesional", _m3)
 
 # ---------------------------------------------------------------------
-titulo("EL VIAJE DEL CV — mirable, no leíble")
+titulo("EL CAMINO — cómo postula sola, que es lo que nos distingue")
 # ---------------------------------------------------------------------
-# Eran cuatro frases largas sobre privacidad, al final de la página,
-# donde la persona ya tiene lo que vino a buscar. Ahora es un camino de
-# cuatro paradas. Lo que estas pruebas protegen no es el diseño, es que
-# al recortar no se cayera ninguna de las cosas que hay que decir.
+# El camino cuenta cómo la extensión postula sola: es lo único que no
+# hace nadie más —convertir un CV lo hace medio internet— y por eso se
+# lleva el sitio de arriba y el movimiento.
+#
+# Lo que estas pruebas protegen no es el diseño. Son dos cosas: que el
+# reparto de trabajo siga contándose (la máquina hace dos pasos, la
+# persona hace dos) y que el alcance real no desaparezca del camino.
 
 _camino = pathlib.Path("templates/web.html").read_text(encoding="utf-8")
 check("el camino tiene cuatro paradas", _camino.count('class="parada"') == 4,
       str(_camino.count('class="parada"')))
 for _pieza, _que in [
-    ("Se guarda", "dice que el CV se guarda"),
-    ("solo tú lo ves", "y que no lo ve nadie más"),
-    ("privacidad-ia", "deja el hueco de qué pasa con la IA"),
-    ("Lo borras entero de un clic", "y que puedes borrarlo todo"),
-    ('href="/privacidad"', "y enlaza a la letra pequeña"),
+    ("Buscas", "empieza por lo que hace la persona"),
+    ("Barre", "sigue con lo que hace la máquina"),
+    ("Llena", "y con lo que de verdad nos distingue"),
+    ("Apruebas", "y acaba en quien decide"),
+    ("nada sale sin tu clic", "dejando claro que no envía sola"),
 ]:
     check(f"{_que}", _pieza in _camino, _pieza)
 
-# El camino ya no puede prometer que el CV se descarta: con cuenta se
-# guarda. Una frase que el sistema no cumple es la peor de todas.
-check("y ya no promete que se borra solo",
-      "no queda en el servidor" not in _camino)
+# Y abajo siguen estando los datos, en tres frases y con el enlace.
+check("los datos se explican sin un párrafo", 'class="datos-linea"' in _camino)
+check("incluido el hueco de qué pasa con la IA", "privacidad-ia" in _camino)
+check("que el CV solo lo ve su dueño", "solo tú lo ves" in _camino)
+check("que se puede borrar", "Lo borras entero" in _camino)
+check("y el enlace a la letra pequeña", 'href="/privacidad"' in _camino)
 
 # Ali, sobre la versión anterior: «no digamos lo de no pide cuenta».
 # Negar algo lo instala — quien no se lo había preguntado, se lo
@@ -804,9 +809,9 @@ for _negacion in ["no pide cuenta", "sin cuenta", "sin registro"]:
 # Las paradas son palabras clave, no frases. Si alguien vuelve a meter un
 # párrafo aquí, esto lo canta.
 _titulos = _re.findall(r"<b>([^<]+)</b>", _camino)
-_paradas = [t for t in _titulos if t in ("Llega", "Se lee", "Vuelve Harvard", "Se guarda")]
-check("cada parada cabe en dos palabras",
-      len(_paradas) == 4 and all(len(t.split()) <= 2 for t in _paradas), str(_paradas))
+_paradas = [t for t in _titulos if t in ("Buscas", "Barre", "Llena", "Apruebas")]
+check("cada parada es una sola palabra",
+      len(_paradas) == 4 and all(len(t.split()) == 1 for t in _paradas), str(_paradas))
 
 # El camino tiene que verse bien SIN JavaScript: el estado por defecto es
 # el recorrido, y apagarlo es cosa del JS. Al revés —apagado por defecto,
@@ -862,6 +867,79 @@ check("y dice que el registro es necesario",
       "necesitas una cuenta para usar el servicio" in _pol2.lower())
 check("sin dejar de explicar qué pasa con el archivo original",
       "se procesa y se descarta" in _pol2)
+
+# ---------------------------------------------------------------------
+titulo("LO QUE SE PROMETE — que no crezca solo")
+# ---------------------------------------------------------------------
+# Ali: «tengamos cuidado con lo que se promete porque nos pueden
+# demandar por eso». Tenía razón y había dos cosas, no una.
+#
+# La portada decía «Un clic. Treinta postulaciones.» y ese treinta no
+# salía de ninguna medición: nadie ha contado nunca cuántas salen. Y
+# decía que llena los formularios en los cuatro portales, cuando solo
+# computrabajo.js sabe postular — los otros tres leen ofertas y nada más.
+# En Perú eso lo mira INDECOPI, y lo segundo además es una función que
+# alguien paga y no existe.
+#
+# Estas pruebas no juzgan la redacción. Comprueban que la página no diga
+# números que nadie ha medido, y que lo que promete de cada portal
+# coincida con lo que el portal sabe hacer.
+
+_pag = pathlib.Path("templates/web.html").read_text(encoding="utf-8")
+
+for _numero in ["treinta", "30 postulaciones", "cientos", "decenas"]:
+    # Se mira solo lo que se ve, no los comentarios del código, que
+    # explican justamente por qué el número se quitó.
+    _visible = _re.sub(r"<!--.*?-->", "", _pag, flags=_re.S)
+    check(f"la portada no promete «{_numero}»", _numero not in _visible.lower())
+
+check("ni promete un tiempo que nadie cronometró",
+      "desayuno" not in _re.sub(r"<!--.*?-->", "", _pag, flags=_re.S).lower())
+
+# El alcance por portal, contrastado con el código de la extensión.
+_puede_postular, _solo_leen = [], []
+for _portal in ("computrabajo", "bumeran", "indeed", "linkedin"):
+    _codigo = pathlib.Path(f"extension/contenido/{_portal}.js").read_text(encoding="utf-8")
+    (_puede_postular if _re.search(r"abrirFormulario|botonPostular", _codigo)
+     else _solo_leen).append(_portal)
+
+check("solo un portal sabe postular hoy", _puede_postular == ["computrabajo"],
+      f"postulan: {_puede_postular} · solo leen: {_solo_leen}")
+check("y la página nombra ese portal al decir que postula sola",
+      "postula sola en <b>Computrabajo</b>" in _pag)
+check("y dice qué pasa en los demás",
+      "te encuentra" in _pag and "las deja abiertas" in _pag)
+
+# Buscar sí es en los cuatro: eso se puede decir y se dice.
+check("buscar en los cuatro sí se promete, porque sí ocurre",
+      all(_p in _pag for _p in ("Computrabajo", "Bumeran", "LinkedIn", "Indeed")))
+check("los cuatro portales saben buscar",
+      all(_re.search(r"leerOfertas",
+                     pathlib.Path(f"extension/contenido/{_p}.js").read_text(encoding="utf-8"))
+          for _p in ("computrabajo", "bumeran", "indeed", "linkedin")))
+
+# Y lo que sí se puede afirmar, porque está en el código: nada se envía
+# sin que la persona lo apruebe.
+check("se sigue prometiendo el último clic", "último clic" in _pag)
+check("y el camino lo repite donde se ve", "nada sale sin tu clic" in _pag)
+
+# El modelo de la extensión y el del servidor tienen que ser el mismo.
+# Se separaron una vez —el servidor se arregló y la extensión se quedó
+# con el alias degradado— y nadie lo habría notado hasta que alguien con
+# su propia clave se comiera los 85 segundos.
+_ia_ext = pathlib.Path("extension/lib/ia.js").read_text(encoding="utf-8")
+_modelo_ext = _re.search(r'const MODELO_GEMINI = "([^"]+)"', _ia_ext).group(1)
+check("la extensión usa el mismo modelo que el servidor",
+      _modelo_ext == redactor_ia.MODELOS_GEMINI[0],
+      f"extensión: {_modelo_ext} · servidor: {redactor_ia.MODELOS_GEMINI[0]}")
+check("y tampoco ella depende de un alias movedizo",
+      not _modelo_ext.endswith("-latest"), _modelo_ext)
+
+# El proxy de IA gasta la cuota de Gemini de Ali. Abierto, cualquiera que
+# encuentre la URL le factura a ella.
+for _m, _r in (("POST", "/api/ia/redactar"), ("GET", "/api/ia/cuota")):
+    check(f"sin sesión, {_r} se cierra",
+          cliente.open(_r, method=_m, json={}).status_code == 401)
 
 print(f"\n{'TODO OK' if fallos == 0 else f'{fallos} FALLO(S)'}")
 sys.exit(1 if fallos else 0)

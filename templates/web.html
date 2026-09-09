@@ -3,8 +3,8 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Chamba Lista — postula a treinta empleos con un clic</title>
-<meta name="description" content="Busca en Computrabajo, Bumeran, LinkedIn e Indeed a la vez, adapta tu CV a cada vacante y postula sin escribir lo mismo mil veces. Empieza convirtiendo tu CV al formato que mejor leen.">
+<title>Chamba Lista — postula sin llenar formularios</title>
+<meta name="description" content="Encuentra vacantes de prácticas y primer empleo en Computrabajo, Bumeran, LinkedIn e Indeed. En Computrabajo, Chamba Lista llena la postulación con tu CV y tus datos y te la deja lista para enviar.">
 <link rel="stylesheet" href="/static/css/web.css">
 </head>
 <body>
@@ -33,23 +33,52 @@
 
 <main class="ancho">
 
-  <!-- El titular es el PRODUCTO, no el paso uno. Postular es lo que la
-       persona quiere; convertir el CV es lo que hay que hacer antes. -->
+  <!-- El titular dice lo ÚNICO que no hace nadie más: postular solo.
+       Convertir un CV lo hace medio internet; llenar el formulario de la
+       vacante y dejarlo listo para enviar, no.
+
+       Y dice lo que se puede sostener. Antes ponía «Un clic. Treinta
+       postulaciones.»: ese treinta no sale de ninguna medición —nadie ha
+       contado nunca cuántas salen— y un número inventado en la portada
+       es publicidad engañosa, que en Perú la ve INDECOPI. -->
   <section class="intro entra">
     <p class="antetitulo">Prácticas y primer empleo en Perú</p>
-    <h1>Un clic.<br>Treinta postulaciones.</h1>
-    <p class="bajada">Busca en Computrabajo, Bumeran, LinkedIn e Indeed a la vez, adapta tu CV a cada vacante y llena los formularios por ti. Tú das el último clic, siempre.</p>
+    <h1>Postula sin llenar<br>un solo formulario.</h1>
+    <p class="bajada">Busca vacantes en Computrabajo, Bumeran, LinkedIn e Indeed. En Computrabajo llena la postulación con tu CV y tus datos, y la deja lista. Tú das el último clic, siempre.</p>
   </section>
 
+  <!-- El camino. Es la estrella del producto, así que se lleva el sitio
+       y el movimiento: cuatro paradas donde se ve de un vistazo qué hace
+       la máquina y qué haces tú. Las dos de en medio son suyas; la
+       primera y la última son tuyas, y eso es exactamente el trato. -->
   <section class="cadena-seccion entra entra-1" id="cadena">
-    <h2 class="titulo-seccion">Treinta postulaciones mientras tomas desayuno</h2>
-    <ol class="cadena">
-      <li><span class="paso-num">01</span><b>Encuentra</b><span>Barre cuatro portales a la vez y trae todo lo que salió hoy</span></li>
-      <li><span class="paso-num">02</span><b>Descarta</b><span>Deja arriba lo que va contigo y hunde lo que no</span></li>
-      <li><span class="paso-num">03</span><b>Postula</b><span>Abre la vacante, llena el formulario y contesta sus preguntas</span></li>
-      <li><span class="paso-num">04</span><b>Repite</b><span>Una tras otra, sin que vuelvas a escribir lo mismo</span></li>
-    </ol>
-    <p class="tuyo"><span class="marca-tuyo">Lo tuyo</span> es leer y decir que sí. Dos segundos por vacante, y nada sale sin tu visto bueno.</p>
+    <p class="titulo-seccion">Cómo postula por ti</p>
+    <div class="ruta-envoltura">
+      <span class="riel" aria-hidden="true"><span class="riel-avance"></span></span>
+      <ol class="ruta">
+        <li class="parada">
+          <span class="marca" aria-hidden="true">1</span>
+          <span class="texto"><b>Buscas</b><span>el puesto y tu distrito, una vez</span></span>
+        </li>
+        <li class="parada">
+          <span class="marca" aria-hidden="true">2</span>
+          <span class="texto"><b>Barre</b><span>cuatro portales, lo que salió hoy</span></span>
+        </li>
+        <li class="parada">
+          <span class="marca" aria-hidden="true">3</span>
+          <span class="texto"><b>Llena</b><span>tu CV, tus datos, sus preguntas</span></span>
+        </li>
+        <li class="parada">
+          <span class="marca" aria-hidden="true">4</span>
+          <span class="texto"><b>Apruebas</b><span>nada sale sin tu clic</span></span>
+        </li>
+      </ol>
+    </div>
+    <!-- El alcance real, dicho aquí y no escondido. Prometer las cuatro
+         y cumplir una es lo que se puede reclamar; decirlo cuesta una
+         línea y quita el motivo. -->
+    <p class="alcance">Hoy postula sola en <b>Computrabajo</b>. En los otros tres te encuentra
+      las vacantes y te las deja abiertas.</p>
   </section>
 
   <!-- 1. Subir -->
@@ -96,10 +125,10 @@
     </div>
   </section>
 
-  <!-- El paso que cerraba el recorrido: la web promete treinta
-       postulaciones y no puede postular —eso necesita la sesión que la
-       persona ya tiene abierta—, así que sin esto se quedaba sin saber
-       cómo llegar a lo que se le prometió.
+  <!-- El paso que cierra el recorrido: la web encuentra y prepara, pero
+       postular necesita la sesión que la persona ya tiene abierta en el
+       portal, y eso solo puede pasar en su navegador. Sin este paso se
+       quedaba sin saber cómo llegar a lo que se le enseñó arriba.
 
        Deliberadamente corto.
        Aquí la persona ya consiguió lo que vino a buscar y está de salida:
@@ -114,8 +143,8 @@
     <div class="fila-instalar">
       <div>
         <h2 class="titulo-instalar">Ahora, a postular</h2>
-        <p class="detalle">Busca en los cuatro portales y llena los formularios por ti,
-          con las sesiones que ya tienes abiertas.</p>
+        <p class="detalle">Busca en los cuatro portales y, en Computrabajo, llena la
+          postulación por ti — con las sesiones que ya tienes abiertas.</p>
       </div>
       <a class="boton principal" id="instalar" href="/extension.zip" download>Descargar la extensión</a>
     </div>
@@ -131,46 +160,17 @@
     </details>
   </section>
 
-  <!-- El viaje del CV.
-       Esto era una lista de cuatro frases largas sobre privacidad, justo
-       donde la persona ya tiene lo que vino a buscar y está de salida.
-       Nadie las leía, y con razón.
-
-       La información es la misma —qué se hace con el archivo, qué cambia
-       si abres cuenta— pero dicha para MIRARLA: cuatro paradas, dos
-       palabras cada una, y una línea que las recorre. Lo largo vive en
-       /privacidad, que es donde se busca cuando se busca. -->
+  <!-- Los datos, en tres frases. Antes esto era el camino del CV, pero
+       el camino se lo lleva postular, que es lo que nos distingue. Aquí
+       queda lo que hay que decir por ley y por decencia, dicho corto y
+       con el documento largo a un clic. -->
   <section class="privacidad entra entra-3" id="privacidad">
-    <p class="titulo-seccion">El viaje de tu CV</p>
-    <div class="ruta-envoltura">
-      <!-- El riel va en elementos de verdad, no en ::before/::after: así
-           se puede medir desde las pruebas y no depende de cómo trate
-           cada navegador la animación de un pseudo-elemento. -->
-      <span class="riel" aria-hidden="true"><span class="riel-avance"></span></span>
-      <ol class="ruta">
-        <li class="parada">
-          <span class="marca" aria-hidden="true">1</span>
-          <span class="texto"><b>Llega</b><span>PDF o Word</span></span>
-        </li>
-        <li class="parada">
-          <span class="marca" aria-hidden="true">2</span>
-          <!-- Esta línea la escribe web.js con lo que diga el servidor.
-               Fija sería mentira en cuanto cambie la configuración. -->
-          <span class="texto"><b>Se lee</b><span id="privacidad-ia">su texto viaja a Google</span></span>
-        </li>
-        <li class="parada">
-          <span class="marca" aria-hidden="true">3</span>
-          <span class="texto"><b>Vuelve Harvard</b><span>pasa los filtros</span></span>
-        </li>
-        <li class="parada">
-          <span class="marca" aria-hidden="true">4</span>
-          <span class="texto"><b>Se guarda</b><span>solo tú lo ves</span></span>
-        </li>
-      </ol>
-    </div>
-    <p class="tuyo cierre-ruta">
-      <span class="marca-tuyo">Tuyo</span>
-      Te sigue en cualquier equipo. Lo borras entero de un clic.
+    <p class="titulo-seccion">Tus datos</p>
+    <p class="datos-linea">
+      <span>Tu CV vive en tu cuenta y <b>solo tú lo ves</b>.</span>
+      <!-- Lo escribe web.js con la configuración real del servidor. -->
+      <span id="privacidad-ia">Para leerlo, su texto se envía a Google.</span>
+      <span>Lo borras entero cuando quieras.</span>
       <a class="enlace-legal" href="/privacidad">Letra pequeña</a>
     </p>
   </section>
