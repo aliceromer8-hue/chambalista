@@ -510,7 +510,7 @@ _html = (BASE_HTML := pathlib.Path("templates/web.html").read_text(encoding="utf
 check("la página ya no promete «sin registro»",
       "sin registro" not in _html.lower(), "sigue diciéndolo")
 check("y explica por qué postular pide cuenta",
-      "postular sí la pide" in _html.lower())
+      "va con tu nombre a empresas reales" in _html.lower())
 
 # ---------------------------------------------------------------------
 titulo("ACEPTACIÓN — no se puede crear cuenta sin aceptar")
@@ -740,6 +740,56 @@ _titulada = dict(_estudiante)
 _titulada["perfil"] = ["Licenciada en Administración, colegiada."]
 _m3, _ = _sug.momento_de_carrera(_titulada)
 check("y un título gana incluso si se menciona un ciclo", _m3 == "profesional", _m3)
+
+# ---------------------------------------------------------------------
+titulo("EL VIAJE DEL CV — mirable, no leíble")
+# ---------------------------------------------------------------------
+# Eran cuatro frases largas sobre privacidad, al final de la página,
+# donde la persona ya tiene lo que vino a buscar. Ahora es un camino de
+# cuatro paradas. Lo que estas pruebas protegen no es el diseño, es que
+# al recortar no se cayera ninguna de las cosas que hay que decir.
+
+_camino = pathlib.Path("templates/web.html").read_text(encoding="utf-8")
+check("el camino tiene cuatro paradas", _camino.count('class="parada"') == 4,
+      str(_camino.count('class="parada"')))
+for _pieza, _que in [
+    ("Se borra", "dice que el archivo se borra"),
+    ("no queda en el servidor", "y que no se queda en el servidor"),
+    ("privacidad-ia", "deja el hueco de qué pasa con la IA"),
+    ("Con cuenta", "dice qué cambia si abres cuenta"),
+    ("Los borras de un clic", "y que puedes borrarlo todo"),
+    ('href="/privacidad"', "y enlaza a la letra pequeña"),
+]:
+    check(f"{_que}", _pieza in _camino, _pieza)
+
+# Ali, sobre la versión anterior: «no digamos lo de no pide cuenta».
+# Negar algo lo instala — quien no se lo había preguntado, se lo
+# pregunta. Se dice lo que SÍ pasa, no lo que no.
+for _negacion in ["no pide cuenta", "sin cuenta", "sin registro"]:
+    check(f"la página no dice «{_negacion}»", _negacion not in _camino.lower())
+
+# Las paradas son palabras clave, no frases. Si alguien vuelve a meter un
+# párrafo aquí, esto lo canta.
+_titulos = _re.findall(r"<b>([^<]+)</b>", _camino)
+_paradas = [t for t in _titulos if t in ("Llega", "Se lee", "Vuelve Harvard", "Se borra")]
+check("cada parada cabe en dos palabras",
+      len(_paradas) == 4 and all(len(t.split()) <= 2 for t in _paradas), str(_paradas))
+
+# El camino tiene que verse bien SIN JavaScript: el estado por defecto es
+# el recorrido, y apagarlo es cosa del JS. Al revés —apagado por defecto,
+# encendido por JS— quien tenga el JS bloqueado ve una sección en blanco.
+_css = pathlib.Path("static/css/web.css").read_text(encoding="utf-8")
+check("por defecto el camino sale recorrido",
+      "transform: scaleX(1)" in _css and "por-recorrer .riel-avance { transform: scaleX(0)" in _css)
+check("y las paradas salen encendidas",
+      _re.search(r"\.marca \{[^}]*background: var\(--lima\)", _css, _re.S) is not None)
+
+_js = pathlib.Path("static/js/web.js").read_text(encoding="utf-8")
+check("se anima al verlo, no al cargar la página", "IntersectionObserver" in _js)
+check("y solo una vez", "ojo.disconnect()" in _js)
+check("si el navegador nunca avisa, se enciende igual",
+      'zona.classList.remove("por-recorrer")' in _js)
+check("sin movimiento, ni se apaga", "prefers-reduced-motion" in _js)
 
 print(f"\n{'TODO OK' if fallos == 0 else f'{fallos} FALLO(S)'}")
 sys.exit(1 if fallos else 0)

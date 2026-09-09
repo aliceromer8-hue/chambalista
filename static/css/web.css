@@ -330,10 +330,111 @@ details > *:not(summary) { margin-top: 14px; }
 }
 .fila-clave input:focus { outline: none; box-shadow: var(--dura-chica); }
 
-/* ══════════ privacidad ══════════ */
-.privacidad h2 { margin-bottom: 12px; font-size: 1.25rem; }
-.privacidad ul { margin: 0; padding-left: 20px; color: var(--tinta-2); font-size: 14px; }
-.privacidad li { margin-bottom: 8px; }
+/* ══════════ el viaje del CV ══════════ */
+/* Era una lista de cuatro frases largas sobre privacidad, justo donde la
+ * persona ya tiene lo que vino a buscar y está de salida. Nadie las leía.
+ *
+ * Ahora es un camino: cuatro paradas, dos palabras cada una, y una línea
+ * que las recorre al aparecer. Dice lo mismo, pero se MIRA en dos
+ * segundos en vez de leerse en veinte. La versión larga sigue en
+ * /privacidad, que es donde se busca cuando se busca. */
+
+.privacidad .titulo-seccion { margin-bottom: 18px; }
+.ruta-envoltura { position: relative; }
+
+/* El riel apagado va de la primera parada a la última; el avance lo
+ * recorre por encima. Los dos son elementos de verdad: en pseudo-
+ * elementos la animación queda a merced de cada navegador y no hay forma
+ * de medirla desde una prueba. */
+.riel {
+  position: absolute; left: 12.5%; right: 12.5%; top: 18px;
+  height: 2px; background: var(--papel-3);
+}
+/* El estado por defecto es el camino YA RECORRIDO: línea entera y
+ * paradas encendidas. Si el JavaScript no llega —o el navegador no tiene
+ * IntersectionObserver— esto es lo que se ve, y es correcto. La animación
+ * es un extra, no el único modo en que la sección se entiende.
+ *
+ * Se anima la ESCALA, no el ancho: animar `height: 0 -> 100%` contra un
+ * padre que saca su altura de top/bottom no arranca, y escalar va por el
+ * compositor en vez de remaquetar sesenta veces por segundo. */
+.riel-avance {
+  display: block; width: 100%; height: 100%; background: var(--tinta);
+  transform: scaleX(1); transform-origin: left center;
+}
+.ruta-envoltura.por-recorrer .riel-avance { transform: scaleX(0); }
+.ruta-envoltura.recorriendo .riel-avance {
+  animation: recorrer 1.4s cubic-bezier(.4, 0, .15, 1) both;
+}
+@keyframes recorrer { from { transform: scaleX(0); } to { transform: scaleX(1); } }
+
+.ruta {
+  list-style: none; margin: 0; padding: 0; position: relative;
+  display: grid; grid-template-columns: repeat(4, 1fr);
+}
+.parada { padding: 0 6px; text-align: center; }
+.marca {
+  display: grid; place-items: center; width: 38px; height: 38px;
+  margin: 0 auto 12px;
+  border: 2px solid var(--linea); border-radius: 99px;
+  background: var(--papel); box-shadow: var(--dura-chica);
+  font-family: var(--mono); font-size: 13px; font-weight: 700;
+  background: var(--lima); color: #131316;
+}
+.ruta-envoltura.por-recorrer .marca { background: var(--papel); color: var(--tinta); }
+
+/* Cada parada se enciende justo cuando la línea llega a ella. */
+.ruta-envoltura.recorriendo .marca { animation: encender .3s both; }
+.recorriendo .parada:nth-child(1) .marca { animation-delay: 0s; }
+.recorriendo .parada:nth-child(2) .marca { animation-delay: .43s; }
+.recorriendo .parada:nth-child(3) .marca { animation-delay: .86s; }
+.recorriendo .parada:nth-child(4) .marca { animation-delay: 1.25s; }
+@keyframes encender {
+  from { background: var(--papel); color: var(--tinta); transform: scale(1); }
+  55%  { transform: scale(1.16); }
+  to   { background: var(--lima); color: #131316; transform: scale(1); }
+}
+
+.parada b {
+  display: block; font-size: 1.05rem; font-weight: 800;
+  letter-spacing: -.03em; line-height: 1.25;
+}
+.parada .texto > span {
+  display: block; color: var(--tinta-2); font-size: 12.5px; margin-top: 3px;
+}
+
+.cierre-ruta { margin-top: 26px; padding-top: 18px; border-top: 1px solid var(--papel-3); }
+.enlace-legal { color: var(--tinta-2); font-weight: 400; font-size: 13px; margin-left: auto; }
+
+/* En móvil el camino se pone de pie: cuatro paradas en fila no caben sin
+ * partir las palabras, y partirlas mata justo lo que se buscaba. */
+@media (max-width: 620px) {
+  .ruta { grid-template-columns: 1fr; gap: 16px; }
+  .riel { left: 18px; right: auto; top: 19px; bottom: 19px; width: 2px; height: auto; }
+  .riel-avance { transform-origin: center top; }
+  .ruta-envoltura.por-recorrer .riel-avance { transform: scaleY(0); }
+  .ruta-envoltura.recorriendo .riel-avance { animation-name: recorrer-alto; }
+  .parada {
+    display: grid; grid-template-columns: 38px 1fr; gap: 14px;
+    align-items: center; text-align: left; padding: 0;
+  }
+  .marca { margin: 0; }
+  .cierre-ruta { margin-top: 22px; }
+  .enlace-legal { margin-left: 0; }
+}
+@keyframes recorrer-alto { from { transform: scaleY(0); } to { transform: scaleY(1); } }
+
+/* Sin movimiento, el camino aparece ya recorrido. El JavaScript ni
+ * siquiera marca el bloque en ese caso, pero esto lo asegura por si
+ * acaso: un camino sin recorrer y sin explicación no dice nada. */
+@media (prefers-reduced-motion: reduce) {
+  .ruta-envoltura.por-recorrer .riel-avance,
+  .ruta-envoltura.recorriendo .riel-avance { animation: none; transform: none; }
+  .ruta-envoltura.por-recorrer .marca,
+  .ruta-envoltura.recorriendo .marca {
+    animation: none; background: var(--lima); color: #131316;
+  }
+}
 
 footer { padding: 26px 24px 60px; color: var(--tinta-2); font-size: 13px; }
 

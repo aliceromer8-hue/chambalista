@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Chamba Lista — postula a treinta empleos con un clic</title>
-<meta name="description" content="Busca en Computrabajo, Bumeran, LinkedIn e Indeed a la vez, adapta tu CV a cada vacante y postula sin escribir lo mismo mil veces. Convertir tu CV es gratis y sin cuenta.">
+<meta name="description" content="Busca en Computrabajo, Bumeran, LinkedIn e Indeed a la vez, adapta tu CV a cada vacante y postula sin escribir lo mismo mil veces. Convertir tu CV es gratis.">
 <link rel="stylesheet" href="/static/css/web.css">
 </head>
 <body>
@@ -122,21 +122,48 @@
     </details>
   </section>
 
+  <!-- El viaje del CV.
+       Esto era una lista de cuatro frases largas sobre privacidad, justo
+       donde la persona ya tiene lo que vino a buscar y está de salida.
+       Nadie las leía, y con razón.
+
+       La información es la misma —qué se hace con el archivo, qué cambia
+       si abres cuenta— pero dicha para MIRARLA: cuatro paradas, dos
+       palabras cada una, y una línea que las recorre. Lo largo vive en
+       /privacidad, que es donde se busca cuando se busca. -->
   <section class="privacidad entra entra-3" id="privacidad">
-    <h2>Qué pasa con tu CV</h2>
-    <ul>
-      <li><strong>Convertir tu CV no pide cuenta.</strong> El archivo se lee,
-        se convierte y se descarta: no se guarda en el servidor.</li>
-      <li><strong>Postular sí la pide.</strong> Lo que se envía lleva tu nombre a
-        empresas reales, y tiene que quedar claro de quién viene. Para eso se
-        guarda tu correo.</li>
-      <li>Con cuenta, tu CV y tu historial de postulaciones se guardan para que
-        no los pierdas al cambiar de equipo. Solo tú puedes verlos, y puedes
-        <strong>borrarlo todo</strong> cuando quieras.</li>
-      <!-- Lo rellena web.js con lo que diga el servidor. Fija sería
-           mentira en cuanto cambie la configuración de la IA. -->
-      <li id="privacidad-ia">Para leer tu CV, su texto se envía a Google.</li>
-    </ul>
+    <p class="titulo-seccion">El viaje de tu CV</p>
+    <div class="ruta-envoltura">
+      <!-- El riel va en elementos de verdad, no en ::before/::after: así
+           se puede medir desde las pruebas y no depende de cómo trate
+           cada navegador la animación de un pseudo-elemento. -->
+      <span class="riel" aria-hidden="true"><span class="riel-avance"></span></span>
+      <ol class="ruta">
+        <li class="parada">
+          <span class="marca" aria-hidden="true">1</span>
+          <span class="texto"><b>Llega</b><span>PDF o Word</span></span>
+        </li>
+        <li class="parada">
+          <span class="marca" aria-hidden="true">2</span>
+          <!-- Esta línea la escribe web.js con lo que diga el servidor.
+               Fija sería mentira en cuanto cambie la configuración. -->
+          <span class="texto"><b>Se lee</b><span id="privacidad-ia">su texto viaja a Google</span></span>
+        </li>
+        <li class="parada">
+          <span class="marca" aria-hidden="true">3</span>
+          <span class="texto"><b>Vuelve Harvard</b><span>pasa los filtros</span></span>
+        </li>
+        <li class="parada">
+          <span class="marca" aria-hidden="true">4</span>
+          <span class="texto"><b>Se borra</b><span>no queda en el servidor</span></span>
+        </li>
+      </ol>
+    </div>
+    <p class="tuyo cierre-ruta">
+      <span class="marca-tuyo">Con cuenta</span>
+      Tu CV y tus postulaciones te siguen. Los borras de un clic.
+      <a class="enlace-legal" href="/privacidad">Letra pequeña</a>
+    </p>
   </section>
 
 </main>

@@ -53,16 +53,17 @@ async function pintarPrivacidadIA() {
   try {
     const e = await (await fetch("/api/estado")).json();
     if (!e.ia_activa) {
-      li.textContent = "Tu CV se lee aquí mismo, sin enviarlo a ningún otro sitio.";
+      li.textContent = "aquí mismo, sin salir";
     } else if (e.ia_facturada) {
-      li.innerHTML = "Para leer tu CV, su texto se envía a <strong>Google</strong>, "
-        + "que lo procesa y no lo usa para entrenar sus modelos.";
+      li.textContent = "lo lee Google, sin entrenar con él";
     } else {
-      li.innerHTML = "Para leer tu CV, su texto se envía a <strong>Google</strong>. "
-        + "Hoy va por su plan gratuito, y en ese plan Google puede usarlo para "
-        + "mejorar sus productos y personal suyo puede llegar a leerlo.";
+      // La única de las tres que no cabe en cuatro palabras, y no se
+      // recorta más: que Google pueda usar el CV y que alguien suyo pueda
+      // leerlo son los dos hechos que a la persona le importan. Decir
+      // solo «lo lee Google» aquí sería quedarse con la mitad cómoda.
+      li.textContent = "lo lee Google · en su plan gratis puede usarlo y revisarlo";
     }
-  } catch { /* si falla, queda la frase corta del HTML */ }
+  } catch { /* si falla, queda la frase del HTML */ }
 }
 
 // ---------- subir ----------
@@ -285,7 +286,51 @@ async function restaurarTrabajo() {
   if (nota) nota.classList.remove("oculto");
 }
 
+// El camino se recorre CUANDO SE VE, no al cargar la página.
+//
+// La sección está abajo del todo: si la animación arranca con la carga,
+// para cuando alguien baja hasta ahí ya terminó y lo que encuentra es una
+// línea quieta. Animar algo que nadie está mirando es gastar el efecto.
+//
+// Sin este JavaScript la sección se ve igual de bien, solo que quieta:
+// el CSS deja por defecto el camino ya recorrido y las paradas
+// encendidas. Por eso lo primero que se hace es «apagarlo», y solo si de
+// verdad se va a poder encender.
+function animarRuta() {
+  const zona = document.querySelector(".ruta-envoltura");
+  if (!zona || !("IntersectionObserver" in window)) return;
+  if (matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+
+  zona.classList.add("por-recorrer");
+
+  // Red de seguridad. Apagar el camino y esperar a que alguien lo mire es
+  // una apuesta: si el navegador nunca avisa —una pestaña que se abrió de
+  // fondo y no se ha llegado a pintar, por ejemplo— la sección se queda
+  // en blanco para siempre, que es mucho peor que quieta.
+  //
+  // Un IntersectionObserver siempre entrega una primera respuesta al
+  // observar, aunque sea «no se ve». Si a los dos segundos no ha llegado
+  // NINGUNA, este navegador no va a avisar: se enciende y se acabó.
+  let hubo = false;
+  const ojo = new IntersectionObserver((entradas) => {
+    hubo = true;
+    for (const e of entradas) {
+      if (!e.isIntersecting) continue;
+      zona.classList.replace("por-recorrer", "recorriendo");
+      ojo.disconnect();        // se recorre una vez, no cada vez que pasa
+    }
+  }, { threshold: 0.45 });
+  ojo.observe(zona);
+
+  setTimeout(() => {
+    if (hubo) return;
+    ojo.disconnect();
+    zona.classList.remove("por-recorrer");   // queda como si no hubiera JS
+  }, 2000);
+}
+
 pintarPrivacidadIA();
+animarRuta();
 restaurarTrabajo();
 
 // ---------- cuenta ----------
