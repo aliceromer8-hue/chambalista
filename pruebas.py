@@ -941,5 +941,22 @@ for _m, _r in (("POST", "/api/ia/redactar"), ("GET", "/api/ia/cuota")):
     check(f"sin sesión, {_r} se cierra",
           cliente.open(_r, method=_m, json={}).status_code == 401)
 
+# El panel de la extensión es tan público como la web: lo ve quien la
+# instala. Las mismas promesas y el mismo cuidado.
+_panel = pathlib.Path("extension/panel/panel.html").read_text(encoding="utf-8")
+_panel_js = pathlib.Path("extension/panel/panel.js").read_text(encoding="utf-8")
+check("el panel tampoco promete treinta",
+      "treinta" not in _panel.lower() and "treinta" not in _panel_js.lower())
+check("y el sello no lleva un número escrito a mano",
+      'id="sello-tope"' in _panel and ">30<" not in _panel)
+check("lo pide al código, que es quien sabe el tope",
+      'accion: "consentimiento"' in _panel_js and "pintarTope" in _panel_js)
+
+_fondo = pathlib.Path("extension/background.js").read_text(encoding="utf-8")
+_tope = int(_re.search(r"TOPE_POR_TANDA = (\d+)", _fondo).group(1))
+check("el tope real está declarado en un solo sitio", _tope > 0, f"{_tope} por tanda")
+check("y el background lo publica para que el panel lo lea",
+      "tope: TOPE_POR_TANDA" in _fondo)
+
 print(f"\n{'TODO OK' if fallos == 0 else f'{fallos} FALLO(S)'}")
 sys.exit(1 if fallos else 0)

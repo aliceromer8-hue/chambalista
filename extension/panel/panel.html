@@ -41,7 +41,7 @@
     <section class="portada" id="portada">
       <div class="portada-texto">
         <p class="antetitulo">Prácticas y primer empleo en Perú</p>
-        <h1 id="portada-titulo">Un clic.<br>Treinta postulaciones.</h1>
+        <h1 id="portada-titulo">Postula sin llenar<br>un solo formulario.</h1>
         <p class="bajada" id="portada-bajada">
           Sube tu CV, elige dónde buscar y postula a todo lo que encaje contigo.
           Tú das el último clic, siempre.
@@ -57,14 +57,17 @@
           <span class="linea corta acento"></span>
           <span class="linea media"></span>
         </div>
-        <div class="sello" id="sello">30<small>por tanda</small></div>
+        <!-- El número lo escribe panel.js con TOPE_POR_TANDA, que es la
+           cifra que el código respeta de verdad. Escrito a mano decía 30
+           cuando el tope real son 15: el doble. -->
+        <div class="sello" id="sello"><span id="sello-tope">—</span><small>por tanda</small></div>
       </div>
     </section>
 
     <!-- Lo que hace la web sola. Es la promesa del producto puesta en
          términos de trabajo que la persona NO tiene que hacer. -->
     <section class="hace" id="hace">
-      <h2 class="titulo-seccion">Treinta postulaciones mientras tomas desayuno</h2>
+      <h2 class="titulo-seccion">Cómo postula por ti</h2>
       <ol class="cadena">
         <li class="entra entra-1"><span class="paso-num">01</span><b>Encuentra</b><span>Barre cuatro portales a la vez y trae todo lo que salió hoy</span></li>
         <li class="entra entra-2"><span class="paso-num">02</span><b>Descarta</b><span>Deja arriba lo que va contigo y hunde lo que no</span></li>

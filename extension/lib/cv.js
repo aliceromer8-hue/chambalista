@@ -10,7 +10,7 @@
 // habilidades que ELLA confirmó que se le habían olvidado poner. El
 // servidor no inventa nada, solo mezcla.
 
-import { SERVIDOR } from "./ia.js";
+import { conCuenta } from "./sesion.js";
 
 /** Nombre de archivo legible: la empresa ve esto en su bandeja. */
 function sufijoDe(vacante) {
@@ -32,7 +32,11 @@ function sufijoDe(vacante) {
 export async function docxAdaptado(perfil, vacante, { resumen, competenciasExtra } = {}) {
   if (!perfil) return null;
   try {
-    const r = await fetch(`${SERVIDOR}/api/cv/docx`, {
+    // Por conCuenta y no por fetch pelado: /api/cv/docx pide sesión, y
+    // sin ella devuelve 401. El error se traga más abajo y la
+    // postulación seguiría con el CV viejo del portal sin decir nada —
+    // que es justo el fallo silencioso que esto existe para evitar.
+    const r = await conCuenta("/api/cv/docx", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({

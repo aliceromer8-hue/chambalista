@@ -136,7 +136,7 @@ function pintarPortada(resumen) {
   $("#arranque").classList.add("oculto");
 
   if (etapa === 1) {
-    $("#portada-titulo").innerHTML = "Postula a treinta<br>sin escribir ninguna.";
+    $("#portada-titulo").innerHTML = "Postula sin llenar<br>un solo formulario.";
     $("#portada-bajada").textContent =
       "Sube tu CV una vez. Desde ahí la web busca, llena formularios y contesta las "
       + "preguntas de cada empresa. Tú solo lees y dices que sí.";
@@ -874,4 +874,25 @@ function pintarPortales() {
   await revisarSesion();
   await pintarInicio();
   pintarCuota();
+  pintarTope();
 })();
+
+
+// El sello de la portada lo escribe el código, no la plantilla.
+//
+// Puesto a mano decía «30 por tanda» cuando TOPE_POR_TANDA son 15: el
+// doble de lo que el producto hace. Un número en la portada que el
+// propio código desmiente es de lo poco que se puede reclamar sin
+// discusión, y evitarlo cuesta ocho líneas.
+async function pintarTope() {
+  const sello = document.querySelector("#sello-tope");
+  if (!sello) return;
+  try {
+    const { tope } = await enviar({ accion: "consentimiento" });
+    if (tope) sello.textContent = tope;
+    else sello.closest(".sello")?.remove();
+  } catch {
+    // Antes que enseñar un número inventado, no enseñar ninguno.
+    sello.closest(".sello")?.remove();
+  }
+}

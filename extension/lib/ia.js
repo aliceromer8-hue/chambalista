@@ -12,6 +12,10 @@
 // - Al parsear hay que descartar las partes marcadas `thought`.
 
 import { claveIA, leer, guardar } from "./almacen.js";
+import { SERVIDOR } from "./servidor.js";
+import { conCuenta } from "./sesion.js";
+
+export { SERVIDOR };
 
 const MODELO_GEMINI = "gemini-3.1-flash-lite";
 const MODELO_GROQ = "llama-3.3-70b-versatile";
@@ -20,7 +24,6 @@ const MARCA_FALTA = "FALTA_DATO:";
 // Servidor propio que hace de proxy: así la persona NO necesita crear
 // ninguna clave, igual que Simplify o JobCopilot. Quien tenga su propia
 // clave puede usarla y entonces no consume cuota.
-export const SERVIDOR = "https://chamba-lista-ali-ab09.vercel.app";
 
 /** Identificador del dispositivo, para llevar la cuenta de la cuota.
  *  No es una cuenta ni un correo: es un número al azar de este navegador. */
@@ -42,7 +45,7 @@ export async function disponible() {
 async function porServidor(operacion, carga) {
   try {
     const clave = await claveIA.obtener();
-    const r = await fetch(`${SERVIDOR}/api/ia/${operacion}`, {
+    const r = await conCuenta(`/api/ia/${operacion}`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -66,7 +69,7 @@ async function porServidor(operacion, carga) {
 /** Cuánto le queda de cuota gratuita. */
 export async function cuota() {
   try {
-    const r = await fetch(`${SERVIDOR}/api/ia/cuota`, {
+    const r = await conCuenta("/api/ia/cuota", {
       headers: { "X-Dispositivo": await dispositivo() },
     });
     return r.ok ? r.json() : null;

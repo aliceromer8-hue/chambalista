@@ -8,7 +8,7 @@
 // persona y no viaja a ningún sitio salvo en la cabecera de nuestras
 // propias peticiones.
 
-import { SERVIDOR } from "./ia.js";
+import { SERVIDOR } from "./servidor.js";
 
 const CLAVE = "sesion";
 
@@ -63,8 +63,14 @@ async function renovar() {
   return renovando;
 }
 
-/** Como fetch, con la sesión puesta y renovándola si hace falta. */
-async function conCuenta(ruta, opciones = {}) {
+/**
+ * Como fetch, con la sesión puesta y renovándola si hace falta.
+ *
+ * Exportada porque TODO lo que llama a nuestro servidor pide sesión —el
+ * .docx adaptado y el proxy de IA incluidos—, y cada módulo que se
+ * saltaba esto se llevaba un 401 que acababa en un fallo mudo.
+ */
+export async function conCuenta(ruta, opciones = {}) {
   const ir = async () => fetch(`${SERVIDOR}${ruta}`, {
     ...opciones, headers: await cabecera(opciones.headers || {}),
   });

@@ -227,5 +227,39 @@ titulo("RENOVAR — la sesion no se muere a la hora");
         !/fetch\(`\$\{SERVIDOR\}\/api\/cuenta\/yo/.test(fuente));
 }
 
+
+titulo("SESION EN TODO — nada llama al servidor a pelo");
+
+{
+  // Este fallo lo metimos nosotros: al cerrar /api/cv/docx y /api/ia/*
+  // detras de la sesion, cv.js e ia.js seguian llamando con fetch
+  // pelado. Resultado: 401, el error se tragaba, y la postulacion
+  // continuaba con el CV viejo del portal sin decir nada. El CV
+  // adaptado —que es la funcion entera— no se habria adjuntado nunca.
+  const fs3 = await import("node:fs/promises");
+  for (const mod of ["cv.js", "ia.js"]) {
+    const fuente = await fs3.readFile(new URL(`lib/${mod}`, BASE), "utf8");
+    comprobarSuelto(mod, fuente);
+  }
+}
+
+function comprobarSuelto(mod, fuente) {
+  const sueltos = fuente.match(/fetch\(`\$\{SERVIDOR\}[^`]*`/g) || [];
+  check(`${mod} no llama al servidor sin sesion`, sueltos.length === 0, sueltos.join(", "));
+  check(`${mod} usa conCuenta`, /conCuenta\(/.test(fuente));
+}
+
+{
+  const fs3 = await import("node:fs/promises");
+  const ses = await fs3.readFile(new URL("lib/sesion.js", BASE), "utf8");
+  check("conCuenta esta exportada", /export async function conCuenta/.test(ses));
+  const srv = await fs3.readFile(new URL("lib/servidor.js", BASE), "utf8");
+  check("la direccion del servidor vive en su propio modulo",
+        /export const SERVIDOR/.test(srv));
+  const ia = await fs3.readFile(new URL("lib/ia.js", BASE), "utf8");
+  check("y ia.js ya no la declara, para no cerrar un circulo",
+        !/^export const SERVIDOR =/m.test(ia));
+}
+
 console.log(`\n${fallos === 0 ? "TODO OK" : `${fallos} FALLO(S)`}`);
 process.exit(fallos ? 1 : 0);
