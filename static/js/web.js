@@ -234,18 +234,23 @@ async function pintarSugerencias() {
   }
 }
 
-$("#otro").addEventListener("click", () => {
-  estado.archivo = estado.perfil = null;
-  guardarTrabajo();          // al vaciarse el perfil, esto lo borra
+function volverAlPrincipio() {
   input.value = "";
   $("#nombre-archivo").textContent = "";
   $("#procesar").disabled = true;
   $("#zona-2").classList.add("oculto");
   $("#zona-3").classList.add("oculto");
+  $("#nota-restaurado")?.classList.add("oculto");
   for (const s of ["#cadena", "#rotulo-subir", "#privacidad", "#zona-1"]) {
     $(s).classList.remove("oculto");
   }
   window.scrollTo({ top: 0, behavior: "smooth" });
+}
+
+$("#otro").addEventListener("click", () => {
+  estado.archivo = estado.perfil = null;
+  guardarTrabajo();          // al vaciarse el perfil, esto lo borra
+  volverAlPrincipio();
 });
 
 // Al volver, se recupera lo que ya estaba hecho.
@@ -277,6 +282,11 @@ async function repintarResultado() {
 async function restaurarTrabajo() {
   const perfil = trabajoGuardado();
   if (!perfil) return;
+  // Sin sesión no se restaura, aunque haya copia en el navegador: todo lo
+  // que se puede hacer con ese CV —la vista previa, el .docx, las
+  // sugerencias— pide cuenta. Enseñarlo sería una pantalla que se ve
+  // entera y falla en el primer botón.
+  if (!sesion()?.token) return;
   estado.perfil = perfil;
   await repintarResultado();
 
@@ -412,12 +422,14 @@ function pintarCuenta() {
   $("#quien-soy").textContent = dentro ? s.usuario.correo : "";
   $("#btn-entrar").classList.toggle("oculto", dentro);
   $("#btn-salir").classList.toggle("oculto", !dentro);
-  // El paso de postular enseña el botón que toca según haya sesión o no.
-  const instalar = $("#instalar"), pedirCuenta = $("#instalar-entrar"), porque = $("#por-que-cuenta");
-  if (instalar && pedirCuenta) {
-    instalar.classList.toggle("oculto", !dentro);
-    pedirCuenta.classList.toggle("oculto", dentro);
-    if (porque) porque.classList.toggle("oculto", dentro);
+  // La puerta tapa la zona de subir mientras no haya sesión. Todo el
+  // producto pide cuenta, así que enseñar el recuadro de arrastrar el CV
+  // a quien no puede usarlo solo sirve para que se estrelle al soltarlo.
+  const puerta = $("#puerta"), zonaSubir = $("#zona"), convertir = $("#procesar");
+  if (puerta && zonaSubir) {
+    puerta.classList.toggle("oculto", dentro);
+    zonaSubir.classList.toggle("oculto", !dentro);
+    convertir.classList.toggle("oculto", !dentro);
   }
   pintarDatos();
 }
@@ -458,7 +470,8 @@ function abrirCuenta(registro = false) {
 }
 
 $("#btn-entrar").addEventListener("click", () => abrirCuenta(false));
-$("#instalar-entrar")?.addEventListener("click", () => abrirCuenta(true));
+$("#puerta-crear")?.addEventListener("click", () => abrirCuenta(true));
+$("#puerta-entrar")?.addEventListener("click", () => abrirCuenta(false));
 $("#btn-cerrar").addEventListener("click", () => $("#dlg-cuenta").close());
 $("#btn-cambiar").addEventListener("click", () => { modoRegistro = !modoRegistro; pintarModo(); });
 
@@ -517,7 +530,12 @@ $("#btn-salir").addEventListener("click", async () => {
     await fetch("/api/cuenta/salir", { method: "POST", headers: conSesion() });
   } catch { /* da igual: lo que importa es soltarla de aquí */ }
   guardarSesion(null);
+  estado.archivo = estado.perfil = null;
+  try { localStorage.removeItem(TRABAJO); } catch { /* navegación privada */ }
   pintarCuenta();
+  // Sin sesión no se puede hacer nada con lo que quedaba en pantalla:
+  // dejarlo ahí es una pantalla que falla en el primer clic.
+  volverAlPrincipio();
 });
 
 // ---------- el CV, en la nube ----------

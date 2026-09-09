@@ -173,6 +173,26 @@ main { padding-bottom: 80px; }
   padding: 4px 13px; border-radius: 99px; font-weight: 700; font-size: 13px;
 }
 
+/* La puerta: ocupa el sitio de la zona de subir mientras no hay sesión.
+ * Mismo tamaño y mismo lenguaje que ella —recuadro, borde, centro— para
+ * que se lea como «aquí es donde empieza», no como un aviso de error. */
+.puerta {
+  border: 2px solid var(--linea); border-radius: var(--r-chico);
+  padding: 36px 24px; text-align: center; background: var(--lima);
+  color: #131316; box-shadow: var(--dura-chica);
+}
+.puerta .grande {
+  font-size: 1.2rem; font-weight: 800; letter-spacing: -.03em; margin-bottom: 6px;
+}
+.puerta .detalle { color: #131316; opacity: .75; margin-bottom: 0; }
+.acciones-puerta {
+  display: flex; gap: 10px; justify-content: center; flex-wrap: wrap; margin-top: 18px;
+}
+@media (max-width: 480px) {
+  .acciones-puerta { flex-direction: column; }
+  .acciones-puerta .boton { width: 100%; }
+}
+
 /* ══════════ botones ══════════ */
 .boton {
   padding: 12px 22px; border: 2px solid var(--linea); border-radius: var(--r-chico);

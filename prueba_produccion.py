@@ -152,11 +152,16 @@ check("la sesión se renueva sin la contraseña", c == 200 and bool(r3.get("toke
 token = r3.get("token") or token
 
 # ---------------------------------------------------------------------
-titulo("CV — subir, convertir y que no se pierda")
+titulo("CV — subir, convertir y que no se pierda (ya con sesión)")
 # ---------------------------------------------------------------------
 contenido = _cv_de_prueba()
 
-c, r = pedir("/api/cv/procesar", "POST", archivo=("cv_prueba.docx", contenido))
+# Todo pide cuenta, también esto: primero se comprueba que la puerta
+# está puesta, y solo después se pasa con la sesión.
+c, _ = pedir("/api/cv/procesar", "POST", archivo=("cv_prueba.docx", contenido))
+check("sin sesión no se puede ni subir un CV", c == 401, str(c))
+
+c, r = pedir("/api/cv/procesar", "POST", archivo=("cv_prueba.docx", contenido), token=token)
 if not check("el CV se lee", c == 200, r.get("error")):
     sys.exit(1)
 perfil = r["perfil"]
@@ -170,7 +175,7 @@ plano = json.dumps(perfil, ensure_ascii=False).lower()
 check("conserva las herramientas que declara el CV",
       "power bi" in plano and "excel" in plano)
 
-c, r = pedir("/api/cv/sugerencias", "POST", perfil)
+c, r = pedir("/api/cv/sugerencias", "POST", perfil, token=token)
 check("sugiere puestos", c == 200 and bool(r.get("puestos")))
 _textos = [p["texto"] for p in r.get("puestos") or []]
 if _textos:
@@ -181,7 +186,7 @@ check("y a una estudiante le ofrece prácticas, no análisis senior",
       bool(_textos) and all(t.lower().startswith("practicante") for t in _textos),
       " · ".join(_textos[:3]))
 
-c, r = pedir("/api/cv/descargar", "POST", perfil)
+c, r = pedir("/api/cv/descargar", "POST", perfil, token=token)
 check("y genera el .docx", c == 200 and isinstance(r, bytes) and r[:2] == b"PK",
       f"{len(r) if isinstance(r, bytes) else 0} bytes")
 

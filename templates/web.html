@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Chamba Lista — postula a treinta empleos con un clic</title>
-<meta name="description" content="Busca en Computrabajo, Bumeran, LinkedIn e Indeed a la vez, adapta tu CV a cada vacante y postula sin escribir lo mismo mil veces. Convertir tu CV es gratis.">
+<meta name="description" content="Busca en Computrabajo, Bumeran, LinkedIn e Indeed a la vez, adapta tu CV a cada vacante y postula sin escribir lo mismo mil veces. Empieza convirtiendo tu CV al formato que mejor leen.">
 <link rel="stylesheet" href="/static/css/web.css">
 </head>
 <body>
@@ -56,6 +56,19 @@
   <p class="antetitulo entra entra-2" id="rotulo-subir" style="margin-bottom:10px">Empieza por aquí</p>
   <section class="paso entra entra-2" id="zona-1">
     <p class="detalle" style="margin-top:0">Antes de postular, tu CV tiene que pasar el filtro automático de los portales. Súbelo y te lo devolvemos en formato Harvard, que es el que mejor leen.</p>
+
+    <!-- La puerta. Aparece cuando no hay sesión y esconde la zona de
+         subir: enseñar «arrastra tu CV aquí» a quien no puede usarlo es
+         prometer algo que al soltar el archivo se vuelve un error. -->
+    <div class="puerta oculto" id="puerta">
+      <p class="grande">Crea tu cuenta y empieza</p>
+      <p class="detalle">Tu CV y tus postulaciones se guardan contigo, en cualquier equipo.</p>
+      <div class="acciones-puerta">
+        <button class="boton principal" id="puerta-crear">Crear cuenta</button>
+        <button class="boton secundario" id="puerta-entrar">Ya tengo cuenta</button>
+      </div>
+    </div>
+
     <div class="zona" id="zona">
       <input type="file" id="archivo" accept=".pdf,.docx,.doc,.txt" hidden>
       <p class="grande">Arrastra tu CV aquí</p>
@@ -104,12 +117,8 @@
         <p class="detalle">Busca en los cuatro portales y llena los formularios por ti,
           con las sesiones que ya tienes abiertas.</p>
       </div>
-      <a class="boton principal oculto" id="instalar" href="/extension.zip" download>Descargar la extensión</a>
-      <button class="boton principal" id="instalar-entrar">Crear cuenta para postular</button>
+      <a class="boton principal" id="instalar" href="/extension.zip" download>Descargar la extensión</a>
     </div>
-    <p class="detalle" id="por-que-cuenta">Para postular hace falta una cuenta:
-      lo que se envía va con tu nombre a empresas reales, y tiene que quedar
-      claro de quién es.</p>
     <details class="como-instalar">
       <summary>Cómo instalarla · 1 minuto</summary>
       <ol>
@@ -155,13 +164,13 @@
         </li>
         <li class="parada">
           <span class="marca" aria-hidden="true">4</span>
-          <span class="texto"><b>Se borra</b><span>no queda en el servidor</span></span>
+          <span class="texto"><b>Se guarda</b><span>solo tú lo ves</span></span>
         </li>
       </ol>
     </div>
     <p class="tuyo cierre-ruta">
-      <span class="marca-tuyo">Con cuenta</span>
-      Tu CV y tus postulaciones te siguen. Los borras de un clic.
+      <span class="marca-tuyo">Tuyo</span>
+      Te sigue en cualquier equipo. Lo borras entero de un clic.
       <a class="enlace-legal" href="/privacidad">Letra pequeña</a>
     </p>
   </section>

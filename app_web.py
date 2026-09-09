@@ -21,10 +21,11 @@ En producción:       gunicorn app_web:app
 import io
 import os
 import time
+from functools import wraps
 from collections import defaultdict, deque
 from pathlib import Path
 
-from flask import Flask, jsonify, render_template, request, send_file
+from flask import Flask, g, jsonify, render_template, request, send_file
 from werkzeug.utils import secure_filename
 
 BASE = Path(__file__).parent
@@ -91,6 +92,39 @@ def _clave_del_usuario():
     return (request.headers.get("X-IA-Key") or "").strip()
 
 
+def _token():
+    """El token de sesión que manda el navegador, si lo manda."""
+    cabecera = request.headers.get("Authorization", "")
+    return cabecera[7:].strip() if cabecera.lower().startswith("bearer ") else ""
+
+
+def _sesion_o_401():
+    """Quién pide, o None. Devuelve (usuario, respuesta_de_error)."""
+    import cuentas
+    usuario = cuentas.quien_es(_token())
+    if not usuario:
+        return None, (jsonify({"error": "Inicia sesión para continuar."}), 401)
+    return usuario, None
+
+
+def con_sesion(f):
+    """Exige sesión iniciada. Sin ella, 401 y nada más.
+
+    Todo el producto pide cuenta, también convertir el CV. La razón es la
+    misma que llevó a pedirla para postular: lo que pasa por aquí es el
+    nombre, el teléfono y el historial laboral de una persona, y eso no
+    puede salir de un visitante del que no se sabe nada.
+    """
+    @wraps(f)
+    def envoltura(*args, **kwargs):
+        usuario, error = _sesion_o_401()
+        if error:
+            return error
+        g.usuario = usuario
+        return f(*args, **kwargs)
+    return envoltura
+
+
 @app.get("/")
 def index():
     return render_template("web.html")
@@ -138,6 +172,7 @@ def estado():
 
 
 @app.post("/api/cv/procesar")
+@con_sesion
 def procesar():
     """Sube un CV y devuelve el perfil estructurado. Nada se guarda."""
     if not _pasa_limite():
@@ -181,6 +216,7 @@ def procesar():
 
 
 @app.post("/api/cv/preview")
+@con_sesion
 def preview():
     perfil = request.get_json(silent=True)
     if not perfil:
@@ -190,6 +226,7 @@ def preview():
 
 
 @app.post("/api/cv/descargar")
+@con_sesion
 def descargar():
     """Genera el .docx en memoria y lo envía. No queda nada en el servidor."""
     perfil = request.get_json(silent=True)
@@ -213,21 +250,6 @@ def descargar():
 # Quien postula manda su nombre y su historial a empresas reales. Eso no
 # puede salir de un identificador de navegador que cualquiera genera.
 # ---------------------------------------------------------------------------
-
-def _token():
-    """El token de sesión que manda el navegador, si lo manda."""
-    cabecera = request.headers.get("Authorization", "")
-    return cabecera[7:].strip() if cabecera.lower().startswith("bearer ") else ""
-
-
-def _sesion_o_401():
-    """Quién pide, o None. Devuelve (usuario, respuesta_de_error)."""
-    import cuentas
-    usuario = cuentas.quien_es(_token())
-    if not usuario:
-        return None, (jsonify({"error": "Inicia sesión para continuar."}), 401)
-    return usuario, None
-
 
 @app.post("/api/cuenta/registrar")
 def cuenta_registrar():
@@ -427,6 +449,7 @@ def descargar_extension():
 
 
 @app.post("/api/cv/sugerencias")
+@con_sesion
 def cv_sugerencias():
     """Qué puestos buscar, deducidos del CV recién convertido.
 
@@ -443,6 +466,7 @@ def cv_sugerencias():
 
 
 @app.post("/api/cv/docx")
+@con_sesion
 def cv_docx():
     """El .docx adaptado a una vacante, en base64, para la extensión.
 

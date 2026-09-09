@@ -209,6 +209,19 @@ import re as _re
 import zipfile
 
 import app_web
+import cuentas
+
+# Sesión de mentira para el resto del fichero.
+#
+# Desde que TODO el producto pide cuenta, una prueba del .docx sin sesión
+# solo comprobaría que la puerta está cerrada — que es una cosa sola y se
+# comprueba aparte, en su propia sección. Se sustituye la verificación
+# del token por una que HONRA EL TOKEN: con cabecera hay usuario, sin
+# cabecera no lo hay. Así las pruebas de la puerta siguen siendo de
+# verdad y las demás pueden llegar a lo suyo.
+cuentas.quien_es = lambda token: (
+    {"id": "prueba", "correo": "prueba@ejemplo.pe"} if token else None)
+DENTRO = {"Authorization": "Bearer sesion-de-prueba"}
 
 cliente = app_web.app.test_client()
 
@@ -225,7 +238,7 @@ CV = {
 
 
 def pedir_docx(**extra):
-    r = cliente.post("/api/cv/docx", json={"perfil": CV, **extra})
+    r = cliente.post("/api/cv/docx", json={"perfil": CV, **extra}, headers=DENTRO)
     return r.status_code, r.get_json()
 
 
@@ -269,7 +282,7 @@ check("una petición vacía no vacía el CV",
 _, j4 = pedir_docx(competencias_extra=["Excel intermedio"])
 check("no duplica una habilidad que ya estaba", j4["anadidas"] == [], str(j4["anadidas"]))
 
-estado5, _ = cliente.post("/api/cv/docx", json={}).status_code, None
+estado5, _ = cliente.post("/api/cv/docx", json={}, headers=DENTRO).status_code, None
 check("sin perfil devuelve error, no un CV vacío", estado5 == 400)
 
 # ---------------------------------------------------------------------
@@ -452,15 +465,26 @@ check("ni carpetas de caché", "__pycache__" not in carpetas)
 # ---------------------------------------------------------------------
 titulo("CUENTAS — la puerta de postular")
 # ---------------------------------------------------------------------
-# Convertir el CV NO pide cuenta: es el gancho y tiene que seguir sin
-# fricción. Todo lo que guarda o manda algo en nombre de la persona SÍ,
-# porque eso llega a empresas reales y tiene que quedar claro de quién es.
-import cuentas
-
-check("convertir el CV sigue abierto",
-      cliente.post("/api/cv/preview", json=CV).status_code == 200)
-check("sugerir puestos sigue abierto",
-      cliente.post("/api/cv/sugerencias", json=CV).status_code == 200)
+# Ya no hay uso anónimo: TODO pide cuenta, también convertir el CV. La
+# razón es la misma que llevó a pedirla para postular — por aquí pasan el
+# nombre, el teléfono y el historial laboral de una persona, y eso no
+# puede salir de un visitante del que no se sabe nada.
+#
+# Ojo con el 200: es el único resultado que nunca puede salir. Un fallo
+# aquí no es una prueba en rojo, es el CV de alguien servido a quien pase.
+for _metodo, _ruta, _cuerpo in (
+        ("POST", "/api/cv/preview", CV),
+        ("POST", "/api/cv/sugerencias", CV),
+        ("POST", "/api/cv/descargar", CV),
+        ("POST", "/api/cv/docx", {"perfil": CV})):
+    _r = cliente.open(_ruta, method=_metodo, json=_cuerpo)
+    check(f"sin sesión, {_ruta} se cierra", _r.status_code == 401, str(_r.status_code))
+check("sin sesión, subir un CV se cierra",
+      cliente.post("/api/cv/procesar", data={}).status_code == 401)
+check("con sesión, convertir funciona",
+      cliente.post("/api/cv/preview", json=CV, headers=DENTRO).status_code == 200)
+check("y sugerir también",
+      cliente.post("/api/cv/sugerencias", json=CV, headers=DENTRO).status_code == 200)
 
 # Lo que toca datos guardados exige sesión. 501 si no hay base
 # configurada, 401 si la hay: lo que NUNCA puede salir es un 200.
@@ -509,8 +533,13 @@ check("recuperar no revela si el correo tiene cuenta", ok1 == ok2)
 _html = (BASE_HTML := pathlib.Path("templates/web.html").read_text(encoding="utf-8"))
 check("la página ya no promete «sin registro»",
       "sin registro" not in _html.lower(), "sigue diciéndolo")
-check("y explica por qué postular pide cuenta",
-      "va con tu nombre a empresas reales" in _html.lower())
+# La puerta tiene que decir qué se gana, no solo qué se pide. «Crea una
+# cuenta» a secas, delante de un producto que aún no has visto, es un
+# peaje; con el porqué al lado es un trato.
+check("la puerta dice qué se gana con la cuenta",
+      "se guardan contigo" in _html.lower())
+check("y ofrece las dos salidas: crearla o entrar",
+      'id="puerta-crear"' in _html and 'id="puerta-entrar"' in _html)
 
 # ---------------------------------------------------------------------
 titulo("ACEPTACIÓN — no se puede crear cuenta sin aceptar")
@@ -753,14 +782,18 @@ _camino = pathlib.Path("templates/web.html").read_text(encoding="utf-8")
 check("el camino tiene cuatro paradas", _camino.count('class="parada"') == 4,
       str(_camino.count('class="parada"')))
 for _pieza, _que in [
-    ("Se borra", "dice que el archivo se borra"),
-    ("no queda en el servidor", "y que no se queda en el servidor"),
+    ("Se guarda", "dice que el CV se guarda"),
+    ("solo tú lo ves", "y que no lo ve nadie más"),
     ("privacidad-ia", "deja el hueco de qué pasa con la IA"),
-    ("Con cuenta", "dice qué cambia si abres cuenta"),
-    ("Los borras de un clic", "y que puedes borrarlo todo"),
+    ("Lo borras entero de un clic", "y que puedes borrarlo todo"),
     ('href="/privacidad"', "y enlaza a la letra pequeña"),
 ]:
     check(f"{_que}", _pieza in _camino, _pieza)
+
+# El camino ya no puede prometer que el CV se descarta: con cuenta se
+# guarda. Una frase que el sistema no cumple es la peor de todas.
+check("y ya no promete que se borra solo",
+      "no queda en el servidor" not in _camino)
 
 # Ali, sobre la versión anterior: «no digamos lo de no pide cuenta».
 # Negar algo lo instala — quien no se lo había preguntado, se lo
@@ -771,7 +804,7 @@ for _negacion in ["no pide cuenta", "sin cuenta", "sin registro"]:
 # Las paradas son palabras clave, no frases. Si alguien vuelve a meter un
 # párrafo aquí, esto lo canta.
 _titulos = _re.findall(r"<b>([^<]+)</b>", _camino)
-_paradas = [t for t in _titulos if t in ("Llega", "Se lee", "Vuelve Harvard", "Se borra")]
+_paradas = [t for t in _titulos if t in ("Llega", "Se lee", "Vuelve Harvard", "Se guarda")]
 check("cada parada cabe en dos palabras",
       len(_paradas) == 4 and all(len(t.split()) <= 2 for t in _paradas), str(_paradas))
 
@@ -790,6 +823,45 @@ check("y solo una vez", "ojo.disconnect()" in _js)
 check("si el navegador nunca avisa, se enciende igual",
       'zona.classList.remove("por-recorrer")' in _js)
 check("sin movimiento, ni se apaga", "prefers-reduced-motion" in _js)
+
+# ---------------------------------------------------------------------
+titulo("SIN ANÓNIMOS — la puerta está delante de todo")
+# ---------------------------------------------------------------------
+# El producto entero pide cuenta. Lo que estas pruebas vigilan no es la
+# puerta del servidor —eso ya está arriba— sino que la PÁGINA no enseñe
+# como usable lo que no lo es: un recuadro de «arrastra tu CV aquí» que
+# al soltar el archivo devuelve un 401 es peor que no enseñar nada.
+
+_pag = pathlib.Path("templates/web.html").read_text(encoding="utf-8")
+_web = pathlib.Path("static/js/web.js").read_text(encoding="utf-8")
+
+check("la puerta existe en la página", 'id="puerta"' in _pag)
+check("y nace oculta, que la decide el JS", 'class="puerta oculto"' in _pag)
+check("sin sesión se enseña la puerta y se esconde la zona de subir",
+      'puerta.classList.toggle("oculto", dentro)' in _web
+      and 'zonaSubir.classList.toggle("oculto", !dentro)' in _web)
+check("el botón de convertir también se esconde",
+      'convertir.classList.toggle("oculto", !dentro)' in _web)
+
+# Lo guardado en el navegador no puede repintarse sin sesión: se vería una
+# pantalla entera que falla en el primer botón.
+check("sin sesión no se restaura el trabajo guardado",
+      "if (!sesion()?.token) return;" in _web)
+check("y al cerrar sesión se vuelve al principio",
+      "volverAlPrincipio()" in _web and "localStorage.removeItem(TRABAJO)" in _web)
+
+# El paso de instalar ya no pide cuenta: a esas alturas la hay por fuerza.
+check("instalar la extensión ya no pide cuenta aparte",
+      'id="instalar-entrar"' not in _pag and 'id="por-que-cuenta"' not in _pag)
+
+# Y la política no puede seguir diciendo que se usa sin registrarse.
+_pol2 = pathlib.Path("templates/privacidad.html").read_text(encoding="utf-8")
+check("la política ya no ofrece uso sin cuenta",
+      "no requiere cuenta" not in _pol2 and "Sin cuenta" not in _pol2)
+check("y dice que el registro es necesario",
+      "necesitas una cuenta para usar el servicio" in _pol2.lower())
+check("sin dejar de explicar qué pasa con el archivo original",
+      "se procesa y se descarta" in _pol2)
 
 print(f"\n{'TODO OK' if fallos == 0 else f'{fallos} FALLO(S)'}")
 sys.exit(1 if fallos else 0)
