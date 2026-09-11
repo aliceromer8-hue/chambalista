@@ -53,17 +53,14 @@ async function pintarPrivacidadIA() {
   try {
     const e = await (await fetch("/api/estado")).json();
     if (!e.ia_activa) {
-      li.textContent = "aquí mismo, sin salir";
+      li.textContent = "Tu CV se lee aquí, sin enviarlo a nadie más.";
     } else if (e.ia_facturada) {
-      li.textContent = "lo lee Google, sin entrenar con él";
+      li.textContent = "Para leer tu CV, su texto se procesa con Google.";
     } else {
-      // La única de las tres que no cabe en cuatro palabras, y no se
-      // recorta más: que Google pueda usar el CV y que alguien suyo pueda
-      // leerlo son los dos hechos que a la persona le importan. Decir
-      // solo «lo lee Google» aquí sería quedarse con la mitad cómoda.
-      li.textContent = "lo lee Google · en su plan gratis puede usarlo y revisarlo";
+      li.textContent = "Para leer tu CV, su texto se procesa con Google, "
+        + "que en su plan gratuito puede usarlo y revisarlo.";
     }
-  } catch { /* si falla, queda la frase del HTML */ }
+  } catch { /* si falla, la política lo explica igual */ }
 }
 
 // ---------- subir ----------

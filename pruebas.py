@@ -800,12 +800,29 @@ for _pieza, _que in [
 ]:
     check(f"{_que}", _pieza in _camino, _pieza)
 
-# Y abajo siguen estando los datos, en tres frases y con el enlace.
-check("los datos se explican sin un párrafo", 'class="datos-linea"' in _camino)
-check("incluido el hueco de qué pasa con la IA", "privacidad-ia" in _camino)
-check("que el CV solo lo ve su dueño", "solo tú lo ves" in _camino)
-check("que se puede borrar", "Lo borras entero" in _camino)
-check("y el enlace a la letra pequeña", 'href="/privacidad"' in _camino)
+# Lo de los datos ya no va en un bloque propio en la portada: iba en
+# grande donde nadie lo pidió. Pero la información NO puede evaporarse,
+# porque es la que sostiene el consentimiento. Ahora vive en los dos
+# sitios donde de verdad cuenta.
+check("el aviso de la IA está en la casilla que hay que marcar",
+      'id="privacidad-ia"' in _camino
+      and _camino.index('id="acepta"') < _camino.index('id="privacidad-ia"'),
+      "debe ir dentro del bloque de aceptación")
+check("la casilla enlaza la política antes de poder marcarla",
+      'href="/privacidad"' in _camino.split('id="acepta"')[1][:600])
+check("y el pie la enlaza desde cualquier punto de la página",
+      'href="/privacidad"' in _camino.split("<footer")[1])
+check("ya no hay un bloque de datos en la portada",
+      'class="datos-linea"' not in _camino and "Letra pequeña" not in _camino)
+
+# Lo que se quitó de la portada tiene que seguir entero en la política,
+# que es el documento que se acepta.
+for _pieza, _que in [
+    ("solo tú", "que el CV solo lo ve su dueño"),
+    ("eliminar", "que se puede borrar todo"),
+    ("Google", "que el texto del CV se envía a Google"),
+]:
+    check(f"la política sigue diciendo {_que}", _pieza.lower() in _pol.lower())
 
 # Ali, sobre la versión anterior: «no digamos lo de no pide cuenta».
 # Negar algo lo instala — quien no se lo había preguntado, se lo
@@ -915,10 +932,24 @@ for _portal in ("computrabajo", "bumeran", "indeed", "linkedin"):
 
 check("solo un portal sabe postular hoy", _puede_postular == ["computrabajo"],
       f"postulan: {_puede_postular} · solo leen: {_solo_leen}")
-check("y la página nombra ese portal al decir que postula sola",
-      "postula sola en <b>Computrabajo</b>" in _pag)
-check("y dice qué pasa en los demás",
-      "te encuentra" in _pag and "las deja abiertas" in _pag)
+# El alcance ya no va en un recuadro aparte —leía como disculpa— pero
+# tiene que seguir dicho donde se lee: en la bajada del titular. Lo que
+# esta prueba vigila no es la redacción, es que la frase que dice «llena
+# la postulación» nombre el portal donde eso pasa de verdad. El día que
+# bumeran.js sepa postular, se amplía aquí y la prueba lo permite.
+_bajada = _re.search(r'class="bajada">(.*?)</p>', _pag, _re.S).group(1)
+_saben_postular = [_p for _p in ("Computrabajo", "Bumeran", "Indeed", "LinkedIn")
+                   if _re.search(r"abrirFormulario|botonPostular",
+                                 pathlib.Path(f"extension/contenido/{_p.lower()}.js")
+                                 .read_text(encoding="utf-8"))]
+_tras_llenar = _bajada.split("llena la postulación")[-1] if "llena la postulación" in _bajada else ""
+_prometidos = [_p for _p in ("Computrabajo", "Bumeran", "Indeed", "LinkedIn")
+               if _p in _bajada.split("llena la postulación")[0].split("En ")[-1]]
+check("la bajada dice en qué portal llena la postulación",
+      "llena la postulación" in _bajada, _bajada.strip()[:80])
+check("y ese portal es uno que sabe hacerlo",
+      all(_p in _saben_postular for _p in _prometidos),
+      f"promete {_prometidos} · saben postular {_saben_postular}")
 
 # Buscar sí es en los cuatro: eso se puede decir y se dice.
 check("buscar en los cuatro sí se promete, porque sí ocurre",
