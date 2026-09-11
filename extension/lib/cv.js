@@ -12,7 +12,16 @@
 
 import { conCuenta } from "./sesion.js";
 
-/** Nombre de archivo legible: la empresa ve esto en su bandeja. */
+/**
+ * La SEMILLA con la que el servidor elige el nombre del archivo.
+ *
+ * Ojo: esto ya no se escribe en el nombre. Antes sí, y salía
+ * «CV-Alice-Romero-Harvard-Artesco-Practicante-de-Marketing.docx»: la
+ * empresa veía su propio nombre en el archivo, que no lo hace una
+ * persona. Ahora solo decide cuál de las formas naturales toca, para que
+ * la misma vacante dé siempre el mismo archivo y vacantes distintas den
+ * nombres distintos. El servidor manda: ver nombres_cv.py.
+ */
 function sufijoDe(vacante) {
   const partes = [vacante?.empresa, vacante?.titulo].filter(Boolean).join("-");
   return partes
@@ -44,6 +53,9 @@ export async function docxAdaptado(perfil, vacante, { resumen, competenciasExtra
         resumen: resumen || null,
         competencias_extra: competenciasExtra || [],
         sufijo: sufijoDe(vacante),
+        // El puesto sí puede salir en el nombre —«CV Alice Romero -
+        // Marketing» lo escribe mucha gente—; la empresa, no.
+        puesto: vacante?.titulo || null,
       }),
     });
     if (!r.ok) return { error: `El servidor respondió ${r.status}` };

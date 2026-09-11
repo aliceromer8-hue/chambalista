@@ -524,7 +524,12 @@ def cv_docx():
             adaptado["competencias"] = competencias
 
     try:
-        buffer, nombre = documento_en_memoria(adaptado, sufijo=datos.get("sufijo"))
+        # `sufijo` solo elige la forma del nombre; `puesto` sí puede
+        # aparecer en él. Ninguno de los dos escribe el nombre de la
+        # empresa: ver nombres_cv.py.
+        buffer, nombre = documento_en_memoria(adaptado,
+                                              sufijo=datos.get("sufijo"),
+                                              puesto=datos.get("puesto"))
     except Exception as e:
         return jsonify({"error": f"No se pudo generar el .docx: {e}"}), 500
 
