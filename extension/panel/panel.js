@@ -136,7 +136,7 @@ function pintarPortada(resumen) {
   $("#arranque").classList.add("oculto");
 
   if (etapa === 1) {
-    $("#portada-titulo").innerHTML = "Postula sin llenar<br>un solo formulario.";
+    $("#portada-titulo").innerHTML = "Un clic.<br>Quince postulaciones.";
     $("#portada-bajada").textContent =
       "Sube tu CV una vez. Desde ahí la web busca, llena formularios y contesta las "
       + "preguntas de cada empresa. Tú solo lees y dices que sí.";

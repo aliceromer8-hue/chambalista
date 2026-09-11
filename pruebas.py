@@ -894,6 +894,9 @@ titulo("LO QUE SE PROMETE — que no crezca solo")
 
 _pag = pathlib.Path("templates/web.html").read_text(encoding="utf-8")
 
+# Ojo: la portada SÍ puede llevar número —y lo lleva— siempre que sea el
+# que el código cumple. Lo que no puede llevar es uno inventado. Estos
+# cuatro lo estaban: «treinta» era el doble del tope real.
 for _numero in ["treinta", "30 postulaciones", "cientos", "decenas"]:
     # Se mira solo lo que se ve, no los comentarios del código, que
     # explican justamente por qué el número se quitó.
@@ -964,6 +967,23 @@ _tope = int(_re.search(r"TOPE_POR_TANDA = (\d+)", _fondo).group(1))
 check("el tope real está declarado en un solo sitio", _tope > 0, f"{_tope} por tanda")
 check("y el background lo publica para que el panel lo lea",
       "tope: TOPE_POR_TANDA" in _fondo)
+
+# El titular vuelve a llevar número, y eso está bien mientras el número
+# sea el que el código cumple. Antes decía «treinta» y el tope eran 15:
+# el doble. Estas dos comprobaciones son las que impiden que se separen
+# otra vez, en la web y en el panel.
+_EN_LETRA = {10: "diez", 12: "doce", 15: "quince", 20: "veinte",
+             25: "veinticinco", 30: "treinta", 40: "cuarenta", 50: "cincuenta"}
+_esperado = _EN_LETRA.get(_tope)
+check("el tope se sabe escribir en letra", bool(_esperado), str(_tope))
+if _esperado:
+    _visible_web = _re.sub(r"<!--.*?-->", "", BASE_HTML, flags=_re.S).lower()
+    check("el titular de la web dice el número que el código cumple",
+          _esperado in _visible_web, f"el código dice {_tope}")
+    check("y el del panel dice el mismo",
+          _esperado in _re.sub(r"<!--.*?-->", "", _panel, flags=_re.S).lower())
+    check("sin que se cuele el número viejo en ninguno",
+          "treinta" not in _visible_web or _esperado == "treinta")
 
 # ---------------------------------------------------------------------
 titulo("EL ARCHIVO QUE RECIBE LA EMPRESA")
