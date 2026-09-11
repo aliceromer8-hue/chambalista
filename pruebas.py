@@ -1053,5 +1053,71 @@ check("los títulos de sección se leen en plano",
 check("sin viñetas de símbolo exótico", not _re.search(r"[❖➢▪]", _texto_ats))
 check("sale texto suficiente al extraerlo", len(_texto_ats) > 200, f"{len(_texto_ats)} caracteres")
 
+# ---------------------------------------------------------------------
+titulo("MEDICIÓN — hasta hoy no se medía absolutamente nada")
+# ---------------------------------------------------------------------
+# La tabla `eventos` existía, `nube.anotar()` existía, y nadie la
+# llamaba. Cero estadísticas. Cada día así es un día de datos que no se
+# recuperan, y sin ellos «¿cuánto cobramos?» se responde a ojo.
+
+import nube as _nube
+
+check("el embudo está nombrado en un solo sitio",
+      all(hasattr(_nube, c) for c in ("LLEGA", "CUENTA_CREADA", "CV_CONVERTIDO", "ENVIADA")))
+
+_codigo = pathlib.Path("app_web.py").read_text(encoding="utf-8")
+for _evento, _donde in [
+    ("pagina_vista", "alguien llega"),
+    ("cuenta_creada", "alguien se registra"),
+    ("sesion_abierta", "alguien entra"),
+    ("cv_convertido", "se convierte un CV"),
+    ("sugerencias_vistas", "se ven los puestos sugeridos"),
+    ("extension_descargada", "se descarga la extensión"),
+    ("cuenta_borrada", "alguien se da de baja"),
+]:
+    check(f"se mide cuando {_donde}", f'"{_evento}"' in _codigo, _evento)
+
+_fondo = pathlib.Path("extension/background.js").read_text(encoding="utf-8")
+for _evento, _donde in [
+    ("busqueda", "se busca en un portal"),
+    ("postulacion_preparada", "se prepara una postulación"),
+    ("postulacion_enviada", "se ENVÍA una, que es el producto"),
+    ("postulacion_omitida", "se omite, y por qué"),
+]:
+    check(f"se mide cuando {_donde}", f'"{_evento}"' in _fondo, _evento)
+
+# La medición no puede tumbar nada ni delatar a nadie.
+check("medir no revienta si la base está caída",
+      "except Exception" in _codigo and "no se pudo anotar" in _codigo)
+check("el endpoint de la extensión pide sesión",
+      cliente.post("/api/medir", json={"tipo": "busqueda"}).status_code == 401)
+check("y solo acepta tipos de una lista cerrada",
+      cliente.post("/api/medir", json={"tipo": "inventado"},
+                   headers=DENTRO).status_code == 400)
+check("un tipo válido sí entra",
+      cliente.post("/api/medir", json={"tipo": "postulacion_enviada",
+                                       "detalle": {"portal": "computrabajo"}},
+                   headers=DENTRO).status_code == 200)
+
+# Lo que se guarda no puede convertirse en una huella. Con el puesto
+# exacto, la hora y el distrito se identifica a una persona aunque no
+# haya ni nombre ni id — y la política promete conteos que no identifican.
+check("el detalle solo admite campos de pocos valores",
+      set(app_web.CAMPOS_MEDIBLES) <= {"portal", "ok", "motivo", "cuantas", "con", "segundos"},
+      str(app_web.CAMPOS_MEDIBLES))
+check("nada de puesto, empresa ni texto del CV",
+      not ({"puesto", "titulo", "empresa", "cv", "correo", "url"}
+           & set(app_web.CAMPOS_MEDIBLES)))
+check("y el motivo se recorta, que si no es texto libre disfrazado",
+      "[:60]" in _codigo)
+
+_vistas = pathlib.Path("supabase/004-estadisticas.sql").read_text(encoding="utf-8")
+for _v in ("embudo_diario", "saltos", "por_portal", "motivos_de_omision", "salud_ia"):
+    check(f"hay vista «{_v}»", f"view {_v}" in _vistas)
+check("los saltos miden lo que cuesta la puerta",
+      "pct_se_registran" in _vistas)
+check("y si la gente llega de verdad a postular",
+      "pct_llegan_a_postular" in _vistas)
+
 print(f"\n{'TODO OK' if fallos == 0 else f'{fallos} FALLO(S)'}")
 sys.exit(1 if fallos else 0)

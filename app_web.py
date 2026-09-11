@@ -107,6 +107,22 @@ def _sesion_o_401():
     return usuario, None
 
 
+def medir(tipo, **detalle):
+    """Anota un evento del embudo. Nunca revienta ni retrasa la respuesta.
+
+    Se traga cualquier error a propósito, pero lo deja en el log: medir
+    es un extra y no puede estropearle nada a nadie, pero una medición
+    que falla en silencio es una estadística que miente a la baja sin que
+    nadie se entere.
+    """
+    try:
+        import nube
+        if nube.activa():
+            nube.anotar(tipo, detalle or None)
+    except Exception as e:                                      # noqa: BLE001
+        app.logger.warning("no se pudo anotar %s: %s", tipo, e)
+
+
 def con_sesion(f):
     """Exige sesión iniciada. Sin ella, 401 y nada más.
 
@@ -127,6 +143,7 @@ def con_sesion(f):
 
 @app.get("/")
 def index():
+    medir("pagina_vista")
     return render_template("web.html")
 
 
@@ -212,6 +229,11 @@ def procesar():
     # de saberlo sin cronometrar a mano desde fuera: el respaldo por
     # reglas hace que un fallo del modelo se vea igual que un acierto.
     app.logger.info("CV leído con %s", perfil.get("analizado_con", "?"))
+    # `con` distingue si lo leyó el modelo o el respaldo por reglas. Es
+    # la diferencia entre el producto funcionando y el producto
+    # sobreviviendo, y sin medirlo ya pasó un día entero sin que nadie
+    # lo notara.
+    medir("cv_convertido", con=perfil.get("analizado_con", "?"), formato=ext.lstrip("."))
     return jsonify({"perfil": perfil})
 
 
@@ -273,6 +295,7 @@ def cuenta_registrar():
         # el servicio. Queda registrado en el log del servidor.
         if not cuentas.anotar_aceptacion((r.get("usuario") or {}).get("id")):
             app.logger.warning("no se pudo anotar la aceptación de la política")
+        medir("cuenta_creada", confirmar=bool(r.get("falta_confirmar")))
     return (jsonify(r), 200) if ok else (jsonify(r), 400)
 
 
@@ -283,6 +306,7 @@ def cuenta_entrar():
     if not _pasa_cuenta():
         return jsonify({"error": "Demasiados intentos. Espera unos minutos."}), 429
     ok, r = cuentas.entrar(d.get("correo"), d.get("contrasena"))
+    medir("sesion_abierta", ok=ok)
     return (jsonify(r), 200) if ok else (jsonify(r), 401)
 
 
@@ -336,6 +360,7 @@ def cuenta_borrar():
     usuario, error = _sesion_o_401()
     if error:
         return error
+    medir("cuenta_borrada")
     if not cuentas.borrar_cuenta(usuario["id"]):
         return jsonify({"error": "No se pudo borrar la cuenta. Escríbenos y lo hacemos."}), 500
     return jsonify({"borrada": True})
@@ -404,8 +429,49 @@ def nube_borrar():
     return jsonify({"borrado": nube.borrar_todo(_token())})
 
 
+# Los eventos que solo la extensión conoce: buscar, preparar y enviar.
+# Esos pasan en el navegador de la persona y el servidor no se entera de
+# ellos si nadie se los cuenta — y son justo los que dicen si el producto
+# sirve para algo, porque «postulación enviada» es el producto.
+MEDIBLES_EXTENSION = {
+    "busqueda", "postulacion_preparada", "postulacion_enviada",
+    "postulacion_omitida", "hueco_detectado", "cv_adjuntado",
+}
+
+# Los únicos valores que se aceptan en el detalle. Lista cerrada a
+# propósito: sin ella, un `detalle` con el puesto exacto y la hora
+# identifica a una persona aunque no lleve ni nombre ni id, y la política
+# promete conteos que no identifican a nadie.
+CAMPOS_MEDIBLES = {"portal", "ok", "motivo", "cuantas", "con", "segundos"}
+
+
+@app.post("/api/medir")
+@con_sesion
+def medir_desde_extension():
+    """Anota un evento del embudo que ocurrió en el navegador.
+
+    Pide sesión y solo acepta tipos y campos de una lista cerrada: un
+    endpoint de métricas abierto es una forma cómoda de llenarle a
+    alguien la base de datos de basura.
+    """
+    d = request.get_json(silent=True) or {}
+    tipo = d.get("tipo")
+    if tipo not in MEDIBLES_EXTENSION:
+        return jsonify({"error": "Evento no reconocido."}), 400
+    detalle = {k: v for k, v in (d.get("detalle") or {}).items()
+               if k in CAMPOS_MEDIBLES and isinstance(v, (str, int, float, bool))}
+    # Un motivo largo es texto libre disfrazado: se recorta.
+    if isinstance(detalle.get("motivo"), str):
+        detalle["motivo"] = detalle["motivo"][:60]
+    medir(tipo, **detalle)
+    return jsonify({"anotado": True})
+
+
 @app.get("/extension.zip")
 def descargar_extension():
+    # El paso más caro del embudo: aquí es donde hay que salir de la web,
+    # descomprimir un zip y activar el modo desarrollador de Chrome. Si
+    # se pierde gente, se pierde aquí, y sin medirlo es invisible.
     """La extensión empaquetada, comprimida al vuelo desde extension/.
 
     Se arma en cada petición en vez de servir un .zip guardado para que
@@ -443,6 +509,7 @@ def descargar_extension():
                 continue
             z.write(ruta, ruta.relative_to(carpeta).as_posix())
     buffer.seek(0)
+    medir("extension_descargada")
     return send_file(buffer, as_attachment=True,
                      download_name="chamba-lista-extension.zip",
                      mimetype="application/zip")
@@ -462,7 +529,13 @@ def cv_sugerencias():
     if not perfil:
         return jsonify({"error": "Falta el perfil."}), 400
     import sugerencias
-    return jsonify(sugerencias.sugerir(perfil))
+    salida = sugerencias.sugerir(perfil)
+    # El momento de carrera detectado, que es lo que más se equivoca y lo
+    # que decide si le ofrecemos prácticas o análisis senior.
+    medir("sugerencias_vistas",
+          cuantas=len(salida.get("puestos") or []),
+          momento=(sugerencias.momento_de_carrera(perfil) or ("?",))[0])
+    return jsonify(salida)
 
 
 @app.post("/api/cv/docx")

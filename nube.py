@@ -168,11 +168,41 @@ def borrar_todo(token):
 # Métricas
 # ---------------------------------------------------------------------
 
+# El embudo, en un solo sitio. Escribirlos a mano en cada llamada acaba
+# en «cv_convertido» aquí y «cvConvertido» allá, y entonces las cuentas
+# no salen y nadie sabe por qué.
+LLEGA          = "pagina_vista"
+CUENTA_CREADA  = "cuenta_creada"
+SESION_ABIERTA = "sesion_abierta"
+CV_CONVERTIDO  = "cv_convertido"
+SUGERENCIAS    = "sugerencias_vistas"
+EXTENSION      = "extension_descargada"
+BUSQUEDA       = "busqueda"
+PREPARADA      = "postulacion_preparada"
+ENVIADA        = "postulacion_enviada"
+HUECO          = "hueco_detectado"
+CUENTA_BORRADA = "cuenta_borrada"
+
+
 def anotar(tipo, detalle=None):
     """Un evento anónimo: sin usuario y sin nada que apunte a nadie.
 
+    QUÉ SE PUEDE PONER EN `detalle`
+
+    Solo cosas de POCOS valores posibles: el portal, si salió bien o mal,
+    el motivo de una omisión, cuánto tardó. Nada de texto libre, nada del
+    CV, nada que venga escrito por la persona. Un detalle con muchos
+    valores distintos deja de ser una estadística y se convierte en una
+    huella: con el puesto exacto, la hora y el distrito se identifica a
+    alguien aunque no haya ni nombre ni id.
+
+    La política dice «conteos de uso agregados y anónimos, que no
+    permiten identificar a ninguna persona». Esta función es el sitio
+    donde esa frase se cumple o se incumple.
+
     Es lo único que usa la clave de servicio, porque no hay ninguna
-    persona a cuyo nombre escribirlo.
+    persona a cuyo nombre escribirlo. Y no se espera el resultado: que la
+    medición falle no puede estropearle la postulación a nadie.
     """
     _pedir("POST", "eventos", [{"tipo": tipo, "detalle": detalle or {}}],
            {"Prefer": "return=minimal"})

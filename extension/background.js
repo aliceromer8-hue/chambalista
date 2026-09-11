@@ -11,6 +11,7 @@ import * as ia from "./lib/ia.js";
 import * as cv from "./lib/cv.js";
 import * as huecos from "./lib/huecos.js";
 import * as sesion from "./lib/sesion.js";
+import { medir } from "./lib/medir.js";
 
 const TOPE_POR_TANDA = 15;
 const PAUSA_ENTRE_VACANTES = 2500;
@@ -95,8 +96,10 @@ async function buscar({ puesto, ciudad, nivel, portales: elegidos }) {
         vacantes.push(...nuevas);
         if (!nuevas.length) break;
       }
+      medir("busqueda", { portal: pid, cuantas: vacantes.length });
     } catch (e) {
       errores.push({ portal: portal.nombre, error: e.message });
+      medir("busqueda", { portal: pid, ok: false });
     }
   }
   return { vacantes, errores, termino };
@@ -325,6 +328,12 @@ async function correrLote({ vacantes, modo, aprobacion, respuestasPersona }) {
         portal: item.portal, empresa: item.empresa, puesto: item.titulo,
         url: item.url, estado: item.estado, motivo: item.motivo,
       });
+      // Y la cuenta anónima, que es lo único que nos llega a nosotros.
+      // El motivo importa tanto como el resultado: saber que se omiten
+      // por «pide aceptar una condición» y no por un fallo es lo que
+      // dice qué hay que arreglar.
+      medir(item.estado === "enviada" ? "postulacion_enviada" : "postulacion_omitida",
+            { portal: item.portal, motivo: item.motivo || item.estado });
     }
 
     lote.hechas = i + 1;
@@ -368,6 +377,8 @@ async function enviarAprobadas(ids) {
       portal: item.portal, empresa: item.empresa, puesto: item.titulo,
       url: item.url, estado: item.estado, motivo: item.motivo,
     });
+    medir(item.estado === "enviada" ? "postulacion_enviada" : "postulacion_omitida",
+          { portal: item.portal, motivo: item.motivo || item.estado });
     lote.hechas = n + 1;
     await esperar(PAUSA_ENTRE_VACANTES);
   }
@@ -389,7 +400,15 @@ chrome.runtime.onMessage.addListener((msg, _e, responder) => {
         case "prepararUna": {
           const perfil = await almacen.perfil.obtener();
           const guardados = await almacen.datosPersonales.obtener();
-          return responder(await prepararUna(msg.vacante, perfil, guardados, msg.respuestasPersona));
+          const listo = await prepararUna(msg.vacante, perfil, guardados, msg.respuestasPersona);
+          medir("postulacion_preparada", {
+            portal: msg.vacante?.portalId || msg.vacante?.portal,
+            // Si el CV adaptado se adjuntó o no. Es la función que nos
+            // distingue: si falla a menudo, hay que saberlo por número y
+            // no porque alguien se queje.
+            ok: Boolean(listo?.cv?.adjuntado),
+          });
+          return responder(listo);
         }
         case "enviarUna": {
           const r = await escribirYEnviar(msg.respuestas);
