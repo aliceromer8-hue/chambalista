@@ -16,4 +16,16 @@
 export const POSTULACION_VERIFICADA = ["computrabajo"];
 
 // Escrito y con selectores medidos, pendiente de una postulación real.
-export const POSTULACION_SIN_PROBAR = ["bumeran"];
+export const POSTULACION_SIN_PROBAR = ["bumeran", "indeed"];
+
+// LinkedIn aparte: aquí no falta probarlo, es que NO va a enviar nunca.
+//
+// Su §8.2 prohíbe la automatización y desde finales de 2025 restringen
+// cuentas por ello; lo que detectan son extensiones que tocan el DOM.
+// Lo que se arriesga es el perfil de la persona, no el nuestro, y su
+// LinkedIn es su vida laboral entera.
+//
+// Su política sí admite extensiones que ayudan al propio usuario
+// mientras no envíen sin revisión, así que se rellena y se para. Esto
+// no es una fase: es la decisión.
+export const SOLO_RELLENA = ["linkedin"];

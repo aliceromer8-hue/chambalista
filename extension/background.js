@@ -310,7 +310,24 @@ async function correrLote({ vacantes, modo, aprobacion, respuestasPersona }) {
       item.motivo = e.message;
     }
 
-    if (modo === "automatico") {
+    // El candado de LinkedIn.
+    //
+    // Su §8.2 prohíbe la automatización y desde finales de 2025
+    // restringen cuentas por ello. Lo que se arriesga es el perfil de la
+    // persona —su vida laboral entera—, no el nuestro. Así que en modo
+    // automático LinkedIn se prepara y se PARA: queda relleno en su
+    // pantalla y el envío lo da ella.
+    //
+    // Va aquí, en el orquestador, además de en el content script: dos
+    // cierres en sitios distintos, porque a este si alguien lo quita
+    // tiene que quitarlo a propósito y no de pasada.
+    const soloRevisado = Boolean(PORTALES[item.portalId]?.soloRevisado)
+      || /linkedin/i.test(item.portal || "");
+
+    if (modo === "automatico" && soloRevisado && item.estado === "preparada") {
+      item.estado = "omitida";
+      item.motivo = "LinkedIn no permite enviar automáticamente: queda lista para que la envíes tú.";
+    } else if (modo === "automatico") {
       if (item.estado === "preparada") {
         const aprobadas = {};
         item.preguntas.forEach((q) => { if (q.texto) aprobadas[q.indice] = q.texto; });

@@ -67,8 +67,16 @@ check("los cuatro portales están registrados", LISTA_PORTALES.length === 4,
     const codigo = await fsp.readFile(new URL(`contenido/${id}.js`, BASE), "utf8");
     check(`${id} tiene el codigo de postular, no solo la marca`,
       /function botonPostular/.test(codigo) && /async function enviar/.test(codigo));
-    check(`${id} comprueba el envio por confirmacion, no por ausencia`,
-      /function confirmada/.test(codigo));
+    // Quien envia tiene que confirmar que entro. Quien NO envia —LinkedIn—
+    // no necesita confirmar nada: lo que tiene que demostrar es lo
+    // contrario, que no hay camino de envio.
+    if (LISTA_PORTALES.find((p) => p.id === id)?.soloRevisado) {
+      check(`${id} no envia, asi que no necesita confirmacion`,
+        !/function confirmada/.test(codigo));
+    } else {
+      check(`${id} comprueba el envio por confirmacion, no por ausencia`,
+        /function confirmada/.test(codigo));
+    }
     check(`${id} se protege del redirect al login`,
       /input\[type=password\]|\/login/.test(codigo));
   }
@@ -280,6 +288,40 @@ function comprobarSuelto(mod, fuente) {
   const ia = await fs3.readFile(new URL("lib/ia.js", BASE), "utf8");
   check("y ia.js ya no la declara, para no cerrar un circulo",
         !/^export const SERVIDOR =/m.test(ia));
+}
+
+
+titulo("LINKEDIN — rellena, pero no envia nunca");
+
+{
+  // No es una fase pendiente, es la decision. Su §8.2 prohibe la
+  // automatizacion y lo que se arriesga es la cuenta de la persona.
+  // Por eso hay DOS cierres en sitios distintos: si alguien quita uno,
+  // el otro sigue, y para quitar los dos hay que hacerlo a proposito.
+  const fsp = await import("node:fs/promises");
+  const li = await fsp.readFile(new URL("contenido/linkedin.js", BASE), "utf8");
+  const fondo = await fsp.readFile(new URL("background.js", BASE), "utf8");
+  const port = await fsp.readFile(new URL("lib/portales.js", BASE), "utf8");
+
+  check("el content script de LinkedIn no pulsa enviar",
+    /async function enviar\(\)[\s\S]{0,400}?enviada: false/.test(li));
+  check("y no busca ningun boton de envio",
+    !/botonEnviar|submit application|enviar solicitud/i.test(li));
+  check("LinkedIn va marcado soloRevisado", /soloRevisado: true/.test(port));
+  check("y el lote automatico lo respeta", /soloRevisado && item\.estado/.test(fondo));
+  // El bloque del candado: desde donde se calcula soloRevisado hasta el
+  // else. Se busca el ULTIMO «soloRevisado», que es el codigo; el
+  // primero esta en el comentario que lo explica.
+  const candado = fondo.slice(fondo.lastIndexOf("const soloRevisado"),
+                              fondo.lastIndexOf("const soloRevisado") + 700);
+  check("con red de seguridad por nombre, por si falta la marca",
+    /linkedin/i.test(candado));
+  check("queda anotado como omitida, no como enviada",
+    /item\.estado = "omitida"/.test(candado));
+
+  const ver = await fsp.readFile(new URL("lib/verificados.js", BASE), "utf8");
+  check("y esta en SOLO_RELLENA, no en pendiente de probar",
+    /SOLO_RELLENA/.test(ver) && /linkedin/.test(ver.split("SOLO_RELLENA")[1].split("]")[0]));
 }
 
 console.log(`\n${fallos === 0 ? "TODO OK" : `${fallos} FALLO(S)`}`);

@@ -9,13 +9,14 @@
     "scripting"
   ],
   "host_permissions": [
-    "https://chamba-lista-ali-ab09.vercel.app/*",
     "https://api.groq.com/*",
     "https://bumeran.com.pe/*",
     "https://candidato.pe.computrabajo.com/*",
+    "https://chamba-lista-ali-ab09.vercel.app/*",
     "https://generativelanguage.googleapis.com/*",
     "https://pe.computrabajo.com/*",
     "https://pe.indeed.com/*",
+    "https://smartapply.indeed.com/*",
     "https://www.bumeran.com.pe/*",
     "https://www.linkedin.com/*"
   ],
@@ -61,7 +62,8 @@
     },
     {
       "matches": [
-        "https://pe.indeed.com/*"
+        "https://pe.indeed.com/*",
+        "https://smartapply.indeed.com/*"
       ],
       "js": [
         "contenido/comun.js",

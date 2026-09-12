@@ -99,7 +99,17 @@ export const PORTALES = {
   linkedin: {
     id: "linkedin",
     nombre: "LinkedIn",
-    postulable: false,
+    // Rellena, pero NO envía. LinkedIn prohíbe la automatización en su
+    // §8.2 y desde finales de 2025 restringe cuentas por ello; lo que
+    // detectan son extensiones que tocan el DOM. Lo que se arriesga es
+    // la cuenta de la persona, no la nuestra, y su perfil de LinkedIn es
+    // su vida laboral entera.
+    //
+    // Su política sí admite extensiones que ayudan al propio usuario
+    // mientras no envíen sin revisión. Eso es lo que se hace.
+    postulable: true,
+    soloRevisado: true,
+
     // El más restrictivo de los cuatro: aquí solo se busca. Postular se
     // hace a mano en la oferta.
     base: "https://www.linkedin.com",
@@ -114,7 +124,11 @@ export const PORTALES = {
   indeed: {
     id: "indeed",
     nombre: "Indeed",
-    postulable: false,
+    // El formulario vive en smartapply.indeed.com y es de varios pasos;
+    // el manifest declara ese dominio. Ojo: muchas vacantes mandan al
+    // ATS del empleador, y esas no se pueden completar desde aquí.
+    postulable: true,
+
     base: "https://pe.indeed.com",
     acceso: "https://secure.indeed.com/auth?hl=es_PE&co=PE",
     url(termino, ciudad, pagina = 1) {
