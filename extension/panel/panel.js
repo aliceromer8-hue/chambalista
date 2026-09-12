@@ -168,8 +168,12 @@ function pintarPortada(resumen) {
     acciones.querySelectorAll("[data-portada-acceso]").forEach((b) => {
       b.addEventListener("click", async () => {
         await enviar({ accion: "abrirAcceso", portal: b.dataset.portadaAcceso });
-        avisar("Inicia sesión en la pestaña que se abrió y vuelve aquí.");
-        setTimeout(revisarSesion, 12000);
+        avisar("Inicia sesión en la pestaña que se abrió. Esto se marca solo.");
+        // Sin temporizador a ciegas: el fondo vigila esa pestaña y avisa
+        // en cuanto la sesión aparece. Mirar a los 12 segundos hacía que
+        // quien tarda más —y con verificación por correo se tarda más—
+        // volviera al panel y viera «sin conectar» después de haber
+        // entrado, sin saber si estaba roto el producto o él.
       });
     });
     return;
@@ -809,6 +813,18 @@ $("#btn-borrar-datos").addEventListener("click", async () => {
   await almacen.datosPersonales.borrar();
   await pintarCamposDatos();
   $("#estado-datos").textContent = "Borrados.";
+});
+
+// El fondo avisa en cuanto detecta la sesión en un portal. Puede llegar
+// a los diez segundos o a los tres minutos: lo que no puede es obligar a
+// la persona a adivinar cuándo mirar.
+chrome.runtime.onMessage.addListener((msg) => {
+  if (msg?.aviso !== "sesionPortal") return;
+  revisarSesion().then(() => {
+    const p = sesionesCache.find((x) => x.id === msg.portal);
+    avisar(p ? `${p.nombre}: conectado.` : "Portal conectado.");
+    pintarInicio();
+  });
 });
 
 async function revisarSesion() {

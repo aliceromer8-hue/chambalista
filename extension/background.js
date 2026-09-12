@@ -391,6 +391,48 @@ async function enviarAprobadas(ids) {
 // Mensajes del popup
 // ---------------------------------------------------------------------
 
+/**
+ * Espera a que la persona termine de iniciar sesión en un portal.
+ *
+ * Antes el panel miraba a los 12 segundos y punto. Iniciar sesión en
+ * Computrabajo con verificación por correo lleva más que eso, así que lo
+ * normal era volver al panel y ver «sin conectar» después de haber
+ * entrado — y a partir de ahí la persona ya no sabe si el producto está
+ * roto o es ella.
+ *
+ * Esto mira cada vez que esa pestaña termina de cargar, hasta cinco
+ * minutos, y avisa al panel en cuanto la sesión aparece. No navega ni
+ * toca nada: solo pregunta al content script que ya está ahí.
+ */
+function vigilarAcceso(tabId, portalId) {
+  const hasta = Date.now() + 5 * 60 * 1000;
+
+  const alCargar = async (idCargada, info) => {
+    if (idCargada !== tabId || info.status !== "complete") return;
+    if (Date.now() > hasta) return parar();
+    try {
+      const r = await chrome.tabs.sendMessage(tabId, { accion: "sesion" });
+      if (r?.sesion) {
+        parar();
+        // El panel puede estar cerrado; si nadie escucha, no pasa nada.
+        chrome.runtime.sendMessage({ aviso: "sesionPortal", portal: portalId })
+          .catch(() => {});
+      }
+    } catch { /* aún sin content script en esa pestaña */ }
+  };
+
+  const alCerrar = (idCerrada) => { if (idCerrada === tabId) parar(); };
+
+  function parar() {
+    chrome.tabs.onUpdated.removeListener(alCargar);
+    chrome.tabs.onRemoved.removeListener(alCerrar);
+  }
+
+  chrome.tabs.onUpdated.addListener(alCargar);
+  chrome.tabs.onRemoved.addListener(alCerrar);
+  setTimeout(parar, 5 * 60 * 1000);
+}
+
 chrome.runtime.onMessage.addListener((msg, _e, responder) => {
   (async () => {
     try {
@@ -459,8 +501,9 @@ chrome.runtime.onMessage.addListener((msg, _e, responder) => {
         case "abrirAcceso": {
           const p = PORTALES[msg.portal];
           if (!p) return responder({ error: "Portal desconocido." });
-          await chrome.tabs.create({ url: p.acceso || p.base, active: true });
-          return responder({ ok: true });
+          const nueva = await chrome.tabs.create({ url: p.acceso || p.base, active: true });
+          vigilarAcceso(nueva.id, msg.portal);
+          return responder({ ok: true, tabId: nueva.id });
         }
         case "abrirComputrabajo": {
           const t = await pestanaDeTrabajo();

@@ -911,14 +911,31 @@ titulo("LO QUE SE PROMETE — que no crezca solo")
 
 _pag = pathlib.Path("templates/web.html").read_text(encoding="utf-8")
 
-# Ojo: la portada SÍ puede llevar número —y lo lleva— siempre que sea el
-# que el código cumple. Lo que no puede llevar es uno inventado. Estos
-# cuatro lo estaban: «treinta» era el doble del tope real.
-for _numero in ["treinta", "30 postulaciones", "cientos", "decenas"]:
-    # Se mira solo lo que se ve, no los comentarios del código, que
-    # explican justamente por qué el número se quitó.
-    _visible = _re.sub(r"<!--.*?-->", "", _pag, flags=_re.S)
-    check(f"la portada no promete «{_numero}»", _numero not in _visible.lower())
+# Hay dos clases de número y solo una es peligrosa.
+#
+#   Lo que COMPRAS      «100 postulaciones por S/ 29» — es la cantidad de
+#                       saldo que se entrega. Verificable y legítimo.
+#   Lo que CONSEGUIRÁS  «treinta postulaciones» como promesa de resultado,
+#                       sin que nadie haya medido nunca cuántas salen.
+#
+# Lo que se vigila aquí es el segundo. Por eso se mira el argumento —el
+# titular, la bajada, el camino— y no el bloque de precios, donde el
+# número ES la especificación del producto.
+_visible = _re.sub(r"<!--.*?-->", "", _pag, flags=_re.S)
+_argumento = _visible.split('id="precios"')[0].lower()
+for _numero in ["treinta", "cientos", "decenas", "miles"]:
+    check(f"el argumento no promete «{_numero}»", _numero not in _argumento)
+
+# Y los números del bloque de precios tienen que ir pegados a un precio:
+# un número de postulaciones suelto ahí ya no sería tamaño de pack, sería
+# una promesa metida entre los planes.
+_precios = ("" if 'id="precios"' not in _visible
+            else _visible.split('id="precios"')[1].split("</section>")[0])
+_cifras = _re.findall(r"(\d+)\s+postulaciones", _precios)
+check("los números del bloque de precios son tamaños de pack",
+      all(_re.search(r"S/\s*\d+|Gratis", _precios) for _ in _cifras) and len(_cifras) >= 2,
+      f"cifras encontradas: {_cifras}")
+check("y cada plan dice su precio", _precios.count("plan-precio") == 3, _precios.count("plan-precio"))
 
 check("ni promete un tiempo que nadie cronometró",
       "desayuno" not in _re.sub(r"<!--.*?-->", "", _pag, flags=_re.S).lower())
