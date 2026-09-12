@@ -102,12 +102,12 @@ $("#procesar").addEventListener("click", async () => {
     // tiene que crear ninguna cuenta en Google para usar esto.
     const datos = new FormData();
     datos.append("cv", estado.archivo);
-    const resp = await fetch("/api/cv/procesar", { method: "POST", body: datos });
+    const resp = await conCuenta("/api/cv/procesar", { method: "POST", body: datos });
     const json = await resp.json();
     if (!resp.ok) throw new Error(json.error);
     estado.perfil = json.perfil;
 
-    const prev = await fetch("/api/cv/preview", {
+    const prev = await conCuenta("/api/cv/preview", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(estado.perfil),
@@ -151,7 +151,7 @@ $("#descargar").addEventListener("click", async () => {
   const boton = $("#descargar");
   boton.disabled = true;
   try {
-    const resp = await fetch("/api/cv/descargar", {
+    const resp = await conCuenta("/api/cv/descargar", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(estado.perfil),
@@ -188,7 +188,7 @@ async function pintarSugerencias() {
   caja.classList.add("oculto");
   caja.innerHTML = "";
   try {
-    const r = await fetch("/api/cv/sugerencias", {
+    const r = await conCuenta("/api/cv/sugerencias", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(estado.perfil),
@@ -258,7 +258,7 @@ $("#otro").addEventListener("click", () => {
 // porque son baratas y así reflejan cualquier cambio del formato.
 async function repintarResultado() {
   try {
-    const prev = await fetch("/api/cv/preview", {
+    const prev = await conCuenta("/api/cv/preview", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(estado.perfil),
@@ -336,9 +336,11 @@ function animarRuta() {
   }, 2000);
 }
 
-pintarPrivacidadIA();
-animarRuta();
-restaurarTrabajo();
+// El arranque va al FINAL del fichero, después de la sección de cuenta.
+// Aquí arriba `restaurarTrabajo()` llamaría a `sesion()`, que lee la
+// constante SESION declarada más abajo: con `const` eso no es «undefined»
+// sino un ReferenceError que corta el script entero y deja la página
+// muerta sin decir nada.
 
 // ---------- cuenta ----------
 // Convertir el CV NO pide cuenta: es el gancho y tiene que seguir sin
@@ -658,3 +660,12 @@ No se puede deshacer y no guardamos copia. ¿Seguimos?`);
     await bajarPerfil();
   } catch { /* sin red: se deja como está */ }
 })();
+
+
+// ---------------------------------------------------------------------
+// Arranque
+// ---------------------------------------------------------------------
+// Lo último del fichero, a propósito: para entonces todo está declarado.
+pintarPrivacidadIA();
+animarRuta();
+restaurarTrabajo();

@@ -1,15 +1,22 @@
 // Content script de Indeed: solo lectura del listado.
 //
-// Indeed sí mantiene atributos estables (`data-testid`, `data-jk`), así
-// que aquí los selectores son directos. Lo único que cambió respecto a
-// lo que se suele documentar: `h2.jobTitle` ya no existe; el título vive
-// en un elemento con id que empieza por `jobTitle`.
-// Verificado contra el sitio real: 16 de 16 ofertas extraídas completas.
+// Indeed mantiene atributos estables (`data-testid`, `data-jk`), así que
+// los selectores son directos. Lo que NO es estable es dónde pone el
+// título: ya no está en `h2.jobTitle` ni en `[id^=jobTitle]` —ambos
+// dejaron de existir— sino dentro del propio enlace de la tarjeta.
+//
+// Comprobado en el sitio real el 2026-09-12, con sesión: 16 tarjetas, 16
+// con identificador, y el título saliendo VACÍO con los selectores que
+// había. Una tarjeta sin título es una vacante que no se puede enseñar
+// ni buscar, así que el portal aportaba dieciséis filas en blanco.
 
 (() => {
   const SEL = {
     oferta: "div.job_seen_beacon",
-    titulo: "[id^='jobTitle'], h2 a span[title], h2 span",
+    // El orden importa: lo primero que encaje gana. `a[data-jk] span[title]`
+    // es lo que funciona hoy; los otros dos quedan detrás por si Indeed
+    // vuelve atrás, y no estorban.
+    titulo: "a[data-jk] span[title], a[data-jk], [id^='jobTitle']",
     empresa: "[data-testid='company-name']",
     ubicacion: "[data-testid='text-location']",
     fecha: "[data-testid='myJobsStateDate'], .date",

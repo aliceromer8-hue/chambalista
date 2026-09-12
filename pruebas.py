@@ -1200,5 +1200,32 @@ check("los saltos miden lo que cuesta la puerta",
 check("y si la gente llega de verdad a postular",
       "pct_llegan_a_postular" in _vistas)
 
+# ---------------------------------------------------------------------
+titulo("LA WEB MANDA EL TOKEN — el fallo que bloqueó a Ali")
+# ---------------------------------------------------------------------
+# Ali, con sesión iniciada, subía su CV y recibía «Inicia sesión para
+# continuar». Al cerrar las rutas del CV detrás de la sesión se arregló
+# la extensión y NO la web: web.js las llamaba con fetch pelado, sin
+# cabecera, así que el servidor no veía sesión y devolvía 401 a quien
+# acababa de entrar. El producto entero quedaba inservible.
+
+_js_web = pathlib.Path("static/js/web.js").read_text(encoding="utf-8")
+_sueltas = _re.findall(r'fetch\("(/api/(?:cv|nube|ia)/[^"]*)"', _js_web)
+check("ninguna ruta con sesión se llama sin token",
+      not _sueltas, f"llamadas sueltas: {_sueltas}")
+check("y todas las del CV pasan por conCuenta",
+      len(_re.findall(r'conCuenta\("/api/cv/', _js_web)) >= 4,
+      str(len(_re.findall(r'conCuenta\("/api/cv/', _js_web))))
+
+# El arranque no puede ir antes de lo que usa. `restaurarTrabajo()` llama
+# a `sesion()`, que lee una const declarada más abajo: eso no es
+# «undefined», es un ReferenceError que mata el script y deja la página
+# muerta sin un solo mensaje.
+_pos_arranque = _js_web.rindex("restaurarTrabajo();")
+_pos_sesion = _js_web.index("const SESION")
+check("el arranque va después de declarar la sesión",
+      _pos_arranque > _pos_sesion,
+      f"arranque en {_pos_arranque}, SESION en {_pos_sesion}")
+
 print(f"\n{'TODO OK' if fallos == 0 else f'{fallos} FALLO(S)'}")
 sys.exit(1 if fallos else 0)

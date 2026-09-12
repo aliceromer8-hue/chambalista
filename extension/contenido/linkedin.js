@@ -25,9 +25,20 @@
   }
 
   function leerOfertas() {
+    // Filtrar por el ENLACE a la oferta, no solo por el atributo.
+    //
+    // `[data-job-id]` lo lleva también el panel de detalle y varios
+    // contenedores que no son tarjetas. Comprobado en el sitio real el
+    // 2026-09-12, con sesión iniciada: el selector devolvía 32 elementos
+    // y solo 14 eran ofertas. Los otros 18 entraban sin título y sin
+    // URL, o sea dieciocho filas vacías en la lista de resultados que
+    // además desplazaban a las buenas.
+    //
+    // Una oferta de verdad siempre tiene su enlace a /jobs/view/. Es la
+    // misma regla que en Bumeran, donde se filtra por el <h2>.
     const tarjetas = [...document.querySelectorAll(
       "[data-occludable-job-id], [data-job-id], li.jobs-search-results__list-item",
-    )];
+    )].filter((c) => c.querySelector("a[href*='/jobs/view/']"));
 
     return tarjetas.map((c) => {
       const id = c.getAttribute("data-occludable-job-id") || c.getAttribute("data-job-id") || "";
