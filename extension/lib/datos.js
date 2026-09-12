@@ -58,7 +58,13 @@ export const CAMPOS = [
   {
     clave: "disponibilidadInicio",
     etiqueta: "Disponibilidad para empezar",
-    ayuda: "Por ejemplo: inmediata, 15 días.",
+    ayuda: "Elige una, o pon la fecha exacta.",
+    // Escribiendo a mano cada quien ponía una cosa: «ya», «cuando sea»,
+    // «a partir del 3». Con opciones se responde de un toque y además
+    // sale escrito igual siempre, que es lo que lee la empresa.
+    tipo: "opciones",
+    opciones: ["Inmediata", "En 15 días", "En 30 días", "A partir de una fecha"],
+    conFecha: "A partir de una fecha",
     patron: /disponibilidad para (empezar|iniciar)|cu[aá]ndo puedes empezar|desde cu[aá]ndo/i,
     validar: /^.{3,60}$/,
     error: "Describe tu disponibilidad.",
@@ -67,18 +73,29 @@ export const CAMPOS = [
   },
   {
     clave: "redes",
-    etiqueta: "Usuario de Instagram / TikTok",
-    ayuda: "Con arroba. Lo piden en marketing y comunicaciones.",
+    etiqueta: "Red social",
+    ayuda: "La que te pidan. Lo preguntan en marketing y comunicaciones.",
+    // Antes era un solo campo de texto donde había que acordarse de
+    // poner de qué red era. Ahora se elige la red y solo se escribe el
+    // usuario: queda «Instagram: @alice», que es lo que espera leer
+    // quien lo pide.
+    tipo: "red",
+    opciones: ["Instagram", "TikTok", "LinkedIn", "Facebook", "X", "Behance", "Portafolio web"],
     patron: /instagram|tiktok|tik tok|facebook|red social|usuario de/i,
-    validar: /^.{2,60}$/,
-    error: "Escribe tu usuario.",
+    validar: /^.{2,80}$/,
+    error: "Elige la red y escribe tu usuario.",
     sensible: false,
     plantilla: (v) => `Mi usuario es ${v}.`,
   },
   {
     clave: "licencia",
     etiqueta: "Licencia de conducir",
-    ayuda: "Por ejemplo: A-I, o «no tengo».",
+    ayuda: "Las categorías peruanas, tal cual las pide el portal.",
+    tipo: "opciones",
+    // Categorías del reglamento peruano. A-I es la de coche particular
+    // y es la que piden casi siempre; las AII y AIII son de transporte.
+    opciones: ["No tengo", "A-I", "A-IIa", "A-IIb", "A-IIIa", "A-IIIb", "A-IIIc",
+               "B-I", "B-IIa", "B-IIb", "B-IIc"],
     patron: /licencia de conducir|brevete/i,
     validar: /^.{2,40}$/,
     error: "Indica la categoría o «no tengo».",
@@ -88,7 +105,9 @@ export const CAMPOS = [
   {
     clave: "movilidad",
     etiqueta: "¿Movilidad propia?",
-    ayuda: "Sí o no.",
+    ayuda: "Un toque.",
+    tipo: "opciones",
+    opciones: ["Sí", "No"],
     patron: /movilidad propia|veh[ií]culo propio|auto propio/i,
     validar: /^.{2,40}$/,
     error: "Responde sí o no.",

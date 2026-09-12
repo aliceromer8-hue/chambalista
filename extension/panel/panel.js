@@ -27,6 +27,13 @@ const estado = {
 // «Iniciar sesión»; el resto de la interfaz lo lee de aquí.
 let sesionesCache = [];
 
+// Portales en los que la persona acaba de pulsar «Iniciar sesión» y
+// todavía no hemos visto la sesión. Sin esto, pulsaba, se iba a la
+// pestaña del portal, entraba, volvía al panel y seguía viendo el punto
+// rojo un rato — sin saber si el producto estaba roto o ella iba lenta.
+// Un «conectando…» que no miente no cuesta nada y quita esa duda.
+const conectando = new Set();
+
 /**
  * Consola de actividad: la máquina cuenta lo que va haciendo.
  *
@@ -209,18 +216,23 @@ function pintarPortada(resumen) {
     acciones.innerHTML = `<div class="portales-portada" style="width:100%">${
       sesionesCache.map((p) => `
         <div class="portal-tarjeta">
-          <span class="marca-punto ${p.sesion ? "si" : "no"}"></span>
+          <span class="marca-punto ${p.sesion ? "si" : conectando.has(p.id) ? "esperando" : "no"}"></span>
           <span>${escapar(p.nombre)}
             <span class="portal-chip" style="margin-left:5px">${p.postulable ? "postula" : "solo busca"}</span>
+            ${conectando.has(p.id) && !p.sesion
+              ? `<span class="nota conectando">conectando… entra en la pestaña que se abrió</span>` : ""}
           </span>
           <button class="boton chico" data-portada-acceso="${p.id}">
-            ${p.sesion ? "Abrir" : "Iniciar sesión"}
+            ${p.sesion ? "Abrir" : conectando.has(p.id) ? "Reintentar" : "Iniciar sesión"}
           </button>
         </div>`).join("")
     }</div>`;
     acciones.querySelectorAll("[data-portada-acceso]").forEach((b) => {
       b.addEventListener("click", async () => {
-        await enviar({ accion: "abrirAcceso", portal: b.dataset.portadaAcceso });
+        const cual = b.dataset.portadaAcceso;
+        conectando.add(cual);
+        pintarInicio();                       // el punto pasa a ámbar ya
+        await enviar({ accion: "abrirAcceso", portal: cual });
         avisar("Inicia sesión en la pestaña que se abrió. Esto se marca solo.");
         // Sin temporizador a ciegas: el fondo vigila esa pestaña y avisa
         // en cuanto la sesión aparece. Mirar a los 12 segundos hacía que
@@ -772,11 +784,17 @@ $("#archivo-cv").addEventListener("change", async (e) => {
     const fd = new FormData();
     fd.append("cv", f);
     const clave = await almacen.claveIA.obtener();
-    const r = await fetch(`${ia.SERVIDOR}/api/cv/procesar`, {
+    // Por conCuenta: /api/cv/procesar pide sesión. Con fetch pelado el
+    // servidor no ve token y responde «Inicia sesión para continuar» a
+    // quien ya entró, que es exactamente lo que le pasaba a Ali.
+    const r = await sesion.conCuenta("/api/cv/procesar", {
       method: "POST", body: fd, headers: clave ? { "X-IA-Key": clave } : {},
     });
-    const j = await r.json();
-    if (!r.ok) throw new Error(j.error);
+    const j = await r.json().catch(() => ({}));
+    if (r.status === 401) {
+      throw new Error("Tu sesión de Chamba Lista caducó. Vuelve a entrar arriba.");
+    }
+    if (!r.ok) throw new Error(j.error || `El servidor respondió ${r.status}`);
     estado.perfil = j.perfil;
     await almacen.perfil.guardar(j.perfil);
     pintarPerfil();
@@ -834,20 +852,94 @@ async function pintarCuota() {
     : `Sin usos gratis por ahora${c.se_renueva_en_minutos ? `, se renuevan en ${c.se_renueva_en_minutos} min` : ""}.`;
 }
 
+/**
+ * Los campos de datos personales, cada uno con el control que le toca.
+ *
+ * Escribir es el enemigo. Un desplegable se contesta de un toque, no se
+ * escribe mal y sale redactado igual siempre — que es lo que acaba
+ * leyendo la empresa. Lo que se GUARDA sigue siendo una cadena de texto,
+ * así que las plantillas y las respuestas no se enteran de nada.
+ */
 async function pintarCamposDatos() {
   const guardados = await almacen.datosPersonales.obtener();
-  $("#campos-datos").innerHTML = datos.CAMPOS.map((c) =>
-    `<div class="campo-dato"><label>${escapar(c.etiqueta)}` +
-    (c.sensible ? `<span class="sensible">sensible</span>` : "") +
-    `<span class="ayuda"> ${escapar(c.ayuda)}</span></label>` +
-    `<input type="text" data-clave="${c.clave}" value="${escapar(guardados[c.clave] || "")}" placeholder="Opcional"></div>`,
-  ).join("");
+  $("#campos-datos").innerHTML = datos.CAMPOS.map((c) => {
+    const v = guardados[c.clave] || "";
+    const cabecera = `<label>${escapar(c.etiqueta)}`
+      + (c.sensible ? `<span class="sensible">sensible</span>` : "")
+      + `<span class="ayuda"> ${escapar(c.ayuda)}</span></label>`;
+
+    if (c.tipo === "opciones") {
+      // «A partir de una fecha» abre un selector de fecha de verdad, que
+      // es lo que pedía Ali: una fecha no se escribe, se elige.
+      const enLista = c.opciones.includes(v);
+      const fecha = !enLista && /^\d{4}-\d{2}-\d{2}$/.test(v) ? v : "";
+      const elegida = fecha ? c.conFecha : v;
+      return `<div class="campo-dato">${cabecera}
+        <select data-clave="${c.clave}" data-tipo="opciones">
+          <option value="">Sin responder</option>
+          ${c.opciones.map((o) =>
+            `<option value="${escapar(o)}"${o === elegida ? " selected" : ""}>${escapar(o)}</option>`).join("")}
+        </select>
+        ${c.conFecha ? `<input type="date" class="fecha-extra ${fecha ? "" : "oculto"}"
+           data-fecha-de="${c.clave}" value="${escapar(fecha)}">` : ""}
+      </div>`;
+    }
+
+    if (c.tipo === "red") {
+      // Guardado como «Instagram: @alice». Se parte para reeditarlo.
+      const corte = v.indexOf(":");
+      const red = corte > 0 ? v.slice(0, corte).trim() : c.opciones[0];
+      const usuario = corte > 0 ? v.slice(corte + 1).trim() : v;
+      return `<div class="campo-dato">${cabecera}
+        <div class="par-red">
+          <select data-red-de="${c.clave}">
+            ${c.opciones.map((o) =>
+              `<option value="${escapar(o)}"${o === red ? " selected" : ""}>${escapar(o)}</option>`).join("")}
+          </select>
+          <input type="text" data-usuario-de="${c.clave}" value="${escapar(usuario)}"
+                 placeholder="@tuusuario">
+        </div>
+      </div>`;
+    }
+
+    return `<div class="campo-dato">${cabecera}
+      <input type="text" data-clave="${c.clave}" value="${escapar(v)}" placeholder="Opcional"></div>`;
+  }).join("");
+
+  // El selector de fecha aparece solo cuando toca.
+  $("#campos-datos").querySelectorAll("select[data-tipo=opciones]").forEach((sel) => {
+    sel.addEventListener("change", () => {
+      const campo = datos.CAMPOS.find((c) => c.clave === sel.dataset.clave);
+      const fecha = $("#campos-datos").querySelector(`[data-fecha-de="${sel.dataset.clave}"]`);
+      if (campo?.conFecha && fecha) fecha.classList.toggle("oculto", sel.value !== campo.conFecha);
+    });
+  });
 }
 
 $("#btn-guardar-datos").addEventListener("click", async () => {
+  // Se recoge de los tres tipos de control y todo sale como cadena, que
+  // es lo que espera `datos.validar` y todo lo que hay debajo.
   const crudo = {};
-  document.querySelectorAll("#campos-datos input").forEach((i) => {
+  const zona = $("#campos-datos");
+
+  zona.querySelectorAll("input[data-clave]").forEach((i) => {
     if (i.value.trim()) crudo[i.dataset.clave] = i.value.trim();
+  });
+
+  zona.querySelectorAll("select[data-clave]").forEach((sel) => {
+    if (!sel.value) return;
+    const campo = datos.CAMPOS.find((c) => c.clave === sel.dataset.clave);
+    const fecha = zona.querySelector(`[data-fecha-de="${sel.dataset.clave}"]`);
+    // Si eligió «a partir de una fecha», lo que vale es la fecha.
+    crudo[sel.dataset.clave] = (campo?.conFecha && sel.value === campo.conFecha && fecha?.value)
+      ? fecha.value
+      : sel.value;
+  });
+
+  zona.querySelectorAll("select[data-red-de]").forEach((sel) => {
+    const usuario = zona.querySelector(`[data-usuario-de="${sel.dataset.redDe}"]`);
+    const escrito = (usuario?.value || "").trim();
+    if (escrito) crudo[sel.dataset.redDe] = `${sel.value}: ${escrito}`;
   });
   const { limpio, errores } = datos.validar(crudo);
   if (Object.keys(errores).length) {
@@ -873,9 +965,10 @@ $("#btn-borrar-datos").addEventListener("click", async () => {
 // la persona a adivinar cuándo mirar.
 chrome.runtime.onMessage.addListener((msg) => {
   if (msg?.aviso !== "sesionPortal") return;
+  conectando.delete(msg.portal);
   revisarSesion().then(() => {
     const p = sesionesCache.find((x) => x.id === msg.portal);
-    avisar(p ? `${p.nombre}: conectado.` : "Portal conectado.");
+    avisar(p ? `${p.nombre}: conectado.` : "Portal conectado.", "bien");
     pintarInicio();
   });
 });
@@ -971,3 +1064,19 @@ async function pintarTope() {
     sello.closest(".sello")?.remove();
   }
 }
+
+
+// Al volver al panel se vuelve a comprobar las sesiones.
+//
+// El fondo avisa cuando ve la sesión, pero el panel puede estar cerrado
+// en ese momento —lo normal es que la persona se vaya a la pestaña del
+// portal— y ese aviso se pierde. Esto es la red: al volver a mirar el
+// panel, se mira de nuevo. Sin esto, quien cierra el panel mientras
+// entra al portal vuelve y lo ve igual de desconectado que antes.
+document.addEventListener("visibilitychange", () => {
+  if (document.visibilityState !== "visible") return;
+  revisarSesion().then(() => {
+    for (const p of sesionesCache) if (p.sesion) conectando.delete(p.id);
+    pintarInicio();
+  });
+});

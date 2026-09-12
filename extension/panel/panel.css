@@ -726,3 +726,26 @@ main { max-width: 1120px; }
   background: var(--coral-suave); border: 2px solid var(--coral);
   border-radius: var(--r-chico); color: var(--tinta);
 }
+
+
+/* Punto ámbar mientras se espera la sesión de un portal. Ni verde —que
+ * seria mentira— ni rojo —que parece averia—: esperando. */
+.marca-punto.esperando { background: #F2B705; animation: latir 1.4s ease-in-out infinite; }
+@keyframes latir { 0%, 100% { opacity: 1; } 50% { opacity: .35; } }
+@media (prefers-reduced-motion: reduce) { .marca-punto.esperando { animation: none; } }
+.nota.conectando { display: block; font-size: 11.5px; color: var(--tinta-2); margin-top: 2px; }
+
+
+/* Controles de los datos personales. Un desplegable se contesta de un
+ * toque; un campo de texto hay que pensarlo y escribirlo bien. */
+.campo-dato select,
+.campo-dato input[type="date"] {
+  width: 100%; padding: 9px 11px; margin-top: 4px;
+  border: 2px solid var(--linea); border-radius: var(--r-chico);
+  font: inherit; font-size: 13.5px; background: var(--papel); color: var(--tinta);
+}
+.campo-dato select:focus,
+.campo-dato input[type="date"]:focus { outline: none; box-shadow: var(--dura-chica); }
+.fecha-extra { margin-top: 6px; }
+.par-red { display: grid; grid-template-columns: 42% 1fr; gap: 7px; margin-top: 4px; }
+.par-red select, .par-red input { margin-top: 0; }

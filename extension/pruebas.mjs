@@ -351,5 +351,43 @@ titulo("EL PANEL SABE ENTRAR — faltaba y nada lo avisaba");
     /acceso-error/.test(pjs));
 }
 
+
+titulo("MENOS ESCRIBIR — elegir en vez de teclear");
+
+{
+  // Ali: «nuestra plataforma soluciona mucho el mundo de la pereza».
+  // Cada campo de texto libre es una excusa para abandonar, y ademas
+  // cada quien escribia una cosa distinta: «ya», «cuando sea», «a partir
+  // del 3». Con opciones sale redactado igual siempre.
+  const fsp = await import("node:fs/promises");
+  const pjs = await fsp.readFile(new URL("panel/panel.js", BASE), "utf8");
+  const conTipo = datos.CAMPOS.filter((c) => c.tipo);
+
+  check("hay campos que se eligen, no se escriben", conTipo.length >= 4,
+    conTipo.map((c) => c.clave).join(", "));
+  for (const clave of ["disponibilidadInicio", "licencia", "movilidad", "redes"]) {
+    const c = datos.CAMPOS.find((x) => x.clave === clave);
+    check(`${clave} ya no es texto libre`, Boolean(c && c.tipo), c ? c.tipo : "no existe");
+  }
+
+  const disp = datos.CAMPOS.find((c) => c.clave === "disponibilidadInicio");
+  check("disponibilidad ofrece fecha de verdad", Boolean(disp.conFecha));
+  check("y el panel pinta un selector de fecha", /type="date"/.test(pjs));
+
+  const lic = datos.CAMPOS.find((c) => c.clave === "licencia");
+  check("licencia trae las categorias peruanas",
+    lic.opciones.includes("A-I") && lic.opciones.includes("No tengo"),
+    lic.opciones.slice(0, 4).join(", "));
+
+  const red = datos.CAMPOS.find((c) => c.clave === "redes");
+  check("la red social se elige de una lista", red.tipo === "red" && red.opciones.length >= 4);
+  check("y se guarda diciendo de que red es", /\$\{sel\.value\}: \$\{escrito\}/.test(pjs));
+
+  // Lo guardado sigue siendo texto: nada de lo que hay debajo se entera.
+  for (const c of conTipo) {
+    check(`${c.clave} sigue validando como texto`, c.validar instanceof RegExp);
+  }
+}
+
 console.log(`\n${fallos === 0 ? "TODO OK" : `${fallos} FALLO(S)`}`);
 process.exit(fallos ? 1 : 0);
