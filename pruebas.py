@@ -1033,18 +1033,35 @@ check("y el background lo publica para que el panel lo lea",
 # sea el que el código cumple. Antes decía «treinta» y el tope eran 15:
 # el doble. Estas dos comprobaciones son las que impiden que se separen
 # otra vez, en la web y en el panel.
-_EN_LETRA = {10: "diez", 12: "doce", 15: "quince", 20: "veinte",
-             25: "veinticinco", 30: "treinta", 40: "cuarenta", 50: "cincuenta"}
-_esperado = _EN_LETRA.get(_tope)
-check("el tope se sabe escribir en letra", bool(_esperado), str(_tope))
+# El titular lleva número, y tiene que ser uno que se cumpla. Pero el
+# número correcto NO es TOPE_POR_TANDA: eso es cuántas manda de una
+# tanda, y nadie compra tandas. Lo que se compra es el pack.
+#
+# «Cien postulaciones. Un clic cada una.» es verdad por las dos mitades:
+# cien es el pack mayor, y cada envío lo da la persona. Lo que no se
+# puede decir es «un clic, cien postulaciones» de golpe — eso sí sería un
+# número que el código desmiente, porque manda quince por tanda.
+_verif2 = pathlib.Path("extension/lib/verificados.js").read_text(encoding="utf-8")
+_pack_mayor = int(_re.search(r"PACK_MAYOR = (\d+)", _verif2).group(1))
+_EN_LETRA = {5: "cinco", 15: "quince", 30: "treinta", 50: "cincuenta", 100: "cien"}
+_esperado = _EN_LETRA.get(_pack_mayor)
+check("el pack mayor se sabe escribir en letra", bool(_esperado), str(_pack_mayor))
+
+_visible_web = _re.sub(r"<!--.*?-->", "", BASE_HTML, flags=_re.S).lower()
+_visible_panel = _re.sub(r"<!--.*?-->", "", _panel, flags=_re.S).lower()
 if _esperado:
-    _visible_web = _re.sub(r"<!--.*?-->", "", BASE_HTML, flags=_re.S).lower()
-    check("el titular de la web dice el número que el código cumple",
-          _esperado in _visible_web, f"el código dice {_tope}")
-    check("y el del panel dice el mismo",
-          _esperado in _re.sub(r"<!--.*?-->", "", _panel, flags=_re.S).lower())
-    check("sin que se cuele el número viejo en ninguno",
-          "treinta" not in _visible_web or _esperado == "treinta")
+    check("el titular de la web dice el tamaño del pack mayor",
+          _esperado in _visible_web, f"el pack mayor es {_pack_mayor}")
+    check("y el del panel dice el mismo", _esperado in _visible_panel)
+
+# El pack mayor del código y el que anuncia la landing son el mismo.
+check("el precio anunciado corresponde a ese pack",
+      f"{_pack_mayor} postulaciones" in _visible_web, f"{_pack_mayor} postulaciones")
+
+# Y el titular no puede prometer que van todas de un clic.
+for _falso in ["un clic. cien postulaciones", "un clic, cien postulaciones",
+               f"un clic. {_pack_mayor}", "cien postulaciones de un clic"]:
+    check(f"no promete «{_falso}»", _falso not in _visible_web)
 
 # ---------------------------------------------------------------------
 titulo("EL ARCHIVO QUE RECIBE LA EMPRESA")

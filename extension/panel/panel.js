@@ -155,7 +155,7 @@ function pintarPortada(resumen) {
   $("#arranque").classList.add("oculto");
 
   if (etapa === 0) {
-    $("#portada-titulo").innerHTML = "Un clic.<br>Quince postulaciones.";
+    $("#portada-titulo").innerHTML = "Cien postulaciones.<br>Un clic cada una.";
     $("#portada-bajada").textContent =
       "Entra con tu cuenta de Chamba Lista para empezar. Es la misma de la web.";
     acciones.innerHTML = `

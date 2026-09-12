@@ -29,3 +29,22 @@ export const POSTULACION_SIN_PROBAR = ["bumeran", "indeed"];
 // mientras no envíen sin revisión, así que se rellena y se para. Esto
 // no es una fase: es la decisión.
 export const SOLO_RELLENA = ["linkedin"];
+
+
+// Los packs que se venden. El titular de la portada sale de aquí.
+//
+// Antes decía «Quince postulaciones», que es TOPE_POR_TANDA: cuántas
+// manda de una tanda. Pero eso no es lo que nadie compra, y Ali lo vio:
+// ninguno de los planes dice quince. Lo que se compra son cien.
+//
+// «Cien postulaciones. Un clic cada una.» es verdad por las dos mitades:
+// cien es el pack, y cada una se envía con un clic suyo. Lo que NO se
+// puede decir es «un clic, cien postulaciones» de golpe, porque el
+// sistema manda quince por tanda y eso seguiría siendo un número que el
+// código desmiente.
+export const PACKS = [
+  { postulaciones: 5, soles: 0, nombre: "Para probar" },
+  { postulaciones: 30, soles: 15, nombre: "Pack chico" },
+  { postulaciones: 100, soles: 29, nombre: "Recomendado" },
+];
+export const PACK_MAYOR = 100;

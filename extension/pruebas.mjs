@@ -429,5 +429,47 @@ titulo("SIN COLETILLAS QUE NO SIGNIFICAN NADA");
     /caduc/i.test(pjs));
 }
 
+
+titulo("CONTRASTE — un fondo fijo obliga a colores fijos encima");
+
+{
+  // «Subir mi CV y empezar sale en negro, no se ve nada». La portada es
+  // SIEMPRE lima y el boton principal tambien era lima: 1.0:1, o sea
+  // invisible. Y en modo oscuro var(--tinta) es casi blanca, asi que el
+  // texto salia a 1.1:1 sobre lima.
+  //
+  // Esto calcula el contraste de verdad con la formula de WCAG, en vez
+  // de fiarse de que la regla «parece» correcta.
+  const fsp = await import("node:fs/promises");
+  const css = await fsp.readFile(new URL("panel/panel.css", BASE), "utf8");
+
+  const hex = (h) => h.replace("#", "").match(/../g).map((x) => parseInt(x, 16));
+  const lum = (h) => {
+    const [r, g, b] = hex(h).map((v) => {
+      v /= 255; return v <= 0.03928 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4);
+    });
+    return 0.2126 * r + 0.7152 * g + 0.0722 * b;
+  };
+  const contraste = (a, b) => {
+    const [l1, l2] = [lum(a), lum(b)];
+    return (Math.max(l1, l2) + 0.05) / (Math.min(l1, l2) + 0.05);
+  };
+
+  const LIMA = "#D4F249";
+  const regla = css.match(/\.portada \.boton\.primario \{([^}]*)\}/);
+  check("hay una regla para el boton principal dentro de la portada", Boolean(regla));
+  if (regla) {
+    const fondo = (regla[1].match(/background:\s*(#[0-9A-Fa-f]{6})/) || [])[1];
+    check("su fondo es un color fijo, no una variable de tema", Boolean(fondo),
+      regla[1].trim().slice(0, 60));
+    if (fondo) {
+      const r = contraste(fondo, LIMA);
+      check("y se recorta contra el lima de la portada", r >= 4.5, `${r.toFixed(1)}:1`);
+    }
+  }
+  check("el texto de la portada tambien lleva tinta fija",
+    /\.portada,[\s\S]{0,200}color: #131316/.test(css));
+}
+
 console.log(`\n${fallos === 0 ? "TODO OK" : `${fallos} FALLO(S)`}`);
 process.exit(fallos ? 1 : 0);
