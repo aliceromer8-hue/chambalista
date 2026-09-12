@@ -8,6 +8,7 @@ import * as almacen from "../lib/almacen.js";
 import * as datos from "../lib/datos.js";
 import * as ia from "../lib/ia.js";
 import * as coincidencia from "../lib/coincidencia.js";
+import * as sesion from "../lib/sesion.js";
 
 const $ = (s) => document.querySelector(s);
 const enviar = (msg) => chrome.runtime.sendMessage(msg);
@@ -15,6 +16,9 @@ const escapar = (t) => String(t ?? "").replace(/[&<>"']/g,
   (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 
 const estado = {
+  // ¿Hay sesión de Chamba Lista? Sin ella, el CV adaptado, la IA y la
+  // medición devuelven 401 y el panel no podría explicar por qué.
+  conCuenta: false,
   perfil: null, vacantes: [], vacanteAbierta: null, reporte: null,
   respuestasPersona: {}, aprobacion: {},
 };
@@ -117,9 +121,17 @@ async function pintarInicio() {
  * se comporta como una landing cuando es nueva —una sola cosa que hacer,
  * el resto atenuado— y se convierte en tablero cuando ya está lista.
  *
+ * 0. Sin cuenta    → entrar. Es lo primero porque sin sesión el CV
+ *                    adaptado, la IA y la medición devuelven 401, y la
+ *                    persona lo ve como «no funciona» sin más pista.
  * 1. Sin CV        → titular grande y un único botón: cargar el CV.
- * 2. Con CV        → elegir dónde buscar e iniciar sesión.
+ * 2. Con CV        → elegir dónde buscar e iniciar sesión en los portales.
  * 3. Todo listo    → la portada se encoge a una franja y manda el tablero.
+ *
+ * La etapa 0 faltaba. sesion.js tenía `entrar` y `hayCuenta` desde que se
+ * añadieron las cuentas, pero el panel no los llamaba nunca: no había
+ * ningún sitio donde iniciar sesión. Todo lo que necesita cuenta fallaba
+ * en silencio y el panel seguía enseñando la portada como si nada.
  */
 function pintarPortada(resumen) {
   const portada = $("#portada");
@@ -127,13 +139,54 @@ function pintarPortada(resumen) {
   const tablero = $("#tablero");
   const conectados = sesionesCache.filter((p) => p.sesion === true);
 
-  const etapa = !estado.perfil ? 1 : !conectados.length ? 2 : 3;
+  const etapa = !estado.conCuenta ? 0 : !estado.perfil ? 1 : !conectados.length ? 2 : 3;
 
   portada.classList.toggle("compacta", etapa === 3);
   // La promesa solo hace falta mientras no la haya comprobado.
   $("#hace").classList.toggle("oculto", etapa === 3 && resumen.total > 0);
   tablero.classList.toggle("esperando", etapa !== 3);
   $("#arranque").classList.add("oculto");
+
+  if (etapa === 0) {
+    $("#portada-titulo").innerHTML = "Un clic.<br>Quince postulaciones.";
+    $("#portada-bajada").textContent =
+      "Entra con tu cuenta de Chamba Lista para empezar. Es la misma de la web.";
+    acciones.innerHTML = `
+      <form class="acceso-panel" id="form-acceso" style="width:100%">
+        <input type="email" id="acceso-correo" placeholder="tu@correo.com"
+               autocomplete="email" required>
+        <input type="password" id="acceso-clave" placeholder="tu contraseña"
+               autocomplete="current-password" required minlength="8">
+        <p class="nota aviso-acceso oculto" id="acceso-error"></p>
+        <button class="boton primario" type="submit" id="acceso-enviar">Entrar</button>
+        <button class="enlace" type="button" id="acceso-crear">No tengo cuenta todavía</button>
+      </form>`;
+
+    $("#acceso-crear").addEventListener("click", () => {
+      chrome.tabs.create({ url: sesion.URL_CUENTA, active: true });
+      avisar("Crea tu cuenta en la web y vuelve aquí a entrar.");
+    });
+
+    $("#form-acceso").addEventListener("submit", async (ev) => {
+      ev.preventDefault();
+      const boton = $("#acceso-enviar");
+      const error = $("#acceso-error");
+      boton.disabled = true;
+      error.classList.add("oculto");
+      const r = await sesion.entrar($("#acceso-correo").value.trim(),
+                                    $("#acceso-clave").value);
+      boton.disabled = false;
+      if (r.error) {
+        error.textContent = r.error;
+        error.classList.remove("oculto");
+        return;
+      }
+      estado.conCuenta = true;
+      avisar(`Hola, ${r.usuario?.correo || "de nuevo"}.`);
+      await pintarInicio();
+    });
+    return;
+  }
 
   if (etapa === 1) {
     $("#portada-titulo").innerHTML = "Un clic.<br>Quince postulaciones.";
@@ -887,6 +940,12 @@ function pintarPortales() {
   await pintarCamposDatos();
   // Las sesiones primero: la etapa de la portada depende de ellas y si
   // no, se pinta la etapa equivocada durante un instante.
+  // Lo primero: ¿hay cuenta? La portada entera depende de ello.
+  estado.conCuenta = await sesion.hayCuenta();
+  if (estado.conCuenta && !(await sesion.verificar())) {
+    // Token muerto: mejor pedir la contraseña que fallar en cada botón.
+    estado.conCuenta = false;
+  }
   await revisarSesion();
   await pintarInicio();
   pintarCuota();

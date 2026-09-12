@@ -324,5 +324,32 @@ titulo("LINKEDIN — rellena, pero no envia nunca");
     /SOLO_RELLENA/.test(ver) && /linkedin/.test(ver.split("SOLO_RELLENA")[1].split("]")[0]));
 }
 
+
+titulo("EL PANEL SABE ENTRAR — faltaba y nada lo avisaba");
+
+{
+  // sesion.js tenia `entrar` y `hayCuenta` desde que existen las cuentas,
+  // pero el panel no los llamaba: no habia ningun sitio donde iniciar
+  // sesion. Resultado: el CV adaptado daba 401, la IA daba 401 y la
+  // medicion no anotaba nada — todo en silencio, porque esos errores
+  // estan escritos para no tumbar la postulacion.
+  const fsp = await import("node:fs/promises");
+  const pjs = await fsp.readFile(new URL("panel/panel.js", BASE), "utf8");
+
+  check("el panel importa el modulo de sesion", /from "\.\.\/lib\/sesion\.js"/.test(pjs));
+  check("y pregunta si hay cuenta al arrancar", /sesion\.hayCuenta\(\)/.test(pjs));
+  check("hay una etapa 0 antes de todo lo demas", /etapa === 0/.test(pjs));
+  check("que se decide por la cuenta, no por el CV",
+    /!estado\.conCuenta \? 0/.test(pjs));
+  check("con formulario para entrar de verdad",
+    /sesion\.entrar\(/.test(pjs) && /form-acceso/.test(pjs));
+  check("y salida para quien aun no tiene cuenta",
+    /sesion\.URL_CUENTA/.test(pjs));
+  check("un token muerto se trata como no tener cuenta",
+    /sesion\.verificar\(\)/.test(pjs));
+  check("el error de entrar se enseña, no se traga",
+    /acceso-error/.test(pjs));
+}
+
 console.log(`\n${fallos === 0 ? "TODO OK" : `${fallos} FALLO(S)`}`);
 process.exit(fallos ? 1 : 0);

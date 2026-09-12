@@ -705,3 +705,24 @@ main { max-width: 1120px; }
 
 .metricas { display: flex; gap: 30px; flex-wrap: wrap; }
 .metricas > div { display: flex; flex-direction: column; gap: 2px; }
+
+
+/* ══════════ entrar en Chamba Lista ══════════ */
+/* La etapa 0 del panel. Existe porque faltaba: sesion.js tenía `entrar`
+ * desde que hay cuentas, pero no había ningún sitio donde pulsarlo, así
+ * que todo lo que necesita sesión —el CV adaptado, la IA, la medición—
+ * fallaba con un 401 que nadie veía. */
+.acceso-panel { display: grid; gap: 9px; }
+.acceso-panel input {
+  width: 100%; padding: 11px 13px;
+  border: 2px solid var(--linea); border-radius: var(--r-chico);
+  font: inherit; font-size: 14px; background: var(--papel); color: var(--tinta);
+}
+.acceso-panel input:focus { outline: none; box-shadow: var(--dura-chica); }
+.acceso-panel .boton { width: 100%; }
+.acceso-panel .enlace { justify-self: center; font-size: 12.5px; }
+.aviso-acceso {
+  margin: 0; padding: 9px 11px; font-size: 12.5px;
+  background: var(--coral-suave); border: 2px solid var(--coral);
+  border-radius: var(--r-chico); color: var(--tinta);
+}
