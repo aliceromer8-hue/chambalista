@@ -54,6 +54,7 @@
         "https://bumeran.com.pe/*"
       ],
       "js": [
+        "contenido/comun.js",
         "contenido/bumeran.js"
       ],
       "run_at": "document_idle"
@@ -63,6 +64,7 @@
         "https://pe.indeed.com/*"
       ],
       "js": [
+        "contenido/comun.js",
         "contenido/indeed.js"
       ],
       "run_at": "document_idle"
@@ -72,6 +74,7 @@
         "https://www.linkedin.com/*"
       ],
       "js": [
+        "contenido/comun.js",
         "contenido/linkedin.js"
       ],
       "run_at": "document_idle"

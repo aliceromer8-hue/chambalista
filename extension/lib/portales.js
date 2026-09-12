@@ -75,7 +75,10 @@ export const PORTALES = {
   bumeran: {
     id: "bumeran",
     nombre: "Bumeran",
-    postulable: false,
+    // Postula desde el 2026-09-11. Ojo: a diferencia de Computrabajo,
+    // Bumeran no acepta un CV adjunto en la vacante — usa el del perfil
+    // de la persona. Ver el bloque «Postular» en contenido/bumeran.js.
+    postulable: true,
     base: "https://www.bumeran.com.pe",
     acceso: "https://www.bumeran.com.pe/login",
     url(termino, ciudad, pagina = 1) {

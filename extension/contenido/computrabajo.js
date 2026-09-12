@@ -91,7 +91,30 @@
     if (C.hayCaptcha()) {
       return { captcha: true, nota: "El portal mostró un CAPTCHA. Resuélvelo tú y vuelve a intentar." };
     }
+    // Dónde acabamos DESPUÉS del clic.
+    //
+    // Arriba se comprueba la sesión, pero esa comprobación es por
+    // ausencia del botón de acceso —lo dice haySesion()— y las
+    // comprobaciones por ausencia fallan abiertas: si la página no cargó
+    // bien, «no está el botón de acceso» se lee como «sesión abierta».
+    // Además la sesión puede caducar entre la comprobación y el clic.
+    //
+    // Sin esto, el flujo seguía adelante sobre la página de acceso:
+    // rellenaba el formulario de login con los datos de la persona y
+    // luego hacía clic en «entrar» creyendo que enviaba una postulación.
+    // Es el mismo fallo que ya se corrigió en la versión de escritorio.
+    if (!enPostulacion()) {
+      return { requiereLogin: true,
+               nota: "Computrabajo pidió iniciar sesión. Entra y vuelve a intentarlo." };
+    }
     return { abierto: true };
+  }
+
+  /** ¿Seguimos en la postulación, o nos mandaron al acceso? */
+  function enPostulacion() {
+    if (/\/acceso|\/login|\/registro/i.test(location.pathname)) return false;
+    if (document.querySelector("input[type=password]")) return false;
+    return true;
   }
 
   /** Lee las preguntas de selección del formulario abierto. */
@@ -192,6 +215,9 @@
 
   /** El clic final. Solo se llama tras la confirmación de la persona. */
   async function enviar() {
+    if (!enPostulacion()) {
+      return { enviada: false, error: "No estamos en la postulación, sino en el acceso." };
+    }
     if (C.hayCaptcha()) return { error: "Hay un CAPTCHA pendiente; resuélvelo en la página." };
 
     const ya = confirmada();

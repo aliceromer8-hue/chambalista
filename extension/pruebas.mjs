@@ -56,8 +56,29 @@ check("URL de Indeed",
   PORTALES.indeed.url("analista de datos", "Lima").includes("q=analista+de+datos"));
 check("los cuatro portales están registrados", LISTA_PORTALES.length === 4,
   LISTA_PORTALES.map((p) => p.nombre).join(", "));
-check("solo Computrabajo postula automáticamente",
-  LISTA_PORTALES.filter((p) => p.postulable).map((p) => p.id).join() === "computrabajo");
+// Un portal marcado `postulable` tiene que tener de verdad las funciones
+// de postular. Marcarlo sin escribirlas hace que la extension lo intente,
+// falle a medias y deje a la persona creyendo que postulo.
+{
+  const fsp = await import("node:fs/promises");
+  const postulables = LISTA_PORTALES.filter((p) => p.postulable).map((p) => p.id);
+  check("hay al menos un portal que postula", postulables.length >= 1, postulables.join(", "));
+  for (const id of postulables) {
+    const codigo = await fsp.readFile(new URL(`contenido/${id}.js`, BASE), "utf8");
+    check(`${id} tiene el codigo de postular, no solo la marca`,
+      /function botonPostular/.test(codigo) && /async function enviar/.test(codigo));
+    check(`${id} comprueba el envio por confirmacion, no por ausencia`,
+      /function confirmada/.test(codigo));
+    check(`${id} se protege del redirect al login`,
+      /input\[type=password\]|\/login/.test(codigo));
+  }
+  // Lo verificado de verdad es otra cosa, y manda sobre lo que se promete.
+  const ver = await fsp.readFile(new URL("lib/verificados.js", BASE), "utf8");
+  check("existe la lista de postulacion verificada",
+    /POSTULACION_VERIFICADA/.test(ver) && /POSTULACION_SIN_PROBAR/.test(ver));
+  check("y distingue lo escrito de lo comprobado",
+    /computrabajo/.test(ver.split("POSTULACION_VERIFICADA")[1].split("]")[0]));
+}
 check("todos tienen URL de acceso para iniciar sesión",
   LISTA_PORTALES.every((p) => p.acceso && p.acceso.startsWith("https://")));
 check("URL de LinkedIn",

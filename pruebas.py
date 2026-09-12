@@ -947,8 +947,21 @@ for _portal in ("computrabajo", "bumeran", "indeed", "linkedin"):
     (_puede_postular if _re.search(r"abrirFormulario|botonPostular", _codigo)
      else _solo_leen).append(_portal)
 
-check("solo un portal sabe postular hoy", _puede_postular == ["computrabajo"],
-      f"postulan: {_puede_postular} · solo leen: {_solo_leen}")
+# Tener el código de postular NO habilita a prometerlo: hasta que alguien
+# complete una postulación real en ese portal, es código sin comprobar.
+# La lista de verificados vive en extension/lib/verificados.js y es la que
+# manda sobre lo que la página puede decir.
+_verif = pathlib.Path("extension/lib/verificados.js").read_text(encoding="utf-8")
+_VERIFICADOS = _re.findall(r'"([a-z]+)"',
+                           _re.search(r"POSTULACION_VERIFICADA = \[(.*?)\]", _verif, _re.S).group(1))
+_SIN_PROBAR = _re.findall(r'"([a-z]+)"',
+                          _re.search(r"POSTULACION_SIN_PROBAR = \[(.*?)\]", _verif, _re.S).group(1))
+check("hay al menos un portal con postulación verificada", bool(_VERIFICADOS), str(_VERIFICADOS))
+check("lo verificado y lo sin probar no se solapan",
+      not (set(_VERIFICADOS) & set(_SIN_PROBAR)))
+check("todo lo verificado o sin probar tiene el código puesto",
+      set(_VERIFICADOS + _SIN_PROBAR) <= set(_puede_postular),
+      f"con código: {_puede_postular}")
 # El alcance ya no va en un recuadro aparte —leía como disculpa— pero
 # tiene que seguir dicho donde se lee: en la bajada del titular. Lo que
 # esta prueba vigila no es la redacción, es que la frase que dice «llena
@@ -964,9 +977,9 @@ _prometidos = [_p for _p in ("Computrabajo", "Bumeran", "Indeed", "LinkedIn")
                if _p in _bajada.split("llena la postulación")[0].split("En ")[-1]]
 check("la bajada dice en qué portal llena la postulación",
       "llena la postulación" in _bajada, _bajada.strip()[:80])
-check("y ese portal es uno que sabe hacerlo",
-      all(_p in _saben_postular for _p in _prometidos),
-      f"promete {_prometidos} · saben postular {_saben_postular}")
+check("y ese portal tiene la postulación VERIFICADA, no solo escrita",
+      all(_p.lower() in _VERIFICADOS for _p in _prometidos),
+      f"promete {_prometidos} · verificados {_VERIFICADOS} · sin probar {_SIN_PROBAR}")
 
 # Buscar sí es en los cuatro: eso se puede decir y se dice.
 check("buscar en los cuatro sí se promete, porque sí ocurre",
