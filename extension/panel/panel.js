@@ -801,12 +801,49 @@ $("#archivo-cv").addEventListener("change", async (e) => {
     avisar("CV cargado y listo", "bien");
     pintarInicio();   // cargar el CV cambia de etapa
   } catch (err) {
-    $("#estado-perfil").textContent =
-      `No se pudo leer: ${err.message}. Si el servicio está dormido, espera 30 s y reintenta.`;
+    // Sin coletillas sobre el estado del servidor: «si el servicio está
+    // dormido» no significa nada para quien lo lee y encima suele ser
+    // falso — casi siempre el problema es otro. El mensaje del servidor
+    // ya explica qué pasa.
+    $("#estado-perfil").textContent = err.message;
   }
 });
 
+/**
+ * Una línea que dice quién eres, arriba del todo.
+ *
+ * El panel sabía tu nombre y tu carrera desde que subes el CV y no lo
+ * enseñaba en ninguna parte. Ver tu propio nombre es lo que convierte una
+ * herramienta en TU herramienta, y de paso confirma de un vistazo que el
+ * CV que va a mandar es el tuyo y no uno viejo.
+ */
+function pintarQuienSoy() {
+  const caja = $("#quien-soy-panel");
+  const p = estado.perfil;
+  if (!caja) return;
+  if (!p?.nombre) { caja.classList.add("oculto"); return; }
+
+  const nombre = p.nombre.trim();
+  $("#quien-inicial").textContent = nombre[0].toUpperCase();
+  // Nombre y primer apellido: el completo no cabe y se corta feo.
+  const trozos = nombre.split(/\s+/);
+  $("#quien-nombre").textContent = trozos.length >= 3
+    ? `${trozos[0]} ${trozos[2]}` : trozos.slice(0, 2).join(" ");
+
+  // La línea de debajo sale de la educación, que es lo que el propio CV
+  // dice de dónde está la persona. El momento de carrera lo deduce el
+  // servidor (sugerencias.py) y aquí no está disponible, así que se
+  // enseña el dato crudo en vez de inventar una etiqueta.
+  const est = (p.educacion || [])[0] || {};
+  const linea = [est.cargo, est.organizacion].filter(Boolean).join(" · ")
+    || (p.perfil || [])[0]
+    || "CV cargado";
+  $("#quien-linea").textContent = linea.length > 58 ? linea.slice(0, 57) + "…" : linea;
+  caja.classList.remove("oculto");
+}
+
 function pintarPerfil() {
+  pintarQuienSoy();
   const p = estado.perfil;
   if (!p) {
     $("#estado-perfil").textContent = "Sin CV cargado. Cárgalo para adaptar tu CV y responder los formularios.";
@@ -840,7 +877,7 @@ async function pintarCuota() {
   }
   const c = await ia.cuota();
   if (!c) {
-    linea.textContent = "IA incluida. (No se pudo consultar la cuota; si el servicio está dormido tarda ~30 s en despertar.)";
+    linea.textContent = "IA incluida.";
     return;
   }
   if (!c.servidor_configurado) {
@@ -1034,6 +1071,8 @@ function pintarPortales() {
   // Las sesiones primero: la etapa de la portada depende de ellas y si
   // no, se pinta la etapa equivocada durante un instante.
   // Lo primero: ¿hay cuenta? La portada entera depende de ello.
+  // El puente puede haber traído la sesión de la web mientras el panel
+  // estaba cerrado, así que esto se lee después de que corra.
   estado.conCuenta = await sesion.hayCuenta();
   if (estado.conCuenta && !(await sesion.verificar())) {
     // Token muerto: mejor pedir la contraseña que fallar en cada botón.

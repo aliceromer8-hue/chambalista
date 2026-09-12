@@ -749,3 +749,61 @@ main { max-width: 1120px; }
 .fecha-extra { margin-top: 6px; }
 .par-red { display: grid; grid-template-columns: 42% 1fr; gap: 7px; margin-top: 4px; }
 .par-red select, .par-red input { margin-top: 0; }
+
+
+/* ══════════ dentro de la portada ══════════ */
+/* La portada es SIEMPRE lima, en claro y en oscuro. Por eso todo lo que
+ * va encima lleva tinta fija y no `var(--tinta)`: en modo oscuro esa
+ * variable es casi blanca, y salia texto claro sobre lima —ilegible— y
+ * un boton lima sobre fondo lima, que directamente no se veia.
+ *
+ * Un fondo fijo obliga a colores fijos encima. Es la regla que se salto
+ * aqui y por eso el boton principal era invisible. */
+.portada,
+.portada h1,
+.portada .bajada,
+.portada .antetitulo,
+.portada .nota { color: #131316; }
+.portada { border-color: #131316; }
+.portada .antetitulo { opacity: .68; }
+.portada .nota { opacity: .72; }
+
+/* El boton principal, invertido: tinta sobre lima. Es el unico elemento
+ * con ese contraste en la portada, asi que el ojo va ahi solo — que es
+ * justo lo que se quiere de una llamada a la accion. */
+.portada .boton.primario {
+  background: #131316; color: var(--lima); border-color: #131316;
+}
+.portada .boton.primario:hover:not(:disabled) { background: #2A2A31; }
+.portada .boton.secundario,
+.portada .boton.chico {
+  background: #FBFAF6; color: #131316; border-color: #131316;
+}
+.portada .enlace { color: #131316; text-decoration: underline; }
+
+/* Los campos del formulario de acceso, tambien sobre lima. */
+.portada .acceso-panel input { background: #FBFAF6; color: #131316; border-color: #131316; }
+.portada .acceso-panel input::placeholder { color: #55555F; }
+
+/* ══════════ quien eres, arriba del todo ══════════ */
+/* Ali: «en la parte de arriba deberia salir el perfil de la persona, el
+ * nombre, y en una linea tipo estudiante de marketing de tal ciclo».
+ * Tiene razon: el panel sabia quien eres desde que subes el CV y no lo
+ * decia en ningun sitio visible. */
+.quien-soy-panel {
+  display: flex; align-items: center; gap: 9px; min-width: 0;
+  font-size: 12px; color: var(--tinta-2);
+}
+.quien-soy-panel .inicial {
+  width: 26px; height: 26px; flex: none; display: grid; place-items: center;
+  border-radius: 99px; background: var(--lima); color: #131316;
+  border: 2px solid var(--tinta); font-weight: 800; font-size: 12px;
+}
+.quien-soy-panel .texto { min-width: 0; line-height: 1.25; }
+.quien-soy-panel .texto b {
+  display: block; color: var(--tinta); font-size: 12.5px;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.quien-soy-panel .texto span {
+  display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}

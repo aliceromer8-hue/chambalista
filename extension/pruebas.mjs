@@ -389,5 +389,45 @@ titulo("MENOS ESCRIBIR — elegir en vez de teclear");
   }
 }
 
+
+titulo("EL PUENTE — entrar una vez, no dos");
+
+{
+  // La sesion de la web vive en el localStorage del sitio; la de la
+  // extension, en chrome.storage. Son dos almacenes que no se ven, asi
+  // que quien entraba en la landing abria el panel y se encontraba otra
+  // vez con «entra con tu cuenta» — y el CV fallaba con un 401.
+  const fsp = await import("node:fs/promises");
+  const puente = await fsp.readFile(new URL("contenido/puente.js", BASE), "utf8");
+  const man = JSON.parse(await fsp.readFile(new URL("manifest.json", BASE), "utf8"));
+  const fondo = await fsp.readFile(new URL("background.js", BASE), "utf8");
+
+  const suyo = man.content_scripts.find((cs) => cs.js.includes("contenido/puente.js"));
+  check("el puente esta declarado en el manifest", Boolean(suyo));
+  check("y SOLO en nuestro dominio",
+    Boolean(suyo) && suyo.matches.every((m) => /chamba-lista|chambalista/.test(m)),
+    suyo ? suyo.matches.join(", ") : "");
+  check("lee la sesion de la web", /chamba_sesion/.test(puente));
+  check("y no toca nada mas de la pagina",
+    !/document\.querySelector|innerHTML|fetch\(/.test(puente));
+  check("el fondo la recibe", /case "sesionDeLaWeb"/.test(fondo));
+  check("y no pisa una sesion propia de la misma persona",
+    /mismaPersona/.test(fondo));
+}
+
+titulo("SIN COLETILLAS QUE NO SIGNIFICAN NADA");
+
+{
+  const fsp = await import("node:fs/promises");
+  const pjs = await fsp.readFile(new URL("panel/panel.js", BASE), "utf8");
+  const visible = pjs.replace(/\/\/.*$/gm, "").replace(/\/\*[\s\S]*?\*\//g, "");
+  check("el panel ya no habla de servicios dormidos",
+    !/dormid/i.test(visible));
+  check("el CV se sube con la sesion puesta",
+    /sesion\.conCuenta\("\/api\/cv\/procesar"/.test(pjs));
+  check("y si el token murio, lo dice claro",
+    /caduc/i.test(pjs));
+}
+
 console.log(`\n${fallos === 0 ? "TODO OK" : `${fallos} FALLO(S)`}`);
 process.exit(fallos ? 1 : 0);

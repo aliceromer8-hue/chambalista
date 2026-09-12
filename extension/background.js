@@ -515,6 +515,23 @@ chrome.runtime.onMessage.addListener((msg, _e, responder) => {
           );
           return responder({ portales: estados });
         }
+        // La sesión que la persona creó en la web, traída por el puente.
+        //
+        // Se guarda solo si aqui no habia ninguna, o si la de la web es
+        // de otra persona. Si ya hay sesión propia y es la misma, no se
+        // toca: pisar un token bueno por otro igual solo sirve para
+        // invalidar el que estaba en uso.
+        case "sesionDeLaWeb": {
+          const traida = msg.sesion;
+          if (!traida?.token) return responder({ guardada: false });
+          const actual = await sesion.obtener();
+          const mismaPersona = actual?.usuario?.id
+            && actual.usuario.id === traida.usuario?.id;
+          if (actual?.token && mismaPersona) return responder({ guardada: false, yaEstaba: true });
+          await sesion.guardar(traida);
+          return responder({ guardada: true, correo: traida.usuario?.correo });
+        }
+
         case "abrirAcceso": {
           const p = PORTALES[msg.portal];
           if (!p) return responder({ error: "Portal desconocido." });

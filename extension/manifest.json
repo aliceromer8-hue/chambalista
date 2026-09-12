@@ -80,6 +80,15 @@
         "contenido/linkedin.js"
       ],
       "run_at": "document_idle"
+    },
+    {
+      "matches": [
+        "https://chamba-lista-ali-ab09.vercel.app/*"
+      ],
+      "js": [
+        "contenido/puente.js"
+      ],
+      "run_at": "document_idle"
     }
   ]
 }
