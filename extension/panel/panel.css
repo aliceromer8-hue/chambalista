@@ -831,3 +831,16 @@ main { max-width: 1120px; }
 .portal-chip.bien   { background: var(--lima); color: #131316; border-color: #131316; }
 .portal-chip.aviso  { background: var(--sol); color: #131316; border-color: #131316; }
 .portal-chip.neutro { background: var(--papel-3); color: var(--tinta); }
+
+
+/* La pregunta que falta por contestar. Se marca porque el sistema la
+ * deja en blanco a proposito —las de consentimiento las decide la
+ * persona— y antes nada lo decia: se enviaba vacia. */
+.pregunta.sin-contestar {
+  border-left: 3px solid var(--sol); padding-left: 10px;
+}
+.pregunta.sin-contestar textarea { border-color: var(--sol); }
+.nota.falta {
+  background: var(--sol-suave); border: 2px solid var(--sol);
+  border-radius: var(--r-chico); padding: 8px 11px; color: var(--tinta);
+}

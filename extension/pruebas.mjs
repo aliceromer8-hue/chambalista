@@ -601,5 +601,39 @@ titulo("EL RECORRIDO — que subir el CV no sea un callejon");
     /PORTALES\[portal\?\.id\]/.test(port));
 }
 
+
+titulo("ENVIAR — no con una pregunta de consentimiento en blanco");
+
+{
+  // El fallo mas serio del recorrido. Las preguntas de consentimiento
+  // —«¿aceptas practicas no remuneradas?»— se dejan en blanco A
+  // PROPOSITO: no las contesta el modelo, las contesta la persona. Pero
+  // nada se lo decia: marcaba la casilla de revision, el boton se
+  // activaba, y la postulacion salia con la pregunta vacia.
+  //
+  // La proteccion funcionaba a medias: evitaba que respondieramos
+  // nosotros, no que la respuesta se fuera vacia. Segun el formulario
+  // eso es una postulacion descartada o, peor, un silencio que el portal
+  // lee como un si.
+  const fsp = await import("node:fs/promises");
+  const pjs = await fsp.readFile(new URL("panel/panel.js", BASE), "utf8");
+
+  check("enviar mira las preguntas, no solo la casilla",
+    /sinContestar/.test(pjs) && /revisarSiPuedeEnviar/.test(pjs));
+  check("el boton se bloquea si queda alguna sin contestar",
+    /disabled = !revisado \|\| sinContestar\.length > 0/.test(pjs));
+  check("y se dice por que, no se bloquea en silencio",
+    /Falta contestar/.test(pjs));
+  check("se marca cual falta, para no tener que buscarla",
+    /sin-contestar/.test(pjs));
+  check("se revisa al escribir, no solo al marcar",
+    /addEventListener\("input", revisarSiPuedeEnviar\)/.test(pjs));
+  check("y se revisa nada mas abrir la pantalla",
+    /revisarSiPuedeEnviar\(\);/.test(pjs));
+
+  const css = await fsp.readFile(new URL("panel/panel.css", BASE), "utf8");
+  check("la que falta se ve distinta", /\.pregunta\.sin-contestar/.test(css));
+}
+
 console.log(`\n${fallos === 0 ? "TODO OK" : `${fallos} FALLO(S)`}`);
 process.exit(fallos ? 1 : 0);

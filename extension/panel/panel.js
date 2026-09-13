@@ -105,7 +105,9 @@ async function pintarInicio() {
   ).join("");
 
   $("#m-semana").textContent = r.estaSemana;
-  $("#m-tasa").textContent = r.tasaRespuesta === null ? "—" : `${r.tasaRespuesta}%`;
+  // `== null` cubre null Y undefined: con `=== null` un undefined se
+  // colaba y pintaba «undefined%».
+  $("#m-tasa").textContent = r.tasaRespuesta == null ? "—" : `${r.tasaRespuesta}%`;
   $("#m-entrevistas").textContent = r.entrevistas;
   dibujarGrafico(r.serie);
 
@@ -417,7 +419,9 @@ $("#btn-buscar").addEventListener("click", async () => {
 
     const fallos = (r.errores || []).map((e) => `${e.portal}: ${e.error}`).join(" · ");
     $("#resumen-busqueda").textContent =
-      `${estado.vacantes.length} vacante(s) para «${r.termino}».` +
+      // Si por lo que sea no vuelve el término, se usa lo que la persona
+      // escribió. «undefined» en pantalla no puede pasar nunca.
+      `${estado.vacantes.length} vacante(s) para «${r.termino || $("#puesto").value.trim() || "tu búsqueda"}».` +
       (estado.perfil ? " Ordenadas por encaje con tu CV." : " Carga tu CV para ordenarlas por encaje.") +
       (fallos ? ` — ${fallos}` : "");
   } catch (e) {
@@ -491,7 +495,47 @@ function pintarModal() {
   c.innerHTML = html;
 
   pintarPreguntas(r.preguntas || []);
-  $("#chk-revision").addEventListener("change", (e) => { $("#btn-enviar").disabled = !e.target.checked; });
+
+  /**
+   * El boton de enviar depende de DOS cosas, no de una.
+   *
+   * Antes solo miraba la casilla de revision. Pero las preguntas de
+   * consentimiento —«¿aceptas practicas no remuneradas?»— se dejan en
+   * blanco A PROPOSITO: no las contesta el modelo, las contesta la
+   * persona. El problema es que nada se lo decia. Marcaba la casilla,
+   * el boton se activaba, y se enviaba la postulacion con la pregunta
+   * vacia.
+   *
+   * O sea que la proteccion funcionaba a medias: evitaba que
+   * respondieramos nosotros, pero no que la respuesta se fuera vacia.
+   * Segun el formulario, eso es una postulacion descartada o —peor— un
+   * silencio que el portal interpreta como un si.
+   */
+  function revisarSiPuedeEnviar() {
+    const sinContestar = [...$("#preguntas").querySelectorAll("textarea")]
+      .filter((t) => !t.value.trim());
+    const revisado = $("#chk-revision").checked;
+    $("#btn-enviar").disabled = !revisado || sinContestar.length > 0;
+
+    const nota = $("#estado-envio");
+    if (sinContestar.length) {
+      nota.textContent = sinContestar.length === 1
+        ? "Falta contestar una pregunta. Esa la decides tú, no la respondemos por ti."
+        : `Faltan ${sinContestar.length} preguntas. Esas las decides tú.`;
+      nota.classList.add("falta");
+    } else {
+      nota.textContent = "";
+      nota.classList.remove("falta");
+    }
+    // Se marca cual falta, para no tener que buscarla.
+    for (const t of $("#preguntas").querySelectorAll("textarea")) {
+      t.closest(".pregunta")?.classList.toggle("sin-contestar", !t.value.trim());
+    }
+  }
+
+  $("#chk-revision").addEventListener("change", revisarSiPuedeEnviar);
+  $("#preguntas").addEventListener("input", revisarSiPuedeEnviar);
+  revisarSiPuedeEnviar();
   $("#btn-enviar").addEventListener("click", enviarUna);
 }
 
@@ -898,9 +942,18 @@ async function pintarCuota() {
     linea.textContent = "El servidor aún no tiene IA configurada. Puedes poner tu propia clave abajo.";
     return;
   }
-  linea.textContent = c.restantes > 0
-    ? `IA incluida — te quedan ${c.restantes} de ${c.limite} usos en ${c.ventana_horas} h.`
-    : `Sin usos gratis por ahora${c.se_renueva_en_minutos ? `, se renuevan en ${c.se_renueva_en_minutos} min` : ""}.`;
+  // La cuota viene de la red y puede llegar a medias. Sin esto se leía
+  // «te quedan 3 de undefined usos en undefined h», que además de feo
+  // hace dudar de todo lo demás que diga el panel.
+  if (c.restantes > 0 && c.limite && c.ventana_horas) {
+    linea.textContent = `IA incluida — te quedan ${c.restantes} de ${c.limite} usos `
+      + `en ${c.ventana_horas} h.`;
+  } else if (c.restantes > 0) {
+    linea.textContent = `IA incluida — te quedan ${c.restantes} usos.`;
+  } else {
+    linea.textContent = "Sin usos gratis por ahora"
+      + (c.se_renueva_en_minutos ? `, se renuevan en ${c.se_renueva_en_minutos} min` : "") + ".";
+  }
 }
 
 /**
