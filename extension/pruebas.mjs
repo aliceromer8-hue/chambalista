@@ -469,6 +469,91 @@ titulo("CONTRASTE — un fondo fijo obliga a colores fijos encima");
   }
   check("el texto de la portada tambien lleva tinta fija",
     /\.portada,[\s\S]{0,200}color: #131316/.test(css));
+
+  // Y NINGUNA regla de tema oscuro puede volver a tocarla.
+  //
+  // Este es el fallo que se vio en pantalla: la portada llevaba
+  // `background: var(--papel-2)` en oscuro, y con la tinta fija encima
+  // daba negro sobre negro. Un bloque de fondo fijo se queda fijo en los
+  // dos temas, o no se le pueden poner colores fijos encima. Una de las
+  // dos, no las dos a medias.
+  const bloquesOscuros = [];
+  const re = /@media \(prefers-color-scheme: dark\)\s*\{/g;
+  let m;
+  while ((m = re.exec(css))) {
+    let prof = 1, j = m.index + m[0].length;
+    while (j < css.length && prof) {
+      if (css[j] === "{") prof++;
+      else if (css[j] === "}") prof--;
+      j++;
+    }
+    bloquesOscuros.push(css.slice(m.index + m[0].length, j));
+  }
+  const tocanPortada = bloquesOscuros
+        .flatMap((b) => [...b.matchAll(new RegExp("([^\\n{}]*\\\\.portada[^\\n{}]*)\\\\{([^}]*)\\\\}", "g"))])
+    .map((r) => r[1].trim());
+  check("ninguna regla de tema oscuro repinta la portada",
+    tocanPortada.length === 0, tocanPortada.join(" | "));
+}
+
+
+titulo("TEMAS — que ningun bloque quede ilegible en oscuro");
+
+{
+  // La regla que se salto y costo el «no se ve nada»:
+  //
+  //   Si el FONDO cambia con el tema, el TEXTO encima tambien tiene que
+  //   cambiar. Si el fondo es fijo, el texto tiene que ser fijo.
+  //
+  // Mezclar las dos cosas hace que uno de los dos temas salga mal por
+  // fuerza. La portada tenia fondo variable (papel-2 en oscuro) y texto
+  // fijo (#131316): negro sobre negro, 1.0:1.
+  //
+  // Ojo: --lima, --coral y --sol NO cambian entre temas, asi que poner
+  // texto fijo encima de ellas es correcto. La prueba lo tiene en cuenta;
+  // si no, saltaria en diez sitios que estan bien.
+  const fsp = await import("node:fs/promises");
+  const css = await fsp.readFile(new URL("panel/panel.css", BASE), "utf8");
+
+  const varsDe = (txt) => {
+    const m = {};
+    for (const r of txt.matchAll(/(--[\w-]+):\s*([^;]+);/g)) m[r[1]] = r[2].trim();
+    return m;
+  };
+  const corte = css.indexOf("@media");
+  const raiz = varsDe(corte > 0 ? css.slice(0, corte) : css);
+  const oscuro = {};
+  for (const m of css.matchAll(/@media \(prefers-color-scheme: dark\)\s*\{/g)) {
+    let prof = 1, j = m.index + m[0].length;
+    while (j < css.length && prof) {
+      if (css[j] === "{") prof++; else if (css[j] === "}") prof--;
+      j++;
+    }
+    Object.assign(oscuro, varsDe(css.slice(m.index + m[0].length, j)));
+  }
+  const cambia = (v) => v in oscuro && raiz[v] !== oscuro[v];
+
+  const sospechosas = [];
+  for (const r of css.matchAll(/([^{}]+)\{([^}]*)\}/g)) {
+    const sel = r[1].trim().split("\n").pop().trim();
+    if (!sel || sel.startsWith("@") || sel.startsWith("/*")) continue;
+    const fondo = (r[2].match(/background(?:-color)?:\s*([^;]+)/) || [])[1];
+    const texto = (r[2].match(/(?<!-)\bcolor:\s*([^;]+)/) || [])[1];
+    if (!fondo || !texto) continue;
+    // `none` y `transparent` no son fondo: lo que se ve detrás es otra
+    // cosa y esta comprobación no puede decir nada sobre ellos.
+    if (/^\s*(none|transparent|inherit)\s*$/.test(fondo)) continue;
+    const varFondo = (fondo.match(/var\((--[\w-]+)\)/) || [])[1];
+    const varTexto = (texto.match(/var\((--[\w-]+)\)/) || [])[1];
+    // El caso malo: el fondo se mueve con el tema y el texto no.
+    const fondoSeMueve = varFondo ? cambia(varFondo) : false;
+    const textoSeMueve = varTexto ? cambia(varTexto) : false;
+    if (fondoSeMueve !== textoSeMueve && (fondoSeMueve || textoSeMueve)) {
+      sospechosas.push(`${sel} (fondo ${fondo.trim()}, texto ${texto.trim()})`);
+    }
+  }
+  check("ningun bloque mezcla fondo de tema con texto fijo",
+    sospechosas.length === 0, sospechosas.slice(0, 3).join(" | "));
 }
 
 console.log(`\n${fallos === 0 ? "TODO OK" : `${fallos} FALLO(S)`}`);
