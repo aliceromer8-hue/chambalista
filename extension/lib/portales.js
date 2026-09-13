@@ -148,3 +148,36 @@ export const PORTALES = {
 };
 
 export const LISTA_PORTALES = Object.values(PORTALES);
+
+
+/**
+ * Qué sabe hacer este portal, dicho en dos palabras.
+ *
+ * Los cuatro ponían «postula» y no es verdad de todos:
+ *
+ *   computrabajo  postula y está comprobado con una postulación real
+ *   bumeran       tiene el código, sin comprobar todavía
+ *   indeed        igual
+ *   linkedin      rellena y NO envía — por decisión, no por falta de
+ *                 código: su §8.2 prohíbe la automatización y lo que se
+ *                 arriesga es la cuenta de la persona
+ *
+ * Enseñar «postula» en los cuatro es prometer en la propia interfaz algo
+ * que tres de ellos no hacen.
+ */
+export function queHace(portal) {
+  // Se mira la CONFIGURACIÓN por id, no lo que venga en el objeto: el
+  // fondo devuelve los portales con solo unos pocos campos —id, nombre,
+  // postulable, sesión— y `soloRevisado` no viaja ahí. Fiarse del objeto
+  // que llega hacía que LinkedIn se anunciara como «postula (en
+  // pruebas)» cuando no envía nunca.
+  const cfg = PORTALES[portal?.id] || portal || {};
+  if (!cfg.postulable) return { etiqueta: "solo busca", tono: "neutro" };
+  if (cfg.soloRevisado) return { etiqueta: "rellena, envías tú", tono: "aviso" };
+  if (VERIFICADOS.includes(cfg.id)) return { etiqueta: "postula", tono: "bien" };
+  return { etiqueta: "postula (en pruebas)", tono: "aviso" };
+}
+
+// Se copia aquí en vez de importar verificados.js para no arrastrar otro
+// módulo a los content scripts, que cargan portales.js.
+const VERIFICADOS = ["computrabajo"];

@@ -556,5 +556,50 @@ titulo("TEMAS — que ningun bloque quede ilegible en oscuro");
     sospechosas.length === 0, sospechosas.slice(0, 3).join(" | "));
 }
 
+
+titulo("EL RECORRIDO — que subir el CV no sea un callejon");
+
+{
+  const fsp = await import("node:fs/promises");
+  const pjs = await fsp.readFile(new URL("panel/panel.js", BASE), "utf8");
+  const { queHace } = await import(`${BASE}lib/portales.js`);
+
+  // Ali: «subo el CV y no se puede seguir». El boton de la portada te
+  // lleva a Mi perfil para abrir el selector de archivo; el CV cargaba
+  // bien, la portada avanzaba... y esa portada esta en la pestaña de
+  // Inicio, que ya no estas mirando. Te quedabas con el CV cargado y sin
+  // un solo boton que dijera «sigue por aqui».
+  const trasSubir = pjs.slice(pjs.indexOf("almacen.perfil.guardar"),
+                              pjs.indexOf("almacen.perfil.guardar") + 900);
+  check("al subir el CV se vuelve al recorrido", /irA\("inicio"\)/.test(trasSubir),
+    "subir el CV es el paso uno de cuatro, no el final");
+  check("y se avisa de que se cargo", /avisar\(/.test(trasSubir));
+
+  // Y el titular de cada etapa dice lo mismo.
+  const titulares = [...pjs.matchAll(/portada-titulo"\)\.innerHTML = "([^"]+)"/g)].map((m) => m[1]);
+  check("ningun titular del panel promete quince",
+    !titulares.some((t) => /quince/i.test(t)), titulares.join(" | "));
+
+  // Cada portal dice lo que hace, no todos lo mismo.
+  const dicen = ["computrabajo", "bumeran", "indeed", "linkedin"]
+    .map((id) => `${id}:${queHace({ id, postulable: true }).etiqueta}`);
+  check("los cuatro portales no dicen todos lo mismo",
+    new Set(dicen.map((d) => d.split(":")[1])).size >= 3, dicen.join(" · "));
+  check("computrabajo es el unico que dice «postula» a secas",
+    queHace({ id: "computrabajo", postulable: true }).etiqueta === "postula");
+  const sinTildes = (t) => t.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase();
+  check("linkedin avisa de que el envio lo da la persona",
+    /envias tu/.test(sinTildes(queHace({ id: "linkedin", postulable: true }).etiqueta)),
+    queHace({ id: "linkedin", postulable: true }).etiqueta);
+  check("y los sin comprobar lo dicen",
+    /pruebas/.test(queHace({ id: "bumeran", postulable: true }).etiqueta));
+
+  // La etiqueta sale de la CONFIGURACION, no del objeto que llegue: el
+  // fondo manda los portales con pocos campos y soloRevisado no viaja.
+  const port = await fsp.readFile(new URL("lib/portales.js", BASE), "utf8");
+  check("queHace mira la configuracion por id",
+    /PORTALES\[portal\?\.id\]/.test(port));
+}
+
 console.log(`\n${fallos === 0 ? "TODO OK" : `${fallos} FALLO(S)`}`);
 process.exit(fallos ? 1 : 0);

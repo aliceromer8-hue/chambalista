@@ -823,3 +823,11 @@ main { max-width: 1120px; }
 .quien-soy-panel .texto span {
   display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
+
+
+/* La etiqueta de cada portal, por tono. Los cuatro ponian «postula» y
+ * solo uno lo tiene comprobado: decirlo igual en los cuatro es prometer
+ * en la propia interfaz lo que tres de ellos no hacen. */
+.portal-chip.bien   { background: var(--lima); color: #131316; border-color: #131316; }
+.portal-chip.aviso  { background: var(--sol); color: #131316; border-color: #131316; }
+.portal-chip.neutro { background: var(--papel-3); color: var(--tinta); }

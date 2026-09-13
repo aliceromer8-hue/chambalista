@@ -3,7 +3,7 @@
 // Solo pinta y recoge decisiones. Toda la lógica de buscar, rellenar y
 // enviar vive en background.js y en los content scripts.
 
-import { NIVELES, CIUDADES, LISTA_PORTALES } from "../lib/portales.js";
+import { NIVELES, CIUDADES, LISTA_PORTALES, queHace } from "../lib/portales.js";
 import * as almacen from "../lib/almacen.js";
 import * as datos from "../lib/datos.js";
 import * as ia from "../lib/ia.js";
@@ -196,10 +196,10 @@ function pintarPortada(resumen) {
   }
 
   if (etapa === 1) {
-    $("#portada-titulo").innerHTML = "Un clic.<br>Quince postulaciones.";
+    $("#portada-titulo").innerHTML = "Cien postulaciones.<br>Un clic cada una.";
     $("#portada-bajada").textContent =
-      "Sube tu CV una vez. Desde ahí la web busca, llena formularios y contesta las "
-      + "preguntas de cada empresa. Tú solo lees y dices que sí.";
+      "Sube tu CV una vez. Desde ahí esto busca, llena los formularios y contesta "
+      + "las preguntas de cada empresa. Tú solo lees y dices que sí.";
     acciones.innerHTML =
       `<button class="boton primario" id="p-cv">Subir mi CV y empezar</button>` +
       `<span class="nota">PDF o Word · listo en unos segundos</span>`;
@@ -218,7 +218,7 @@ function pintarPortada(resumen) {
         <div class="portal-tarjeta">
           <span class="marca-punto ${p.sesion ? "si" : conectando.has(p.id) ? "esperando" : "no"}"></span>
           <span>${escapar(p.nombre)}
-            <span class="portal-chip" style="margin-left:5px">${p.postulable ? "postula" : "solo busca"}</span>
+            <span class="portal-chip ${queHace(p).tono}" style="margin-left:5px">${queHace(p).etiqueta}</span>
             ${conectando.has(p.id) && !p.sesion
               ? `<span class="nota conectando">conectando… entra en la pestaña que se abrió</span>` : ""}
           </span>
@@ -310,7 +310,7 @@ function iniciarBuscador() {
   $("#portales").innerHTML = LISTA_PORTALES.map((p) =>
     `<label class="chk-portal"><input type="checkbox" class="chk-p" value="${p.id}" checked>` +
     `<span>${p.nombre}</span>` +
-    `<span class="portal-chip">${p.postulable ? "postula" : "solo busca"}</span></label>`,
+    `<span class="portal-chip">${queHace(p).etiqueta}</span></label>`,
   ).join("");
 }
 
@@ -798,8 +798,22 @@ $("#archivo-cv").addEventListener("change", async (e) => {
     estado.perfil = j.perfil;
     await almacen.perfil.guardar(j.perfil);
     pintarPerfil();
-    avisar("CV cargado y listo", "bien");
-    pintarInicio();   // cargar el CV cambia de etapa
+    await pintarInicio();   // cargar el CV cambia de etapa
+
+    // Y se VUELVE al recorrido.
+    //
+    // Aquí estaba el callejón sin salida que encontró Ali. El botón de la
+    // portada te trae a «Mi perfil» para abrir el selector de archivo; el
+    // CV se cargaba bien, la portada avanzaba a «¿dónde buscamos?»... y
+    // esa portada está en la pestaña de Inicio, que la persona ya no
+    // está mirando. Se quedaba en Mi perfil, con el CV cargado y sin un
+    // solo botón que dijera «sigue por aquí».
+    //
+    // Subir el CV no es el final de nada: es el paso uno de cuatro. Así
+    // que al terminar se vuelve a donde está el paso dos.
+    avisar(`CV de ${(j.perfil.nombre || "").split(" ")[0] || "listo"} cargado`, "bien");
+    irA("inicio");
+    $("#portada")?.scrollIntoView({ behavior: "smooth", block: "start" });
   } catch (err) {
     // Sin coletillas sobre el estado del servidor: «si el servicio está
     // dormido» no significa nada para quien lo lee y encima suele ser
@@ -1035,7 +1049,7 @@ function pintarPortales() {
     const clase = p.sesion === true ? "ok" : p.sesion === false ? "mal" : "";
     return `<div class="portal-fila">
       <strong>${escapar(p.nombre)}</strong>
-      <span class="portal-chip">${p.postulable ? "postula" : "solo busca"}</span>
+      <span class="portal-chip">${queHace(p).etiqueta}</span>
       <span class="estado-sesion ${clase}" style="margin-left:auto">${etiqueta}</span>
       <button class="boton chico" data-acceso="${p.id}">
         ${p.sesion === true ? "Abrir" : "Iniciar sesión"}
