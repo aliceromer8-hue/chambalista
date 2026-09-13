@@ -369,7 +369,13 @@ function actualizarCuenta() {
 
 $("#btn-buscar").addEventListener("click", async () => {
   const puesto = $("#puesto").value.trim();
-  if (!puesto) return;
+  if (!puesto) {
+    // Volver sin decir nada hace que el boton parezca roto: pulsas y no
+    // pasa nada, y no sabes si falla el producto o te falta a ti algo.
+    $("#resumen-busqueda").textContent = "Escribe qué puesto buscas y le damos.";
+    $("#puesto").focus();
+    return;
+  }
   const boton = $("#btn-buscar");
   boton.disabled = true;
   boton.textContent = "Buscando…";
@@ -422,7 +428,11 @@ $("#btn-buscar").addEventListener("click", async () => {
       // Si por lo que sea no vuelve el término, se usa lo que la persona
       // escribió. «undefined» en pantalla no puede pasar nunca.
       `${estado.vacantes.length} vacante(s) para «${r.termino || $("#puesto").value.trim() || "tu búsqueda"}».` +
-      (estado.perfil ? " Ordenadas por encaje con tu CV." : " Carga tu CV para ordenarlas por encaje.") +
+      // Con cero resultados no hay nada que ordenar: decir «ordenadas por
+      // encaje» ahi no informa de nada y suena a respuesta automatica.
+      (estado.vacantes.length === 0 ? ""
+        : estado.perfil ? " Ordenadas por encaje con tu CV."
+        : " Carga tu CV para ordenarlas por encaje.") +
       (fallos ? ` — ${fallos}` : "");
   } catch (e) {
     $("#resumen-busqueda").textContent = `No se pudo buscar: ${e.message}`;
@@ -648,6 +658,42 @@ $("#btn-lote-revisar").addEventListener("click", () => arrancarLote("revisado"))
 $("#btn-lote-auto").addEventListener("click", async () => {
   const { casillas } = await enviar({ accion: "consentimiento" });
   $("#casillas").innerHTML = "";
+
+  // Antes de pedirle que asuma riesgos, decirle qué va a pasar de verdad.
+  //
+  // El lote automático salta los portales que no envían solos —LinkedIn,
+  // porque su §8.2 prohíbe la automatización y lo que se arriesga es la
+  // cuenta de la persona. El fondo lo hace bien y las marca «omitida»,
+  // pero nadie se lo decía ANTES: marcabas las cuatro casillas contando
+  // con enviar diez y salían siete, sin explicación hasta el final.
+  const marcadas = estado.vacantes.filter((v) => v.marcada !== false);
+  const seSaltan = marcadas.filter((v) => {
+    const cfg = LISTA_PORTALES.find((p) => p.id === (v.portalId || "")) || {};
+    return cfg.soloRevisado;
+  });
+  const avisoPrevio = $("#aviso-lote") || (() => {
+    const p = document.createElement("p");
+    p.id = "aviso-lote";
+    p.className = "nota";
+    $("#bloque-riesgo").insertBefore(p, $("#casillas"));
+    return p;
+  })();
+  if (seSaltan.length) {
+    const cuales = [...new Set(seSaltan.map((v) => v.portal))].join(" y ");
+    const iran = marcadas.length - seSaltan.length;
+    avisoPrevio.textContent =
+      `De las ${marcadas.length} marcadas, ${seSaltan.length === 1 ? "una es" : `${seSaltan.length} son`} `
+      + `de ${cuales} y no se ${seSaltan.length === 1 ? "envía sola" : "envían solas"}: `
+      + `${seSaltan.length === 1 ? "queda preparada" : "quedan preparadas"} para que `
+      + `${seSaltan.length === 1 ? "la mandes" : "las mandes"} tú. `
+      + (iran === 0 ? "No se enviará ninguna automáticamente."
+                    : iran === 1 ? "Se enviará una." : `Se enviarán ${iran}.`);
+    avisoPrevio.classList.remove("oculto");
+  } else {
+    avisoPrevio.textContent = "";
+    avisoPrevio.classList.add("oculto");
+  }
+
   casillas.forEach((c) => {
     const l = document.createElement("label");
     const i = document.createElement("input");

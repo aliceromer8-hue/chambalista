@@ -635,5 +635,31 @@ titulo("ENVIAR — no con una pregunta de consentimiento en blanco");
   check("la que falta se ve distinta", /\.pregunta\.sin-contestar/.test(css));
 }
 
+
+titulo("LOTE AUTOMATICO — decir antes lo que va a pasar");
+
+{
+  const fsp = await import("node:fs/promises");
+  const pjs = await fsp.readFile(new URL("panel/panel.js", BASE), "utf8");
+
+  // El lote salta los portales que no envian solos —LinkedIn— y el fondo
+  // los marca «omitida». Bien hecho, pero nadie se lo decia ANTES:
+  // marcabas las casillas de riesgo contando con enviar diez y salian
+  // siete, sin explicacion hasta el final.
+  check("se avisa de cuales no se enviaran solas", /aviso-lote/.test(pjs));
+  check("y se cuentan antes de pedir el consentimiento",
+    /seSaltan/.test(pjs) && pjs.indexOf("seSaltan") < pjs.indexOf("btn-confirmar-auto"));
+  check("el aviso sale de soloRevisado, no de una lista a mano",
+    /cfg\.soloRevisado/.test(pjs));
+  check("y dice cuantas SI se enviaran", /Se enviar/.test(pjs));
+
+  // Buscar sin escribir nada no puede ser un no-op mudo.
+  check("buscar con el campo vacio avisa",
+    /Escribe qué puesto buscas y le damos/.test(pjs));
+  check("y lleva el cursor al campo", /\$\("#puesto"\)\.focus\(\)/.test(pjs));
+  check("con cero resultados no dice «ordenadas por encaje»",
+    /estado\.vacantes\.length === 0 \? ""/.test(pjs));
+}
+
 console.log(`\n${fallos === 0 ? "TODO OK" : `${fallos} FALLO(S)`}`);
 process.exit(fallos ? 1 : 0);
