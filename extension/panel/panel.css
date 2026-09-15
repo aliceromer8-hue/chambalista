@@ -966,3 +966,19 @@ main { max-width: 1120px; }
 @media (prefers-reduced-motion: reduce) {
   .chip-puesto, .chip-puesto:hover { transition: none; transform: none; }
 }
+
+
+/* Los otros portales, plegados. Se piden DESPUES de que haya visto
+ * funcionar uno: cuatro sesiones seguidas antes de ver una sola vacante
+ * es el sitio perfecto para abandonar, y ademas sobra — con uno ya se
+ * busca y se postula. */
+.mas-portales { grid-column: 1 / -1; margin-top: 4px; }
+.mas-portales summary {
+  cursor: pointer; list-style: none; padding: 9px 2px;
+  font-size: 12.5px; font-weight: 700; color: #131316; opacity: .72;
+}
+.mas-portales summary::-webkit-details-marker { display: none; }
+.mas-portales summary::before { content: "+ "; font-weight: 800; }
+.mas-portales[open] summary::before { content: "2  "; }
+.mas-portales summary:hover { opacity: 1; }
+.mas-portales .portales-portada { margin-top: 2px; }

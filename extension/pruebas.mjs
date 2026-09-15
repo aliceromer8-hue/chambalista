@@ -780,5 +780,32 @@ titulo("ESTADO VACIO — una sola cosa que hacer, sin escribir");
     /minmax\(min\(300px, 100%\), 1fr\)/.test(css));
 }
 
+
+titulo("UN PORTAL, NO CUATRO — el tercer punto de fuga");
+
+{
+  // Se pedian cuatro sesiones seguidas antes de ver una sola vacante.
+  // Cuatro peajes delante de alguien que todavia no ha visto funcionar
+  // nada, y ademas innecesarios: con un portal conectado ya se busca y
+  // se postula.
+  const fsp = await import("node:fs/promises");
+  const pjs = await fsp.readFile(new URL("panel/panel.js", BASE), "utf8");
+  const css = await fsp.readFile(new URL("panel/panel.css", BASE), "utf8");
+
+  check("solo se pide uno al principio", /ordenados\.slice\(0, 1\)/.test(pjs));
+  check("los demas quedan plegados", /mas-portales/.test(pjs) && /<details/.test(pjs));
+  check("y se nombran, para que se sepa que estan ahi",
+    /Añadir \$\{resto\.map/.test(pjs));
+  check("hay estilo para el desplegable", /\.mas-portales/.test(css));
+
+  // El primero es el que tiene la postulacion COMPROBADA, no el primero
+  // de la lista. Si mañana se verifica Bumeran, el orden se ajusta solo.
+  check("el primero se elige por estar verificado",
+    /queHace\(p\)\.tono === "bien"/.test(pjs),
+    "no por el orden en que esten declarados");
+  check("en cuanto hay uno conectado se ven todos",
+    /ordenados\.filter\(\(p\) => p\.sesion\)\.length/.test(pjs));
+}
+
 console.log(`\n${fallos === 0 ? "TODO OK" : `${fallos} FALLO(S)`}`);
 process.exit(fallos ? 1 : 0);

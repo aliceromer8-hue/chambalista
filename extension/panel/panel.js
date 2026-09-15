@@ -232,14 +232,29 @@ function pintarPortada(resumen) {
     const nombre = (estado.perfil.nombre || "").split(" ")[0];
     $("#portada-titulo").innerHTML = `Listo${nombre ? `, ${escapar(nombre)}` : ""}.<br>¿Dónde buscamos?`;
     $("#portada-bajada").textContent =
-      "Marca dónde quieres que busque. Entras una vez a cada uno y ya no vuelves a hacerlo: "
-      + "la sesión queda en tu navegador y nunca vemos tu contraseña.";
-    // Una fila por portal, de una sola linea: punto, nombre, lo que hace
-    // y el boton. Antes esto se partia en tres lineas y cada portal
-    // ocupaba cien pixeles de alto — en un panel de 380 px eso es media
-    // pantalla para decir cuatro nombres.
-    acciones.innerHTML = `<div class="portales-portada" style="width:100%">${
-      sesionesCache.map((p) => `
+      "Con uno basta para empezar. Entras una vez y ya no vuelves a hacerlo: la sesión "
+      + "queda en tu navegador y nunca vemos tu contraseña.";
+
+    // Uno primero, los demás después.
+    //
+    // Antes se pedían cuatro sesiones seguidas antes de ver una sola
+    // vacante. Cuatro peajes delante de alguien que todavía no ha visto
+    // funcionar nada es el sitio perfecto para abandonar — y encima
+    // sobra: con un portal conectado ya se busca y se postula.
+    //
+    // Primero va el que tiene la postulación COMPROBADA, no el primero
+    // de la lista. Si mañana se verifica Bumeran, este orden se ajusta
+    // solo desde verificados.js.
+    const ordenados = [...sesionesCache].sort((a2, b2) => {
+      const peso = (p) => (p.sesion ? 0 : queHace(p).tono === "bien" ? 1 : 2);
+      return peso(a2) - peso(b2);
+    });
+    const primeros = ordenados.filter((p) => p.sesion).length
+      ? ordenados                       // ya conectó alguno: se ven todos
+      : ordenados.slice(0, 1);
+    const resto = primeros.length === ordenados.length ? [] : ordenados.slice(1);
+
+    const fila = (p) => `
         <div class="portal-tarjeta${p.sesion ? " conectado" : ""}">
           <span class="marca-punto ${p.sesion ? "si" : conectando.has(p.id) ? "esperando" : "no"}"></span>
           <span class="portal-nombre">${escapar(p.nombre)}</span>
@@ -250,8 +265,17 @@ function pintarPortada(resumen) {
           ${conectando.has(p.id) && !p.sesion
             ? `<span class="portal-aviso">Entra en la pestaña que se abrió. Esto se marca solo.</span>`
             : ""}
-        </div>`).join("")
-    }</div>`;
+        </div>`;
+
+    acciones.innerHTML = `<div class="portales-portada" style="width:100%">`
+      + primeros.map(fila).join("")
+      + (resto.length
+        ? `<details class="mas-portales">
+             <summary>Añadir ${resto.map((p) => escapar(p.nombre)).join(", ")}</summary>
+             <div class="portales-portada">${resto.map(fila).join("")}</div>
+           </details>`
+        : "")
+      + `</div>`;
     acciones.querySelectorAll("[data-portada-acceso]").forEach((b) => {
       b.addEventListener("click", async () => {
         const cual = b.dataset.portadaAcceso;
