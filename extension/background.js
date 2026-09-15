@@ -30,7 +30,7 @@ async function pestanaLista(tabId, limite = 25000) {
   const fin = Date.now() + limite;
   while (Date.now() < fin) {
     try {
-      const r = await chrome.tabs.sendMessage(tabId, { accion: "ping" });
+      const r = await hablarCon(tabId, { accion: "ping" });
       if (r?.ok) return true;
     } catch {
       // el content script aún no cargó
@@ -40,11 +40,60 @@ async function pestanaLista(tabId, limite = 25000) {
   return false;
 }
 
+/**
+ * Habla con el content script de una pestaña, inyectándolo si no está.
+ *
+ * `chrome.tabs.sendMessage` a una pestaña sin content script falla con
+ * «Could not establish connection. Receiving end does not exist.», que
+ * es un error de Chrome y no le dice nada a nadie. Y pasa a menudo: cada
+ * vez que se recarga la extensión, las pestañas de portales que ya
+ * estaban abiertas se quedan sin script hasta que se recargan a mano.
+ *
+ * Como el manifest ya pide el permiso `scripting`, se puede arreglar en
+ * vez de solo avisar: se inyecta el script que toca para ese dominio y
+ * se reintenta una vez. Si ni así, entonces sí se dice algo que se
+ * entienda.
+ */
+const GUION_POR_DOMINIO = [
+  [/(^|\.)computrabajo\.com$/, ["contenido/comun.js", "contenido/computrabajo.js"]],
+  [/(^|\.)bumeran\.com\.pe$/, ["contenido/comun.js", "contenido/bumeran.js"]],
+  [/(^|\.)indeed\.com$/,       ["contenido/comun.js", "contenido/indeed.js"]],
+  [/(^|\.)linkedin\.com$/,     ["contenido/comun.js", "contenido/linkedin.js"]],
+];
+
+async function hablarCon(tabId, mensaje) {
+  try {
+    // La directa a propósito: esta es la que puede fallar por falta de
+    // content script, y es justo lo que el catch de abajo arregla.
+    return await chrome.tabs.sendMessage(tabId, mensaje);
+  } catch (e) {
+    if (!/Receiving end does not exist|Could not establish connection/i.test(e.message || "")) {
+      throw e;
+    }
+    let host = "";
+    try {
+      host = new URL((await chrome.tabs.get(tabId)).url || "").hostname;
+    } catch { /* la pestaña se cerró */ }
+    const guiones = (GUION_POR_DOMINIO.find(([re]) => re.test(host)) || [])[1];
+    if (!guiones) {
+      throw new Error("Esa pestaña no es de un portal que conozcamos.");
+    }
+    try {
+      await chrome.scripting.executeScript({ target: { tabId }, files: guiones });
+    } catch (fallo) {
+      throw new Error(`No se pudo preparar la pestaña de ${host}. `
+        + `Recárgala y vuelve a intentarlo. (${fallo.message})`);
+    }
+    await esperar(400);
+    return chrome.tabs.sendMessage(tabId, mensaje);
+  }
+}
+
 async function irY(tabId, url, accion, extra = {}) {
   await chrome.tabs.update(tabId, { url });
   await esperar(1200);
   if (!(await pestanaLista(tabId))) throw new Error("La página no terminó de cargar.");
-  return chrome.tabs.sendMessage(tabId, { accion, ...extra });
+  return hablarCon(tabId, { accion, ...extra });
 }
 
 /** Pestaña de trabajo: se reutiliza una sola para no llenar el navegador. */
@@ -133,7 +182,7 @@ async function adjuntarCVAdaptado(tabId, perfil, vacante, resumen, competenciasE
 
   let puesto;
   try {
-    puesto = await chrome.tabs.sendMessage(tabId, {
+    puesto = await hablarCon(tabId, {
       accion: "adjuntar", nombre: pedido.nombre, base64: pedido.base64,
     });
   } catch (e) {
@@ -218,7 +267,7 @@ async function prepararUna(vacante, perfil, guardados, respuestasPersona) {
     }
   }
 
-  const abierto = await chrome.tabs.sendMessage(tabId, { accion: "abrirFormulario" });
+  const abierto = await hablarCon(tabId, { accion: "abrirFormulario" });
   if (abierto?.requiereLogin) return { ...reporte, requiereLogin: true, nota: abierto.nota };
   if (abierto?.captcha) return { ...reporte, captcha: true, nota: abierto.nota };
   if (abierto?.error) return { ...reporte, error: abierto.error };
@@ -233,13 +282,13 @@ async function prepararUna(vacante, perfil, guardados, respuestasPersona) {
   const patrones = datos.CAMPOS.map((c) => ({
     clave: c.clave, etiqueta: c.etiqueta, patron: c.patron.source,
   }));
-  const relleno = await chrome.tabs.sendMessage(tabId, {
+  const relleno = await hablarCon(tabId, {
     accion: "rellenar", perfil, guardados, patrones,
   });
   reporte.completados = relleno?.completados || [];
   reporte.pendientes = relleno?.pendientes || [];
 
-  const { preguntas } = await chrome.tabs.sendMessage(tabId, { accion: "preguntas" });
+  const { preguntas } = await hablarCon(tabId, { accion: "preguntas" });
   reporte.preguntas = await respuestas.redactar(preguntas || [], perfil, guardados, respuestasPersona || {});
   reporte.listoParaEnviar = true;
   return reporte;
@@ -248,10 +297,10 @@ async function prepararUna(vacante, perfil, guardados, respuestasPersona) {
 async function escribirYEnviar(respuestasAprobadas) {
   const tabId = await pestanaDeTrabajo();
   if (respuestasAprobadas && Object.keys(respuestasAprobadas).length) {
-    await chrome.tabs.sendMessage(tabId, { accion: "escribir", respuestas: respuestasAprobadas });
+    await hablarCon(tabId, { accion: "escribir", respuestas: respuestasAprobadas });
     await esperar(400);
   }
-  return chrome.tabs.sendMessage(tabId, { accion: "enviar" });
+  return hablarCon(tabId, { accion: "enviar" });
 }
 
 // ---------------------------------------------------------------------
@@ -428,7 +477,7 @@ function vigilarAcceso(tabId, portalId) {
     if (idCargada !== tabId || info.status !== "complete") return;
     if (Date.now() > hasta) return parar();
     try {
-      const r = await chrome.tabs.sendMessage(tabId, { accion: "sesion" });
+      const r = await hablarCon(tabId, { accion: "sesion" });
       if (r?.sesion) {
         parar();
         // El panel puede estar cerrado; si nadie escucha, no pasa nada.
@@ -503,7 +552,7 @@ chrome.runtime.onMessage.addListener((msg, _e, responder) => {
                 const tabs = await chrome.tabs.query({ url: [patron, `${p.base}/*`] });
                 for (const t of tabs) {
                   try {
-                    const r = await chrome.tabs.sendMessage(t.id, { accion: "sesion" });
+                    const r = await hablarCon(t.id, { accion: "sesion" });
                     if (r) return { id: p.id, nombre: p.nombre, postulable: p.postulable,
                                     acceso: p.acceso, sesion: Boolean(r.sesion), abierto: true };
                   } catch { /* esa pestaña no tiene content script */ }

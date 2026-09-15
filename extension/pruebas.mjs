@@ -841,5 +841,50 @@ titulo("LAS FRASES QUE LEE LA EMPRESA");
   check("ninguna plantilla escupe basura", feo.length === 0, JSON.stringify(feo));
 }
 
+
+titulo("LA PESTAÑA SIN CONTENT SCRIPT — el fallo mas probable del primer intento");
+
+{
+  // chrome.tabs.sendMessage a una pestaña sin content script falla con
+  // «Could not establish connection. Receiving end does not exist.»:
+  // un error de Chrome que no dice nada. Y pasa a menudo — cada vez que
+  // se recarga la extension, las pestañas de portales que ya estaban
+  // abiertas se quedan sin script hasta recargarlas a mano.
+  //
+  // Como el manifest ya pide `scripting`, se puede ARREGLAR en vez de
+  // solo avisar.
+  const fsp = await import("node:fs/promises");
+  const fondo = await fsp.readFile(new URL("background.js", BASE), "utf8");
+  const man = JSON.parse(await fsp.readFile(new URL("manifest.json", BASE), "utf8"));
+
+  check("existe un unico camino para hablar con la pestaña",
+    /async function hablarCon\(/.test(fondo));
+  check("reconoce ese error concreto de Chrome",
+    /Receiving end does not exist/.test(fondo));
+  check("e inyecta el script en vez de rendirse",
+    /chrome\.scripting\.executeScript/.test(fondo));
+  check("el permiso `scripting` esta pedido",
+    (man.permissions || []).includes("scripting"), (man.permissions || []).join(", "));
+
+  // Nada puede llamar a sendMessage por fuera: si lo hace, se salta el
+  // arreglo y vuelve el error crudo.
+  const sueltas = [...fondo.matchAll(/chrome\.tabs\.sendMessage\(/g)].length;
+  check("solo hablarCon llama a sendMessage directamente", sueltas === 2,
+    `${sueltas} llamadas (deben ser 2: la primera y el reintento)`);
+
+  // Y sin recursion: hablarCon llamandose a si misma cuelga el fondo.
+  const cuerpo = fondo.slice(fondo.indexOf("async function hablarCon("),
+                             fondo.indexOf("async function irY("));
+  check("hablarCon no se llama a si misma",
+    !/return await hablarCon\(/.test(cuerpo), "seria una recursion infinita");
+
+  // Cada dominio sabe que guiones inyectar, y coinciden con el manifest.
+  for (const cs of man.content_scripts.filter((c) => !c.js.includes("contenido/puente.js"))) {
+    const archivo = cs.js.find((j) => j !== "contenido/comun.js");
+    check(`${archivo.split("/").pop()} esta en la tabla de inyeccion`,
+      fondo.includes(`"${archivo}"`), archivo);
+  }
+}
+
 console.log(`\n${fallos === 0 ? "TODO OK" : `${fallos} FALLO(S)`}`);
 process.exit(fallos ? 1 : 0);
