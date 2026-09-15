@@ -807,5 +807,39 @@ titulo("UN PORTAL, NO CUATRO — el tercer punto de fuga");
     /ordenados\.filter\(\(p\) => p\.sesion\)\.length/.test(pjs));
 }
 
+
+titulo("LAS FRASES QUE LEE LA EMPRESA");
+
+{
+  // Estos campos no se quedan en el panel: se escriben en el formulario
+  // de la empresa. Con los controles nuevos —desplegables y calendario—
+  // lo guardado cambio de forma y las frases salian raras:
+  //
+  //   «Mi disponibilidad para empezar es 2026-10-01.»   formato de BD
+  //   «Mi usuario es TikTok: @alicemkt.»                no lo dice nadie
+  const disp = datos.CAMPOS.find((c) => c.clave === "disponibilidadInicio");
+  const red = datos.CAMPOS.find((c) => c.clave === "redes");
+
+  check("una fecha se escribe como la escribe una persona",
+    disp.plantilla("2026-10-01") === "Puedo empezar a partir del 1 de octubre de 2026.",
+    disp.plantilla("2026-10-01"));
+  check("y una opcion sigue leyendose bien",
+    /inmediata/.test(disp.plantilla("Inmediata")), disp.plantilla("Inmediata"));
+  check("ninguna frase deja ver el formato ISO",
+    !/\d{4}-\d{2}-\d{2}/.test(disp.plantilla("2026-10-01")));
+
+  check("la red social se nombra, no se pega",
+    red.plantilla("TikTok: @alicemkt") === "Mi TikTok es @alicemkt.",
+    red.plantilla("TikTok: @alicemkt"));
+  check("y un valor sin red no rompe",
+    /solo_usuario/.test(red.plantilla("solo_usuario")), red.plantilla("solo_usuario"));
+
+  // Ninguna plantilla puede escupir «undefined» ni «[object Object]».
+  const feo = datos.CAMPOS
+    .map((c) => ({ c: c.clave, t: c.plantilla("x") }))
+    .filter((r) => /undefined|NaN|\[object/.test(r.t));
+  check("ninguna plantilla escupe basura", feo.length === 0, JSON.stringify(feo));
+}
+
 console.log(`\n${fallos === 0 ? "TODO OK" : `${fallos} FALLO(S)`}`);
 process.exit(fallos ? 1 : 0);

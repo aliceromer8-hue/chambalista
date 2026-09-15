@@ -69,7 +69,13 @@ export const CAMPOS = [
     validar: /^.{3,60}$/,
     error: "Describe tu disponibilidad.",
     sensible: false,
-    plantilla: (v) => `Mi disponibilidad para empezar es ${v}.`,
+    // Lo guardado puede ser una opcion («Inmediata») o una fecha ISO,
+    // que es como la devuelve <input type="date">. Escribirle
+    // «2026-10-01» a una empresa es mandarle el formato de la base de
+    // datos: nadie contesta asi.
+    plantilla: (v) => (/^\d{4}-\d{2}-\d{2}$/.test(v)
+      ? `Puedo empezar a partir del ${enCastellano(v)}.`
+      : `Mi disponibilidad para empezar es ${v.toLowerCase()}.`),
   },
   {
     clave: "redes",
@@ -85,7 +91,13 @@ export const CAMPOS = [
     validar: /^.{2,80}$/,
     error: "Elige la red y escribe tu usuario.",
     sensible: false,
-    plantilla: (v) => `Mi usuario es ${v}.`,
+    // Guardado como «TikTok: @alicemkt». «Mi usuario es TikTok:
+    // @alicemkt» no lo escribe nadie; «Mi TikTok es @alicemkt», si.
+    plantilla: (v) => {
+      const corte = v.indexOf(":");
+      if (corte < 1) return `Mi usuario es ${v}.`;
+      return `Mi ${v.slice(0, corte).trim()} es ${v.slice(corte + 1).trim()}.`;
+    },
   },
   {
     clave: "licencia",
@@ -144,4 +156,15 @@ export function paraCampo(etiqueta, guardados = {}) {
 export function faltantes(guardados = {}) {
   return CAMPOS.filter((c) => !guardados[c.clave])
     .map((c) => ({ clave: c.clave, etiqueta: c.etiqueta, ayuda: c.ayuda }));
+}
+
+
+const MESES = ["enero", "febrero", "marzo", "abril", "mayo", "junio", "julio",
+               "agosto", "septiembre", "octubre", "noviembre", "diciembre"];
+
+/** «2026-10-01» -> «1 de octubre de 2026». */
+function enCastellano(iso) {
+  const [a, m, d] = iso.split("-").map(Number);
+  if (!a || !m || !d || m < 1 || m > 12) return iso;
+  return `${d} de ${MESES[m - 1]} de ${a}`;
 }
