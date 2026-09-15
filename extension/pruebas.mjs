@@ -682,8 +682,16 @@ titulo("ANCHO REAL — el panel de Chrome son 380 px, no 900");
   };
   check("las filas de portal se parten si no caben",
     /flex-wrap: wrap/.test(bloque(".portal-fila")), bloque(".portal-fila").slice(0, 60));
-  check("y las tarjetas de portal tambien",
-    /flex-wrap: wrap/.test(bloque(".portal-tarjeta")));
+  // La tarjeta de portal se rehizo como rejilla en vez de flex: cuatro
+  // columnas que no se parten, con el nombre recortandose si hace falta.
+  // Lo que hay que comprobar no es COMO lo hace sino que pueda encoger —
+  // con `flex-wrap` acababa en tres lineas y cien pixeles de alto.
+  check("la tarjeta de portal puede encoger sin desbordar",
+    /minmax\(0, 1fr\)/.test(bloque(".portal-tarjeta"))
+    || /flex-wrap: wrap/.test(bloque(".portal-tarjeta")),
+    bloque(".portal-tarjeta").slice(0, 80));
+  check("y el nombre se recorta antes de empujar",
+    /text-overflow: ellipsis/.test(bloque(".portal-nombre")));
   check("las cuatro pestañas caben en 380 px",
     /@media \(max-width: 400px\)[\s\S]{0,120}\.tab \{/.test(css),
     "«Mi perfil» se cortaba por seis pixeles");
@@ -694,6 +702,37 @@ titulo("ANCHO REAL — el panel de Chrome son 380 px, no 900");
   check("la rejilla de las tarjetas lleva suelo cero",
     /minmax\(0, 1fr\)/.test(css.slice(css.indexOf(".rejilla {"), css.indexOf(".rejilla {") + 400)),
     "ahi es donde vive la tarjeta de Portales");
+}
+
+
+titulo("ESCRITORIO — el panel se abre en una pestaña entera, no en un popup");
+
+{
+  // Dato que cambia el objetivo de diseño: background.js abre el panel
+  // con chrome.tabs.create, asi que en un PC coge el ancho completo de
+  // la ventana —1280, 1440— y no los 380 px de un panel lateral. Estuve
+  // probandolo a 380 y ese es un tamaño que casi nunca ve.
+  const fsp = await import("node:fs/promises");
+  const fondo = await fsp.readFile(new URL("background.js", BASE), "utf8");
+  const pjs = await fsp.readFile(new URL("panel/panel.js", BASE), "utf8");
+  const css = await fsp.readFile(new URL("panel/panel.css", BASE), "utf8");
+
+  check("el panel se abre en una pestaña completa",
+    /chrome\.tabs\.create\(\{ url: URL_PANEL/.test(fondo));
+  check("y el ancho de lectura tiene tope, para que no se estire sin fin",
+    /main \{[^}]*max-width/.test(css));
+
+  // El argumento de venta estorba a quien ya compro.
+  check("el bloque «como postula por ti» se retira al cargar el CV",
+    /#hace"\)\.classList\.toggle\("oculto", etapa >= 2\)/.test(pjs),
+    "en escritorio empujaba el tablero fuera de la vista");
+
+  // No tener portales conectados todavia no es una averia.
+  check("sin portales conectados el aviso es neutro, no rojo",
+    /habiaConectado \? "mal" : "neutro"/.test(pjs));
+  check("y solo avisa en rojo si la sesion se cayo",
+    /sesión caída/.test(pjs));
+  check("hay estilo para ese estado neutro", /\.estado-sesion\.neutro/.test(css));
 }
 
 console.log(`\n${fallos === 0 ? "TODO OK" : `${fallos} FALLO(S)`}`);

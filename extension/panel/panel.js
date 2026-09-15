@@ -152,7 +152,11 @@ function pintarPortada(resumen) {
 
   portada.classList.toggle("compacta", etapa === 3);
   // La promesa solo hace falta mientras no la haya comprobado.
-  $("#hace").classList.toggle("oculto", etapa === 3 && resumen.total > 0);
+  // El bloque «cómo postula por ti» es el argumento de venta, y quien ya
+  // subió su CV lo compró: a partir de ahí estorba, y en una pantalla de
+  // escritorio empuja el tablero fuera de la vista. Solo se enseña
+  // mientras la persona aún no tiene CV.
+  $("#hace").classList.toggle("oculto", etapa >= 2);
   tablero.classList.toggle("esperando", etapa !== 3);
   $("#arranque").classList.add("oculto");
 
@@ -215,18 +219,22 @@ function pintarPortada(resumen) {
     $("#portada-bajada").textContent =
       "Marca dónde quieres que busque. Entras una vez a cada uno y ya no vuelves a hacerlo: "
       + "la sesión queda en tu navegador y nunca vemos tu contraseña.";
+    // Una fila por portal, de una sola linea: punto, nombre, lo que hace
+    // y el boton. Antes esto se partia en tres lineas y cada portal
+    // ocupaba cien pixeles de alto — en un panel de 380 px eso es media
+    // pantalla para decir cuatro nombres.
     acciones.innerHTML = `<div class="portales-portada" style="width:100%">${
       sesionesCache.map((p) => `
-        <div class="portal-tarjeta">
+        <div class="portal-tarjeta${p.sesion ? " conectado" : ""}">
           <span class="marca-punto ${p.sesion ? "si" : conectando.has(p.id) ? "esperando" : "no"}"></span>
-          <span>${escapar(p.nombre)}
-            <span class="portal-chip ${queHace(p).tono}" style="margin-left:5px">${queHace(p).etiqueta}</span>
-            ${conectando.has(p.id) && !p.sesion
-              ? `<span class="nota conectando">conectando… entra en la pestaña que se abrió</span>` : ""}
-          </span>
+          <span class="portal-nombre">${escapar(p.nombre)}</span>
+          <span class="portal-chip ${queHace(p).tono}">${queHace(p).etiqueta}</span>
           <button class="boton chico" data-portada-acceso="${p.id}">
-            ${p.sesion ? "Abrir" : conectando.has(p.id) ? "Reintentar" : "Iniciar sesión"}
+            ${p.sesion ? "Abrir" : conectando.has(p.id) ? "Reintentando…" : "Entrar"}
           </button>
+          ${conectando.has(p.id) && !p.sesion
+            ? `<span class="portal-aviso">Entra en la pestaña que se abrió. Esto se marca solo.</span>`
+            : ""}
         </div>`).join("")
     }</div>`;
     acciones.querySelectorAll("[data-portada-acceso]").forEach((b) => {
@@ -1130,8 +1138,16 @@ async function revisarSesion() {
   const conectados = sesionesCache.filter((p) => p.sesion === true).length;
   const total = sesionesCache.length;
 
-  chip.textContent = conectados ? `${conectados}/${total} conectados` : "sin conectar";
-  chip.className = "estado-sesion " + (conectados ? "ok" : "mal");
+  // No tener portales conectados TODAVIA no es una averia: es el estado
+  // normal de quien acaba de entrar. En rojo y arriba del todo era lo
+  // primero que veia, y decia «algo va mal» cuando lo que pasaba es que
+  // aun no habia empezado. Rojo solo cuando hubo sesion y se perdio.
+  const habiaConectado = sesionesCache.some((p) => p.abierto);
+  chip.textContent = conectados
+    ? `${conectados} de ${total} conectados`
+    : (habiaConectado ? "sesión caída" : "sin portales aún");
+  chip.className = "estado-sesion "
+    + (conectados ? "ok" : habiaConectado ? "mal" : "neutro");
   pintarPortales();
   // Conectar un portal cambia de etapa: la portada debe reaccionar.
   if (!$("#vista-inicio").classList.contains("oculto")) pintarInicio();
