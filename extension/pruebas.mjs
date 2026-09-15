@@ -690,8 +690,12 @@ titulo("ANCHO REAL — el panel de Chrome son 380 px, no 900");
     /minmax\(0, 1fr\)/.test(bloque(".portal-tarjeta"))
     || /flex-wrap: wrap/.test(bloque(".portal-tarjeta")),
     bloque(".portal-tarjeta").slice(0, 80));
-  check("y el nombre se recorta antes de empujar",
-    /text-overflow: ellipsis/.test(bloque(".portal-nombre")));
+  // Decision revisada: el nombre NO se recorta. Es el dato de la fila, y
+  // «Compu…» no sirve para nada. Lo que cede es la etiqueta, que
+  // desaparece del todo cuando la fila se estrecha de verdad.
+  check("la etiqueta cede antes que el nombre",
+    /text-overflow: ellipsis/.test(bloque(".portal-chip"))
+    && !/text-overflow: ellipsis/.test(bloque(".portal-nombre")));
   check("las cuatro pestañas caben en 380 px",
     /@media \(max-width: 400px\)[\s\S]{0,120}\.tab \{/.test(css),
     "«Mi perfil» se cortaba por seis pixeles");
@@ -733,6 +737,47 @@ titulo("ESCRITORIO — el panel se abre en una pestaña entera, no en un popup")
   check("y solo avisa en rojo si la sesion se cayo",
     /sesión caída/.test(pjs));
   check("hay estilo para ese estado neutro", /\.estado-sesion\.neutro/.test(css));
+}
+
+
+titulo("ESTADO VACIO — una sola cosa que hacer, sin escribir");
+
+{
+  // Ali: «la flojera es la joya, debemos facilitarlo lo mas que se pueda».
+  //
+  // Antes, con cero postulaciones, se dejaba el tablero entero —cinco
+  // columnas de «0» y dos tarjetas vacias— al 38 % de opacidad y sin
+  // poder tocarlo. Eso no es un estado vacio: es ruido atenuado ocupando
+  // la pantalla para decir que todavia no se puede usar.
+  const fsp = await import("node:fs/promises");
+  const pjs = await fsp.readFile(new URL("panel/panel.js", BASE), "utf8");
+  const css = await fsp.readFile(new URL("panel/panel.css", BASE), "utf8");
+
+  check("el tablero se esconde si no hay nada que enseñar",
+    /tablero\.classList\.toggle\("oculto"/.test(pjs));
+  check("y ya no queda el tablero fantasma atenuado",
+    !/#tablero\.esperando/.test(css), "opacity .38 y pointer-events none");
+  check("en su lugar hay un arranque con una sola cosa que hacer",
+    /pintarArranque/.test(pjs));
+
+  // Lo importante: no se le pide que escriba.
+  check("los puestos los propone el servidor, no los escribe la persona",
+    /\/api\/cv\/sugerencias/.test(pjs));
+  check("cada puesto es un clic que ya busca",
+    /#puesto"\)\.value = b\.dataset\.puesto/.test(pjs)
+    && /#btn-buscar"\)\.click\(\)/.test(pjs));
+  check("con la razon de por que se propone", /p\.razon/.test(pjs));
+  check("y la explicacion del momento de carrera", /arranque-pista/.test(pjs));
+  check("escribirlo a mano sigue siendo posible, pero es la salida",
+    /arranque-otro/.test(pjs));
+  check("las sugerencias se piden una sola vez", /sugerenciasPedidas/.test(pjs));
+
+  // El nombre del portal no se recorta nunca: es EL dato de la fila.
+  const bloquePortal = css.slice(css.indexOf(".portal-nombre {"), css.indexOf("}", css.indexOf(".portal-nombre {")));
+  check("el nombre del portal no se recorta",
+    !/text-overflow: ellipsis/.test(bloquePortal), bloquePortal.trim().slice(0, 60));
+  check("y las tarjetas piden ancho suficiente para no cortarlo",
+    /minmax\(min\(300px, 100%\), 1fr\)/.test(css));
 }
 
 console.log(`\n${fallos === 0 ? "TODO OK" : `${fallos} FALLO(S)`}`);

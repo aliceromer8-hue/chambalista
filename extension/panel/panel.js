@@ -157,8 +157,23 @@ function pintarPortada(resumen) {
   // escritorio empuja el tablero fuera de la vista. Solo se enseña
   // mientras la persona aún no tiene CV.
   $("#hace").classList.toggle("oculto", etapa >= 2);
-  tablero.classList.toggle("esperando", etapa !== 3);
-  $("#arranque").classList.add("oculto");
+  // El tablero: se enseña cuando hay algo que enseñar, y no antes.
+  //
+  // Antes se dejaba SIEMPRE visible, atenuado al 38 % y sin poder
+  // tocarlo. O sea cinco columnas con «0» y dos tarjetas vacías,
+  // fantasmales, ocupando la pantalla entera para decir que todavía no
+  // se puede usar. Eso no es un estado vacío: es ruido con opacidad.
+  const sinNada = resumen.total === 0;
+  tablero.classList.toggle("oculto", etapa !== 3 || sinNada);
+  tablero.classList.remove("esperando");
+  $("#kanban-resumen").classList.toggle("oculto", etapa !== 3 || sinNada);
+
+  // Y en su lugar, cuando ya está todo listo pero aún no ha postulado a
+  // nada, una sola cosa que hacer. Con los puestos ya propuestos: pedirle
+  // que escriba qué buscar es pedirle trabajo justo cuando el producto
+  // existe para ahorrárselo.
+  $("#arranque").classList.toggle("oculto", !(etapa === 3 && sinNada));
+  if (etapa === 3 && sinNada) pintarArranque();
 
   if (etapa === 0) {
     $("#portada-titulo").innerHTML = "Cien postulaciones.<br>Un clic cada una.";
@@ -228,7 +243,7 @@ function pintarPortada(resumen) {
         <div class="portal-tarjeta${p.sesion ? " conectado" : ""}">
           <span class="marca-punto ${p.sesion ? "si" : conectando.has(p.id) ? "esperando" : "no"}"></span>
           <span class="portal-nombre">${escapar(p.nombre)}</span>
-          <span class="portal-chip ${queHace(p).tono}">${queHace(p).etiqueta}</span>
+          <span class="portal-chip ${queHace(p).tono}" title="${queHace(p).etiqueta}">${queHace(p).etiqueta}</span>
           <button class="boton chico" data-portada-acceso="${p.id}">
             ${p.sesion ? "Abrir" : conectando.has(p.id) ? "Reintentando…" : "Entrar"}
           </button>
@@ -1151,6 +1166,62 @@ async function revisarSesion() {
   pintarPortales();
   // Conectar un portal cambia de etapa: la portada debe reaccionar.
   if (!$("#vista-inicio").classList.contains("oculto")) pintarInicio();
+}
+
+/**
+ * Lo único que hay que hacer cuando ya está todo listo y no has
+ * postulado a nada todavía.
+ *
+ * Los puestos los propone el servidor a partir del CV —la misma
+ * deducción que ya sabe que quien está en ciclo 11 busca prácticas y no
+ * jefaturas— así que aquí no hay que escribir nada: se elige y ya.
+ * Escribir es el enemigo; cada campo vacío es una excusa para cerrar la
+ * pestaña.
+ */
+let sugerenciasPedidas = false;
+
+async function pintarArranque() {
+  const caja = $("#arranque");
+  const nombre = (estado.perfil?.nombre || "").split(" ")[0];
+  if (!caja.dataset.pintado) {
+    caja.innerHTML = `
+      <article class="tarjeta arranque-tarjeta">
+        <p class="antetitulo">Ya está todo listo</p>
+        <h2 id="arranque-titulo">${nombre ? `${escapar(nombre)}, ` : ""}busca tu primer puesto</h2>
+        <p class="pista" id="arranque-pista">Elige uno y empezamos. Puedes cambiarlo cuando quieras.</p>
+        <div class="arranque-puestos" id="arranque-puestos"></div>
+        <button class="boton secundario" id="arranque-otro">Prefiero escribirlo yo</button>
+      </article>`;
+    caja.dataset.pintado = "1";
+    $("#arranque-otro").addEventListener("click", () => {
+      irA("vacantes");
+      $("#puesto").focus();
+    });
+  }
+  if (sugerenciasPedidas || !estado.perfil) return;
+  sugerenciasPedidas = true;
+  try {
+    const r = await sesion.conCuenta("/api/cv/sugerencias", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(estado.perfil),
+    });
+    if (!r.ok) return;
+    const { puestos = [], explicacion = "" } = await r.json();
+    if (explicacion) $("#arranque-pista").textContent = explicacion;
+    $("#arranque-puestos").innerHTML = puestos.slice(0, 4).map((p) => `
+      <button class="chip-puesto" data-puesto="${escapar(p.texto)}">
+        <b>${escapar(p.texto)}</b><span>${escapar(p.razon || "")}</span>
+      </button>`).join("");
+    $("#arranque-puestos").querySelectorAll("[data-puesto]").forEach((b) => {
+      b.addEventListener("click", () => {
+        // Un clic: se pone el puesto y se busca. Sin escribir nada.
+        irA("vacantes");
+        $("#puesto").value = b.dataset.puesto;
+        $("#btn-buscar").click();
+      });
+    });
+  } catch { /* sin sugerencias se puede escribir igual */ }
 }
 
 /** Tarjeta de portales: estado y botón para iniciar sesión en cada uno. */

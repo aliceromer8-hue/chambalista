@@ -574,11 +574,16 @@ select:focus-visible, textarea:focus-visible, [draggable]:focus-visible {
 
 /* El tablero se atenúa hasta que la configuración esté hecha: se ve
    que existe, pero no compite con lo que toca hacer ahora. */
-#tablero.esperando { opacity: .38; pointer-events: none; filter: saturate(.4); }
 
 /* Selector de portales dentro de la portada */
-.portales-portada { display: grid; grid-template-columns: repeat(2, 1fr); gap: 9px; margin-top: 18px; }
-@media (max-width: 560px) { .portales-portada { grid-template-columns: 1fr; } }
+/* Las tarjetas piden 300 px para que quepan nombre, etiqueta y boton sin
+ * recortar nada. Con `repeat(2, 1fr)` fijo, a ancho de escritorio salian
+ * dos columnas de 290 y el nombre del portal se cortaba a «Compu…» — que
+ * es justo el dato que la persona busca en esa fila. */
+.portales-portada {
+  display: grid; grid-template-columns: repeat(auto-fit, minmax(min(300px, 100%), 1fr));
+  gap: 9px; margin-top: 18px;
+}
 
 
 
@@ -869,8 +874,9 @@ main { max-width: 1120px; }
  * boton miden lo que miden, el nombre se recorta si hace falta y la
  * etiqueta cede antes que nada. Todo cabe en una linea de 40 px. */
 .portal-tarjeta {
+  container-type: inline-size;
   display: grid;
-  grid-template-columns: auto minmax(0, 1fr) auto auto;
+  grid-template-columns: auto auto minmax(0, 1fr) auto;
   align-items: center; gap: 9px;
   background: var(--papel); border: 2px solid var(--linea);
   border-radius: var(--r-chico); padding: 9px 11px;
@@ -879,7 +885,9 @@ main { max-width: 1120px; }
 .portal-tarjeta + .portal-tarjeta { margin-top: 7px; }
 .portal-tarjeta.conectado { box-shadow: var(--dura-chica); }
 .portal-nombre {
-  font-weight: 800; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  font-weight: 800; white-space: nowrap;
+  /* Sin recorte: el nombre del portal es EL dato de la fila. Si no cabe
+   * todo, lo que sobra es la etiqueta, no el nombre. */
 }
 .portal-tarjeta .boton.chico { padding: 5px 11px; font-size: 12px; }
 
@@ -890,8 +898,15 @@ main { max-width: 1120px; }
   letter-spacing: .02em; white-space: nowrap;
   border: 1.5px solid var(--papel-3); border-radius: 99px;
   padding: 2px 8px; color: var(--tinta-2); background: var(--papel-2);
-  overflow: hidden; text-overflow: ellipsis; max-width: 42%;
+  min-width: 0; overflow: hidden; text-overflow: ellipsis;
+  /* No se estira: ocupa lo que dice y el hueco libre queda ANTES del
+   * boton. Sin esto la etiqueta salia como una pildora larguisima medio
+   * vacia, que parece un campo de texto en vez de una etiqueta. */
+  justify-self: start;
 }
+/* Cuando la fila se estrecha de verdad, la etiqueta desaparece antes que
+ * recortar el nombre o el boton. Decir «post…» no informa de nada. */
+@container (max-width: 250px) { .portal-chip { display: none; } }
 .portal-chip.bien   { background: var(--lima); color: #131316; border-color: #131316; }
 .portal-chip.aviso  { background: var(--sol-suave); color: var(--tinta); border-color: var(--sol); }
 .portal-chip.neutro { background: var(--papel-2); color: var(--tinta-2); }
@@ -916,4 +931,38 @@ main { max-width: 1120px; }
  * que pasaba es que todavia no habia empezado. */
 .estado-sesion.neutro {
   background: var(--papel-2); border-color: var(--papel-3); color: var(--tinta-2);
+}
+
+
+/* ══════════ lo unico que hay que hacer ══════════ */
+/* Sustituye al tablero fantasma: antes, con cero postulaciones, se
+ * dejaban cinco columnas de «0» y dos tarjetas vacias al 38 % de opacidad
+ * y sin poder tocarlas. Eso no es un estado vacio, es ruido atenuado.
+ *
+ * Aqui hay una sola cosa que hacer, y los puestos vienen propuestos por
+ * el servidor: pedirle que escriba que buscar seria pedirle trabajo justo
+ * cuando el producto existe para ahorrarselo. */
+.arranque-tarjeta { max-width: 720px; }
+.arranque-tarjeta h2 { font-size: clamp(1.3rem, 2.4vw, 1.75rem); margin: 4px 0 6px; }
+.arranque-tarjeta .pista { max-width: 62ch; }
+
+.arranque-puestos {
+  display: grid; grid-template-columns: repeat(auto-fit, minmax(min(240px, 100%), 1fr));
+  gap: 10px; margin: 16px 0 14px;
+}
+.chip-puesto {
+  display: grid; gap: 2px; text-align: left; cursor: pointer;
+  background: var(--papel); color: var(--tinta);
+  border: 2px solid var(--linea); border-radius: var(--r-chico);
+  padding: 12px 14px; font: inherit;
+  box-shadow: var(--dura-chica);
+  transition: transform .12s, background .12s;
+}
+.chip-puesto b { font-size: 14px; font-weight: 800; letter-spacing: -.01em; }
+.chip-puesto span { font-size: 12px; color: var(--tinta-2); }
+.chip-puesto:hover { background: var(--lima); transform: translate(-1px, -1px); }
+.chip-puesto:hover b, .chip-puesto:hover span { color: #131316; }
+.chip-puesto:active { transform: none; box-shadow: none; }
+@media (prefers-reduced-motion: reduce) {
+  .chip-puesto, .chip-puesto:hover { transition: none; transform: none; }
 }
