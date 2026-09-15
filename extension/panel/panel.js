@@ -79,6 +79,21 @@ function avisar(texto, tipo = "") {
   setTimeout(() => el.remove(), 3800);
 }
 
+/**
+ * La fecha de una postulación, en corto.
+ *
+ * `new Date(x).toLocaleDateString()` pinta «Invalid Date» —así, en
+ * inglés— en cuanto el registro no trae fecha o la trae rota. Puede
+ * pasar con un registro viejo o con uno que baje de la nube, y aparece
+ * en la tarjeta de una postulación de verdad. Mejor no decir nada que
+ * decir «Invalid Date».
+ */
+function fechaCorta(valor) {
+  if (!valor) return "";
+  const f = new Date(valor);
+  return Number.isNaN(f.getTime()) ? "" : f.toLocaleDateString("es-PE");
+}
+
 // ---------------------------------------------------------------------
 // Navegación
 // ---------------------------------------------------------------------
@@ -114,11 +129,11 @@ async function pintarInicio() {
   const lista = (await almacen.tracker.listar()).slice(0, 6);
   $("#ultimos").innerHTML = lista.length
     ? lista.map((p) => {
-        const f = new Date(p.fecha);
+        const f = fechaCorta(p.fecha);
         return `<div class="portal-fila"><span class="punto ${p.etapa}"></span>` +
           `<span><strong>${escapar(p.puesto || "—")}</strong>` +
           `<div class="nota">${escapar(p.empresa || "")}</div></span>` +
-          `<span class="estado nota">${f.toLocaleDateString("es-PE")}</span></div>`;
+          `<span class="estado nota">${f}</span></div>`;
       }).join("")
     : `<p class="vacio">Todavía no has postulado a nada.</p>`;
 
@@ -849,10 +864,10 @@ async function pintarPipeline() {
     return `<div class="columna" data-etapa="${e.id}">
       <header><span class="punto ${e.id}"></span>${e.nombre}<span class="conteo">${suyas.length}</span></header>
       ${suyas.map((p) => {
-        const f = new Date(p.fecha);
+        const f = fechaCorta(p.fecha);
         return `<div class="ficha" draggable="true" data-id="${escapar(p.id)}">
           <strong>${escapar(p.puesto || "—")}</strong>
-          <div class="sub">${escapar(p.empresa || "")} · ${f.toLocaleDateString("es-PE")}</div>
+          <div class="sub">${escapar([p.empresa, f].filter(Boolean).join(" · "))}</div>
           ${p.motivo ? `<div class="motivo">${escapar(p.motivo)}</div>` : ""}
           <select class="mover">
             ${almacen.ETAPAS.map((x) =>
