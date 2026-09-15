@@ -661,5 +661,40 @@ titulo("LOTE AUTOMATICO — decir antes lo que va a pasar");
     /estado\.vacantes\.length === 0 \? ""/.test(pjs));
 }
 
+
+titulo("ANCHO REAL — el panel de Chrome son 380 px, no 900");
+
+{
+  // Toda la pestaña «Mi perfil» se salia de la pantalla. La causa: un
+  // `1fr` tiene el contenido minimo como suelo, asi que la tarjeta de
+  // Portales —cuatro filas de nombre + etiqueta + boton, sin partir—
+  // empujaba la columna a 402 px dentro de un panel de 348. Y lo empeore
+  // yo al alargar las etiquetas a «rellena, envias tu».
+  const fsp = await import("node:fs/promises");
+  const css = await fsp.readFile(new URL("panel/panel.css", BASE), "utf8");
+
+  check("las rejillas estrechas pueden encoger",
+    /\.rejilla \{ grid-template-columns: minmax\(0, 1fr\)/.test(css),
+    "un `1fr` a secas no baja de su contenido minimo");
+  const bloque = (sel) => {
+    const i = css.indexOf(sel + " {");
+    return i < 0 ? "" : css.slice(i, css.indexOf("}", i));
+  };
+  check("las filas de portal se parten si no caben",
+    /flex-wrap: wrap/.test(bloque(".portal-fila")), bloque(".portal-fila").slice(0, 60));
+  check("y las tarjetas de portal tambien",
+    /flex-wrap: wrap/.test(bloque(".portal-tarjeta")));
+  check("las cuatro pestañas caben en 380 px",
+    /@media \(max-width: 400px\)[\s\S]{0,120}\.tab \{/.test(css),
+    "«Mi perfil» se cortaba por seis pixeles");
+
+  // No se prohibe `1fr` en general —con contenido que encoge esta bien—
+  // sino en la rejilla que contiene las tarjetas de portal, que es la
+  // que tiene un minimo grande y no puede ceder.
+  check("la rejilla de las tarjetas lleva suelo cero",
+    /minmax\(0, 1fr\)/.test(css.slice(css.indexOf(".rejilla {"), css.indexOf(".rejilla {") + 400)),
+    "ahi es donde vive la tarjeta de Portales");
+}
+
 console.log(`\n${fallos === 0 ? "TODO OK" : `${fallos} FALLO(S)`}`);
 process.exit(fallos ? 1 : 0);

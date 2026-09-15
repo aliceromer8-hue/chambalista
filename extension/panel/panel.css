@@ -95,6 +95,16 @@ b, .cifra, time, .conteo { font-variant-numeric: tabular-nums; }
   background: none; border: 2px solid transparent; color: var(--tinta-2);
   cursor: pointer; font: inherit; font-size: 13.5px; font-weight: 700;
   padding: 7px 14px; border-radius: 99px; transition: background .12s, color .12s;
+  white-space: nowrap;
+}
+
+/* A 380 px —el ancho real del panel de Chrome— las cuatro pestañas se
+ * pasaban por SEIS pixeles y «Mi perfil» quedaba cortada. Se podia
+ * arrastrar, pero seis pixeles cortados no parecen una zona que se
+ * desplaza: parecen un fallo de dibujo, y la pestaña de los datos
+ * personales es justo la que hay que encontrar. */
+@media (max-width: 400px) {
+  .tab { padding: 7px 11px; font-size: 13px; }
 }
 .tab:hover { color: var(--tinta); background: var(--papel-2); }
 .tab.activa {
@@ -131,7 +141,12 @@ main { max-width: 1200px; margin: 0 auto; padding: 24px 20px 80px; }
 .cabecera-tarjeta { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 12px; }
 .cabecera-vista { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 6px; }
 .rejilla { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
-@media (max-width: 880px) { .rejilla { grid-template-columns: 1fr; } }
+/* minmax(0, 1fr) y no `1fr` a secas: un `1fr` tiene el contenido minimo
+ * como suelo, asi que una tarjeta ancha —la de Portales, con cuatro
+ * filas de nombre + etiqueta + boton que no parten— empujaba la columna
+ * a 402 px dentro de un panel de 348 y toda la pestaña se salia.
+ * Con minmax(0, …) la columna puede encoger y el contenido se adapta. */
+@media (max-width: 880px) { .rejilla { grid-template-columns: minmax(0, 1fr); } }
 
 /* ══════════ kanban de cifras ══════════ */
 .kanban { display: grid; grid-template-columns: repeat(5, 1fr); gap: 12px; margin-bottom: 20px; }
@@ -383,9 +398,16 @@ main { max-width: 1200px; margin: 0 auto; padding: 24px 20px 80px; }
 }
 
 .portal-fila {
+  /* Igual que .portal-tarjeta: en un panel de 380 px el nombre, la
+   * etiqueta de lo que hace y el boton no caben en una linea, y sin
+   * `wrap` el boton se salia de la pantalla. Con las etiquetas nuevas
+   * —«rellena, envias tu»— pasaba en tres de las cuatro filas. */
   display: flex; align-items: center; gap: 10px; padding: 11px 0;
   border-bottom: 2px solid var(--papel-3); font-size: 13px;
+  flex-wrap: wrap; min-width: 0;
 }
+.portal-fila > strong, .portal-fila > span:not(.estado) { min-width: 0; }
+.portal-fila .boton { flex: 0 0 auto; }
 .portal-fila:last-child { border-bottom: none; }
 .portal-fila strong { font-weight: 800; }
 .portal-fila .estado { margin-left: auto; font-size: 11px; font-weight: 700; }
@@ -562,11 +584,16 @@ select:focus-visible, textarea:focus-visible, [draggable]:focus-visible {
 .portales-portada { display: grid; grid-template-columns: repeat(2, 1fr); gap: 9px; margin-top: 18px; }
 @media (max-width: 560px) { .portales-portada { grid-template-columns: 1fr; } }
 .portal-tarjeta {
-  display: flex; align-items: center; gap: 9px;
+  /* `wrap` para que en un panel estrecho el boton baje a la linea de
+   * abajo en vez de empujar la tarjeta a lo ancho. `min-width: 0` para
+   * que el nombre pueda recortarse si hace falta. */
+  display: flex; align-items: center; gap: 9px; flex-wrap: wrap; min-width: 0;
   background: var(--papel); border: 2px solid var(--tinta); border-radius: var(--r-chico);
   padding: 11px 13px; box-shadow: var(--dura-chica); font-size: 13px; font-weight: 700;
   text-align: left;
 }
+.portal-tarjeta > span:nth-child(2) { min-width: 0; flex: 1 1 auto; }
+.portal-tarjeta .boton { flex: 0 0 auto; margin-left: auto; }
 .portal-tarjeta .marca-punto { width: 11px; height: 11px; border-radius: 3px; border: 2px solid var(--tinta); flex-shrink: 0; }
 .portal-tarjeta .marca-punto.si { background: var(--menta); }
 .portal-tarjeta .marca-punto.no { background: var(--papel); }
