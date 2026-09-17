@@ -982,3 +982,16 @@ main { max-width: 1120px; }
 .mas-portales[open] summary::before { content: "2  "; }
 .mas-portales summary:hover { opacity: 1; }
 .mas-portales .portales-portada { margin-top: 2px; }
+
+/* ══════════ pie de versión ══════════
+ * Discreto a propósito: no es información que se necesite mientras se
+ * postula, pero tiene que estar cuando algo va mal y hay que comprobar
+ * si Chrome cargó el código nuevo o el de hace tres horas. */
+.pie-version {
+  /* main ya reserva 80px abajo: el pie vive dentro de ese aire, no debajo. */
+  max-width: 1200px;
+  margin: -56px auto 0;
+  padding: 0 20px 24px;
+  text-align: center;
+}
+.pie-version .nota { color: var(--tinta-2); font-size: 11.5px; }

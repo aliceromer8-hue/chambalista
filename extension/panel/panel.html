@@ -222,6 +222,16 @@
 
 </main>
 
+<!-- Qué versión se está ejecutando de verdad.
+   ~ Chrome carga la extensión descomprimida desde la CARPETA del disco, así
+   ~ que «tengo la última» y «estoy corriendo la última» son cosas distintas:
+   ~ se puede pasar una tarde arreglando un fallo que ya estaba arreglado.
+   ~ Esto lo lee del propio manifest cargado, no de un número escrito a mano,
+   ~ así que si dice 0.2.0 es porque Chrome tiene 0.2.0. -->
+<footer class="pie-version">
+  <span class="nota" id="version-extension"></span>
+</footer>
+
 <!-- Detalle de una vacante -->
 <div class="modal oculto" id="modal">
   <div class="caja">

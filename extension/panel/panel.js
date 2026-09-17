@@ -1321,7 +1321,34 @@ function pintarPortales() {
   await pintarInicio();
   pintarCuota();
   pintarTope();
+  pintarVersion();
 })();
+
+
+/**
+ * Qué versión está corriendo Chrome AHORA MISMO.
+ *
+ * No es un adorno. La extensión se carga descomprimida desde una carpeta
+ * del disco, así que actualizar el repositorio y actualizar lo que Chrome
+ * ejecuta son dos cosas distintas, y desde fuera se ven iguales: el panel
+ * se abre, todo parece normal, y el fallo que ya estaba arreglado sigue
+ * ahí. Se puede perder una tarde entera así.
+ *
+ * Por eso el número sale de `getManifest()` —el manifest que Chrome tiene
+ * cargado de verdad— y nunca de una constante escrita aquí: una constante
+ * diría la versión nueva aunque Chrome siguiera con el código viejo,
+ * que es exactamente la mentira que esto existe para no contar.
+ */
+function pintarVersion() {
+  const donde = document.querySelector("#version-extension");
+  if (!donde) return;
+  try {
+    donde.textContent = `Chamba Lista ${chrome.runtime.getManifest().version}`;
+  } catch {
+    // Sin manifest no hay nada honesto que decir: mejor un pie vacío.
+    donde.closest(".pie-version")?.remove();
+  }
+}
 
 
 // El sello de la portada lo escribe el código, no la plantilla.

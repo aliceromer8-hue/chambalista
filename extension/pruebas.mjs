@@ -886,5 +886,39 @@ titulo("LA PESTAÑA SIN CONTENT SCRIPT — el fallo mas probable del primer inte
   }
 }
 
-console.log(`\n${fallos === 0 ? "TODO OK" : `${fallos} FALLO(S)`}`);
+// ══════════════════════════════════════════════════════════════════════
+// LA VERSIÓN QUE SE VE ES LA QUE SE EJECUTA
+// ══════════════════════════════════════════════════════════════════════
+// Ali pasó horas arreglando fallos que ya estaban arreglados: Chrome
+// tenía cargada la carpeta vieja y nada en pantalla lo decía. El pie del
+// panel existe para que eso se vea de un vistazo, así que aquí se
+// comprueba que sigue estando y —lo que de verdad importa— que el número
+// sale del manifest cargado y no de una constante escrita a mano.
+{
+  titulo("VERSIÓN — que no se pueda probar código viejo sin enterarse");
+
+  const fsp = await import("node:fs/promises");
+  const man = JSON.parse(await fsp.readFile(new URL("manifest.json", BASE), "utf8"));
+  const html = await fsp.readFile(new URL("panel/panel.html", BASE), "utf8");
+  const js = await fsp.readFile(new URL("panel/panel.js", BASE), "utf8");
+  const css = await fsp.readFile(new URL("panel/panel.css", BASE), "utf8");
+
+  check("el manifest declara una version", /^\d+\.\d+\.\d+$/.test(man.version || ""),
+    man.version);
+  check("el panel tiene donde enseñarla", html.includes('id="version-extension"'));
+  check("y el pie existe en el CSS", /\.pie-version\s*\{/.test(css));
+  check("se pinta al arrancar el panel", js.includes("pintarVersion();"));
+
+  // El corazon de la prueba: una constante diria la version nueva aunque
+  // Chrome siguiera ejecutando la vieja — la mentira exacta que esto
+  // existe para no contar.
+  check("el numero sale de getManifest, no de una constante",
+    js.includes("chrome.runtime.getManifest().version"));
+
+  const sinLaLlamada = js.split("getManifest().version").join("");
+  check("la version no esta ademas escrita a mano en panel.js",
+    !sinLaLlamada.includes(man.version),
+    sinLaLlamada.includes(man.version) ? "se desincronizaria en silencio" : "");
+}
+
 process.exit(fallos ? 1 : 0);
