@@ -1024,9 +1024,16 @@ check("lo pide al código, que es quien sabe el tope",
       'accion: "consentimiento"' in _panel_js and "pintarTope" in _panel_js)
 
 _fondo = pathlib.Path("extension/background.js").read_text(encoding="utf-8")
-_tope = int(_re.search(r"TOPE_POR_TANDA = (\d+)", _fondo).group(1))
+# El tope se mudó a verificados.js, al lado de los packs: el titular y el
+# número que el código cumple tienen que salir del MISMO sitio o vuelven
+# a decir cosas distintas. background.js ahora lo importa.
+_verif_tope = pathlib.Path("extension/lib/verificados.js").read_text(encoding="utf-8")
+_tope = int(_re.search(r"TOPE_POR_TANDA = (\d+)", _verif_tope).group(1))
 check("el tope real está declarado en un solo sitio", _tope > 0, f"{_tope} por tanda")
-check("y el background lo publica para que el panel lo lea",
+check("y el background lo importa, no lo redeclara",
+      "import { TOPE_POR_TANDA }" in _fondo
+      and not _re.search(r"^const TOPE_POR_TANDA", _fondo, _re.M))
+check("y lo publica para que el panel lo lea",
       "tope: TOPE_POR_TANDA" in _fondo)
 
 # El titular vuelve a llevar número, y eso está bien mientras el número
@@ -1052,7 +1059,11 @@ _visible_panel = _re.sub(r"<!--.*?-->", "", _panel, flags=_re.S).lower()
 if _esperado:
     check("el titular de la web dice el tamaño del pack mayor",
           _esperado in _visible_web, f"el pack mayor es {_pack_mayor}")
-    check("y el del panel dice el mismo", _esperado in _visible_panel)
+    # En el panel el titular lo escribe titularPortada() desde las
+    # constantes; el HTML solo lleva el primer fotograma. Vale cualquiera
+    # de los dos, pero alguno tiene que decir el número.
+    check("y el del panel dice el mismo",
+          _esperado in _visible_panel or "PACK_MAYOR" in _panel_js)
 
 # El pack mayor del código y el que anuncia la landing son el mismo.
 check("el precio anunciado corresponde a ese pack",

@@ -921,4 +921,105 @@ titulo("LA PESTAÑA SIN CONTENT SCRIPT — el fallo mas probable del primer inte
     sinLaLlamada.includes(man.version) ? "se desincronizaria en silencio" : "");
 }
 
+// ══════════════════════════════════════════════════════════════════════
+// EL CSS PARSEA — un selector suelto se come la regla siguiente
+// ══════════════════════════════════════════════════════════════════════
+// Habia un `.chk-portal` sin bloque, y el parser de CSS se traga todo
+// hasta la siguiente llave: se llevo por delante `.boton { ... }` entero.
+// Resultado: NINGUN boton de la extension tenia padding, ni forma de
+// pildora, ni peso. El de «Entrar» medía 21 px de alto y Ali lo vio
+// «muerto» — no estaba apagado, estaba sin estilo.
+//
+// Lo peor es que no falla ruidosamente: el navegador descarta la regla y
+// sigue como si nada. Por eso se comprueba aqui, y no mirando.
+{
+  titulo("CSS — que no haya reglas que se coman a la siguiente");
+
+  const fsp2 = await import("node:fs/promises");
+  const css = await fsp2.readFile(new URL("panel/panel.css", BASE), "utf8");
+  const limpio = css.replace(/\/\*[\s\S]*?\*\//g, "");
+
+  const abren = (limpio.match(/{/g) || []).length;
+  const cierran = (limpio.match(/}/g) || []).length;
+  check("las llaves cuadran", abren === cierran, `${abren} abren, ${cierran} cierran`);
+
+  // Una linea que parece selector y no abre bloque debe ir seguida de `{`.
+  // (Un `}` tambien vale: es la ultima declaracion sin punto y coma.)
+  const lineas = limpio.split("\n");
+  const huerfanos = [];
+  for (let i = 0; i < lineas.length; i++) {
+    const l = lineas[i].trim();
+    if (!l || l.includes("{") || /[,;}]$/.test(l)) continue;
+    if (!/^[.#[:a-zA-Z*]/.test(l)) continue;
+    const sig = (lineas.slice(i + 1).find((x) => x.trim()) || "").trim();
+    if (!sig.startsWith("{") && !sig.startsWith("}")) {
+      huerfanos.push(`linea ${i + 1}: «${l}»`);
+    }
+  }
+  check("ningun selector se queda sin bloque", huerfanos.length === 0,
+    huerfanos.slice(0, 3).join(" · "));
+
+  // Y la regla concreta que se perdio, por su nombre: si vuelve a
+  // desaparecer, el boton vuelve a medir 21 px y nadie se entera.
+  const base = css.match(/(?:^|\n)\.boton\s*\{([^}]*)\}/);
+  check("la regla base .boton existe", Boolean(base));
+  for (const prop of ["padding", "border-radius", "box-shadow", "font-weight"]) {
+    check(`  .boton declara ${prop}`, Boolean(base) && base[1].includes(prop));
+  }
+}
+
+// ══════════════════════════════════════════════════════════════════════
+// EL TITULAR NO PUEDE PROMETER LO QUE EL CODIGO NO HACE
+// ══════════════════════════════════════════════════════════════════════
+// La portada decia «Cien postulaciones» mientras background.js mandaba
+// quince por tanda. Eran dos numeros en dos archivos distintos y nadie
+// los comparaba nunca. Ahora salen del mismo sitio.
+{
+  titulo("TITULAR — el numero de la portada es el que el codigo cumple");
+
+  const fsp3 = await import("node:fs/promises");
+  const ver = await fsp3.readFile(new URL("lib/verificados.js", BASE), "utf8");
+  const fondo2 = await fsp3.readFile(new URL("background.js", BASE), "utf8");
+  const pjs = await fsp3.readFile(new URL("panel/panel.js", BASE), "utf8");
+  const phtml = await fsp3.readFile(new URL("panel/panel.html", BASE), "utf8");
+
+  check("el tope vive en verificados.js, con los packs",
+    /export const TOPE_POR_TANDA\s*=\s*\d+/.test(ver));
+  check("background.js lo importa en vez de declararlo",
+    fondo2.includes('import { TOPE_POR_TANDA }') &&
+    !/^const TOPE_POR_TANDA/m.test(fondo2));
+
+  const tope = Number((ver.match(/TOPE_POR_TANDA\s*=\s*(\d+)/) || [])[1]);
+  const pack = Number((ver.match(/PACK_MAYOR\s*=\s*(\d+)/) || [])[1]);
+  check("los dos numeros se leen", Number.isFinite(tope) && Number.isFinite(pack),
+    `tope ${tope}, pack ${pack}`);
+
+  check("el titular se escribe desde los numeros, no a mano",
+    pjs.includes("titularPortada()") &&
+    !/portada-titulo"\)\.innerHTML = "Cien/.test(pjs));
+
+  // Lo que de verdad importa no es que la cadena «Un clic» este en el
+  // archivo —esta, dentro de una rama— sino que esa rama este CERRADA
+  // por la comparacion. Buscar la cadena a secas da un falso positivo.
+  const cuerpo = (pjs.match(/function titularPortada\(\)\s*\{([\s\S]*?)^\}/m) || [])[1] || "";
+  check("titularPortada compara el tope con el pack",
+    /TOPE_POR_TANDA\s*>=\s*PACK_MAYOR/.test(cuerpo), cuerpo ? "" : "no se encontro la funcion");
+
+  // Y lo que devuelve cuando la comparacion NO se cumple —el caso de hoy—
+  // no puede prometer un clic.
+  const salidaPorDefecto = cuerpo.split("}").pop();
+  check("sin cubrir el pack, el titular no promete un clic",
+    Boolean(cuerpo) && !/un clic/i.test(salidaPorDefecto),
+    salidaPorDefecto.trim().slice(0, 60));
+
+  // Y el primer fotograma (el HTML estatico) dice lo mismo que el JS.
+  const enHtml = (phtml.match(/id="portada-titulo">([^<]*(?:<br>)?[^<]*)</) || [])[1] || "";
+  check("el HTML estatico no contradice al JS",
+    tope >= pack ? enHtml.includes("Un clic") : !enHtml.includes("Un clic"),
+    enHtml.replace(/<br>/g, " "));
+}
+
+console.log(`
+${fallos === 0 ? "TODO OK" : `${fallos} FALLO(S)`}`);
+
 process.exit(fallos ? 1 : 0);

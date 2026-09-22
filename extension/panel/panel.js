@@ -9,6 +9,7 @@ import * as datos from "../lib/datos.js";
 import * as ia from "../lib/ia.js";
 import * as coincidencia from "../lib/coincidencia.js";
 import * as sesion from "../lib/sesion.js";
+import { PACK_MAYOR, TOPE_POR_TANDA } from "../lib/verificados.js";
 
 const $ = (s) => document.querySelector(s);
 const enviar = (msg) => chrome.runtime.sendMessage(msg);
@@ -141,6 +142,30 @@ async function pintarInicio() {
 }
 
 /**
+ * El titular de la portada, escrito desde los números de verdad.
+ *
+ * Estaba a mano en dos sitios del JS y otro del HTML, y decía «cien»
+ * mientras el código mandaba quince. Un número que el propio producto
+ * desmiente es exactamente lo que no podemos permitirnos.
+ *
+ * Así que lo escribe la única fuente que manda —`verificados.js`— y
+ * dice lo que sea verdad ese día:
+ *
+ *   · Si una tanda ya cubre el pack entero, promete el clic: es cierto.
+ *   · Si no, promete lo que SÍ se cumple siempre: que no escribes
+ *     ninguna. Que es además el motivo real por el que alguien paga.
+ *
+ * El día que suba TOPE_POR_TANDA a cien —una línea, después de activar
+ * facturación en Gemini— el titular cambia solo.
+ */
+function titularPortada() {
+  if (TOPE_POR_TANDA >= PACK_MAYOR) {
+    return `Un clic.<br>${PACK_MAYOR} postulaciones.`;
+  }
+  return `${PACK_MAYOR} postulaciones.<br>Sin escribir ninguna.`;
+}
+
+/**
  * La portada cambia según en qué punto está la persona. El panel entero
  * se comporta como una landing cuando es nueva —una sola cosa que hacer,
  * el resto atenuado— y se convierte en tablero cuando ya está lista.
@@ -191,7 +216,7 @@ function pintarPortada(resumen) {
   if (etapa === 3 && sinNada) pintarArranque();
 
   if (etapa === 0) {
-    $("#portada-titulo").innerHTML = "Cien postulaciones.<br>Un clic cada una.";
+    $("#portada-titulo").innerHTML = titularPortada();
     $("#portada-bajada").textContent =
       "Entra con tu cuenta de Chamba Lista para empezar. Es la misma de la web.";
     acciones.innerHTML = `
@@ -232,7 +257,7 @@ function pintarPortada(resumen) {
   }
 
   if (etapa === 1) {
-    $("#portada-titulo").innerHTML = "Cien postulaciones.<br>Un clic cada una.";
+    $("#portada-titulo").innerHTML = titularPortada();
     $("#portada-bajada").textContent =
       "Sube tu CV una vez. Desde ahí esto busca, llena los formularios y contesta "
       + "las preguntas de cada empresa. Tú solo lees y dices que sí.";

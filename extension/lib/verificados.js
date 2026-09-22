@@ -37,14 +37,27 @@ export const SOLO_RELLENA = ["linkedin"];
 // manda de una tanda. Pero eso no es lo que nadie compra, y Ali lo vio:
 // ninguno de los planes dice quince. Lo que se compra son cien.
 //
-// «Cien postulaciones. Un clic cada una.» es verdad por las dos mitades:
-// cien es el pack, y cada una se envía con un clic suyo. Lo que NO se
-// puede decir es «un clic, cien postulaciones» de golpe, porque el
-// sistema manda quince por tanda y eso seguiría siendo un número que el
-// código desmiente.
+// El titular y el tope de una tanda tienen que salir del MISMO sitio.
+// Estaban separados —el titular en panel.html, el tope en background.js—
+// y llevaban meses diciendo cosas distintas: el texto prometía cien y el
+// código mandaba quince. Un número en la portada que el propio código
+// desmiente es justo lo que no se puede permitir.
+//
+// Ahora TOPE_POR_TANDA está aquí, al lado de los packs, background.js lo
+// importa y el panel escribe el titular con él. Suban o bajen, coinciden;
+// y una prueba falla si alguien los vuelve a separar.
+//
+// Por qué sigue en 15 y no en 100: el tope real no es este número, es la
+// cuota de IA. Cada postulación gasta ~2 llamadas al modelo y la capa
+// gratuita da 40 cada 24 h — una tanda de cien se quedaría tiesa cerca de
+// la veinte, con ochenta «llegaste al límite» en pantalla. Subirlo a cien
+// es una línea, pero solo después de activar facturación en Gemini.
 export const PACKS = [
   { postulaciones: 5, soles: 0, nombre: "Para probar" },
   { postulaciones: 30, soles: 15, nombre: "Pack chico" },
   { postulaciones: 100, soles: 29, nombre: "Recomendado" },
 ];
 export const PACK_MAYOR = 100;
+
+// Cuántas prepara una tanda de un clic. Ver el bloque de arriba.
+export const TOPE_POR_TANDA = 15;

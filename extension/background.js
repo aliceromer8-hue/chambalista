@@ -12,8 +12,8 @@ import * as cv from "./lib/cv.js";
 import * as huecos from "./lib/huecos.js";
 import * as sesion from "./lib/sesion.js";
 import { medir } from "./lib/medir.js";
+import { TOPE_POR_TANDA } from "./lib/verificados.js";
 
-const TOPE_POR_TANDA = 15;
 const PAUSA_ENTRE_VACANTES = 2500;
 
 let lote = { fase: "inactivo", modo: "", total: 0, hechas: 0, mensaje: "", items: [], cancelado: false };
