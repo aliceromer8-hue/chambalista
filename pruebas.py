@@ -1016,8 +1016,17 @@ for _m, _r in (("POST", "/api/ia/redactar"), ("GET", "/api/ia/cuota")):
 # instala. Las mismas promesas y el mismo cuidado.
 _panel = pathlib.Path("extension/panel/panel.html").read_text(encoding="utf-8")
 _panel_js = pathlib.Path("extension/panel/panel.js").read_text(encoding="utf-8")
-check("el panel tampoco promete treinta",
-      "treinta" not in _panel.lower() and "treinta" not in _panel_js.lower())
+# Lo prohibido es la PROMESA, no la palabra.
+#
+# Antes bastaba con que «treinta» no apareciera. Pero ahora panel.js
+# lleva una tabla de número→palabra («30: "Treinta"») para escribir el
+# titular, y esa tabla no puede mentir: va indexada por PACK_MAYOR, así
+# que devuelve la palabra del número que de verdad es. Prohibir el
+# término suelto marcaba como fallo justo el mecanismo que garantiza
+# que no haya fallo.
+check("el panel no promete «treinta postulaciones»",
+      "treinta postulaciones" not in _panel.lower()
+      and "treinta postulaciones" not in _panel_js.lower())
 check("y el sello no lleva un número escrito a mano",
       'id="sello-tope"' in _panel and ">30<" not in _panel)
 check("lo pide al código, que es quien sabe el tope",
