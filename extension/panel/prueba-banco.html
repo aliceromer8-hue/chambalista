@@ -1,0 +1,359 @@
+<!-- BANCO DE PRUEBAS DEL PANEL — no forma parte de la extensión.
+     Se llama «prueba-…» a proposito: app_web.py deja fuera del zip todo
+     archivo cuyo nombre empiece por «prueba». (Por prefijo «_» NO se
+     excluye nada, y con razon: `_locales/` es una carpeta legitima.)
+
+     Para qué: el panel decide qué enseña según en qué punto está la
+     persona (etapa 0 sin cuenta, 1 sin CV, 2 sin portales, 3 listo), y
+     esas etapas solo corren si existe `chrome.*`. Abriendo panel.html a
+     pelo no se ve ninguna: sale la portada estática y nada más.
+
+     Aquí se simula esa API antes de que cargue el módulo, así que el
+     panel ejecuta SU código y se ve lo mismo que en Chrome.
+
+         ?etapa=0   sin cuenta        → formulario de acceso
+         ?etapa=1   con cuenta, sin CV
+         ?etapa=2   con CV, sin portales
+         ?etapa=3   todo listo
+
+     Levantarlo:  python -m http.server 8777 --directory extension
+     y abrir      /panel/prueba-banco.html?etapa=1
+-->
+<script>
+(() => {
+  const params = new URLSearchParams(location.search);
+  const etapa = Number(params.get("etapa") ?? 1);
+
+  // Un CV mínimo pero realista: el del banco de IA, para que lo que se
+  // vea aquí sea lo mismo que se mide allí.
+  const CV = {
+    nombre: "MARIANA QUISPE TORRES",
+    contacto: { ubicacion: "Lima, Perú", email: "mariana.prueba@ejemplo.pe" },
+    perfil: ["Estudiante de Administración de décimo ciclo."],
+    competencias: [{ categoria: "Herramientas", items: "Excel · Power BI · SQL" }],
+    experiencia: [{
+      organizacion: "COMERCIAL ANDINA SAC", lugar: "Lima, PE",
+      cargo: "Practicante de Análisis Comercial", fechas: "Ene 2025 – Dic 2025",
+      logros: ["Automatizó el reporte semanal de ventas en Power BI."],
+    }],
+    educacion: [{
+      organizacion: "UNMSM", lugar: "Lima, PE",
+      cargo: "Administración de Empresas | Ciclo 10", fechas: "2021 – 2026", logros: [],
+    }],
+  };
+
+  // Las claves son las de verdad: sesion.js usa "sesion" y almacen.js
+  // "perfil"/"preferencias". Inventarlas aqui pinta siempre la etapa 0 y
+  // uno cree que el panel esta roto.
+  const almacen = {};
+  if (etapa >= 1) almacen.sesion = { token: "banco", correo: "mariana@ejemplo.pe" };
+  if (etapa >= 2) almacen.perfil = CV;
+  if (etapa >= 3) almacen.preferencias = { puesto: "practicante de marketing", ciudad: "Lima", nivel: "cualquiera", portales: ["computrabajo"] };
+
+  window.chrome = {
+    runtime: {
+      getManifest: () => ({ version: "0.2.0" }),
+      onMessage: { addListener() {} },
+      // El fondo no existe aquí: se contesta lo mínimo para que el panel
+      // no se quede esperando. Si algo pide más, sale en la consola.
+      sendMessage: async (msg) => {
+        const a = msg && msg.accion;
+        if (a === "consentimiento") return { casillas: [], tope: 15 };
+        if (a === "sesiones") return { portales: [] };
+        if (a === "estadoLote") return { fase: "inactivo", items: [] };
+        console.log("[banco] sendMessage sin respuesta:", a, msg);
+        return {};
+      },
+    },
+    storage: {
+      local: {
+        get: async (k) => {
+          if (k == null) return { ...almacen };
+          if (Array.isArray(k)) return Object.fromEntries(k.filter((x) => x in almacen).map((x) => [x, almacen[x]]));
+          return k in almacen ? { [k]: almacen[k] } : {};
+        },
+        set: async (o) => Object.assign(almacen, o),
+        remove: async (k) => { for (const x of [].concat(k)) delete almacen[x]; },
+      },
+    },
+    tabs: { create: (o) => console.log("[banco] abriría pestaña:", o.url) },
+  };
+
+  // La sesión se verifica contra el servidor real; aquí se contesta que
+  // vale, para no depender de la red ni gastar una cuenta de verdad.
+  const fetchReal = window.fetch;
+  window.fetch = async (url, opts) => {
+    const u = String(url);
+    if (u.includes("/api/cuenta/yo")) {
+      // OJO con la forma: verificar() lee `j.usuario`. Si se devuelve
+      // otra cosa da la sesion por muerta, la BORRA y el panel cae a la
+      // etapa 0 — que parece un fallo del panel y es del banco.
+      return new Response(JSON.stringify({ usuario: { correo: "mariana@ejemplo.pe" } }), { status: 200 });
+    }
+    if (u.includes("/api/cv/sugerencias")) {
+      return new Response(JSON.stringify({ momento: "estudiante-final", puestos: [
+        { texto: "Practicante de Análisis de Datos", razon: "es lo que más respalda tu CV (61 %)" },
+        { texto: "Practicante de Business Intelligence", razon: "tu CV respalda análisis (61 %)" },
+      ] }), { status: 200 });
+    }
+    console.log("[banco] fetch:", u);
+    return new Response("{}", { status: 200 });
+  };
+
+  document.addEventListener("DOMContentLoaded", () => {
+    const aviso = document.createElement("div");
+    aviso.textContent = `banco de pruebas · etapa ${etapa}`;
+    aviso.style.cssText = "position:fixed;right:8px;bottom:8px;z-index:9999;background:#FF6B4A;"
+      + "color:#fff;font:700 11px system-ui;padding:4px 9px;border-radius:99px;border:2px solid #131316";
+    document.body.appendChild(aviso);
+  });
+})();
+</script>
+
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Chamba Lista — Panel</title>
+<link rel="stylesheet" href="panel.css?v=1790112626">
+</head>
+<body>
+
+<header class="cabecera">
+  <span class="marca">
+    <svg width="22" height="24" viewBox="0 0 24 26" fill="none" aria-hidden="true">
+      <rect x="1.5" y="1.5" width="21" height="23" rx="2" stroke="currentColor" stroke-width="1.7"/>
+      <line x1="6" y1="7.5" x2="18" y2="7.5" stroke="currentColor" stroke-width="1.7"/>
+      <line x1="6" y1="12" x2="12" y2="12" stroke="currentColor" stroke-width="1.7"/>
+      <line x1="15" y1="12" x2="18" y2="12" stroke="var(--acento)" stroke-width="1.7"/>
+      <line x1="6" y1="16" x2="12" y2="16" stroke="currentColor" stroke-width="1.7"/>
+      <line x1="15" y1="16" x2="18" y2="16" stroke="var(--acento)" stroke-width="1.7"/>
+    </svg>
+    Chamba Lista
+  </span>
+
+  <nav class="menu" role="tablist">
+    <button class="tab activa" data-vista="inicio" role="tab">Inicio</button>
+    <button class="tab" data-vista="vacantes" role="tab">Vacantes</button>
+    <button class="tab" data-vista="pipeline" role="tab">Postulaciones</button>
+    <button class="tab" data-vista="perfil" role="tab">Mi perfil</button>
+  </nav>
+
+  <!-- Quién eres. Vacío hasta que hay CV; lo rellena pintarPerfil(). -->
+  <div class="quien-soy-panel oculto" id="quien-soy-panel">
+    <span class="inicial" id="quien-inicial" aria-hidden="true"></span>
+    <span class="texto"><b id="quien-nombre"></b><span id="quien-linea"></span></span>
+  </div>
+  <span class="estado-sesion" id="estado-sesion">…</span>
+</header>
+
+<main>
+
+  <!-- ══════════ INICIO ══════════ -->
+  <section class="vista" id="vista-inicio">
+
+    <!-- Portada: manda cuando la persona es nueva, se encoge cuando ya
+         está lista. El panel es landing y tablero según el momento. -->
+    <section class="portada" id="portada">
+      <div class="portada-texto">
+        <p class="antetitulo">Prácticas y primer empleo en Perú</p>
+        <!-- Lo reescribe panel.js con titularPortada(), desde PACK_MAYOR y
+           TOPE_POR_TANDA. Esto es solo el primer fotograma. -->
+        <h1 id="portada-titulo">Cien postulaciones.<br>Sin escribir ninguna.</h1>
+        <p class="bajada" id="portada-bajada">
+          Sube tu CV, elige dónde buscar y postula a todo lo que encaje contigo.
+          Tú das el último clic, siempre.
+        </p>
+        <div class="portada-acciones" id="portada-acciones"></div>
+      </div>
+      <div class="portada-arte" aria-hidden="true">
+        <div class="hoja-flotante">
+          <span class="linea larga"></span>
+          <span class="linea"></span>
+          <span class="linea corta acento"></span>
+          <span class="linea"></span>
+          <span class="linea corta acento"></span>
+          <span class="linea media"></span>
+        </div>
+        <!-- El número lo escribe panel.js con TOPE_POR_TANDA, que es la
+           cifra que el código respeta de verdad. Escrito a mano decía 30
+           cuando el tope real son 15: el doble. -->
+        <div class="sello" id="sello"><span id="sello-tope">—</span><small>por tanda</small></div>
+      </div>
+    </section>
+
+    <!-- Lo que hace la web sola. Es la promesa del producto puesta en
+         términos de trabajo que la persona NO tiene que hacer. -->
+    <section class="hace" id="hace">
+      <h2 class="titulo-seccion">Cómo postula por ti</h2>
+      <ol class="cadena">
+        <li class="entra entra-1"><span class="paso-num">01</span><b>Encuentra</b><span>Barre cuatro portales a la vez y trae todo lo que salió hoy</span></li>
+        <li class="entra entra-2"><span class="paso-num">02</span><b>Descarta</b><span>Deja arriba lo que va contigo y hunde lo que no</span></li>
+        <li class="entra entra-3"><span class="paso-num">03</span><b>Postula</b><span>Abre la vacante, llena el formulario y contesta sus preguntas</span></li>
+        <li class="entra entra-4"><span class="paso-num">04</span><b>Repite</b><span>Una tras otra, sin que vuelvas a escribir lo mismo</span></li>
+      </ol>
+      <p class="tuyo"><span class="marca-tuyo">Lo tuyo</span> es leer y decir que sí. Dos segundos por vacante, y nada sale sin tu visto bueno.</p>
+    </section>
+
+    <div id="arranque" class="oculto"></div>
+
+    <div class="kanban" id="kanban-resumen"></div>
+
+    <div id="tablero">
+    <div class="rejilla">
+      <article class="tarjeta metricas">
+        <h2>Tu búsqueda</h2>
+        <div class="cifra-grande">
+          <b id="m-semana">—</b>
+          <span>postulaciones esta semana</span>
+        </div>
+        <svg class="grafico" id="grafico" viewBox="0 0 300 70" preserveAspectRatio="none" aria-hidden="true"></svg>
+        <div class="fila-cifras">
+          <div><b id="m-tasa">—</b><span>llegaron a entrevista</span></div>
+          <div><b id="m-entrevistas">—</b><span>entrevistas</span></div>
+        </div>
+      </article>
+
+      <article class="tarjeta">
+        <div class="cabecera-tarjeta">
+          <h2>Últimos movimientos</h2>
+          <button class="enlace" data-ir="pipeline">Ver todas</button>
+        </div>
+        <div id="ultimos"></div>
+      </article>
+    </div>
+
+    <article class="tarjeta">
+      <div class="cabecera-tarjeta">
+        <h2>Vacantes que encajan contigo</h2>
+        <button class="enlace" data-ir="vacantes">Buscar más</button>
+      </div>
+      <div id="destacadas"><p class="vacio">Busca vacantes y las mejores aparecen aquí.</p></div>
+    </article>
+    </div>
+  </section>
+
+  <!-- ══════════ VACANTES ══════════ -->
+  <section class="vista oculto" id="vista-vacantes">
+    <article class="tarjeta buscador">
+      <p class="pista"><strong>Escribe el puesto como lo dirías tú.</strong>
+        Enfermera, cajero, practicante de derecho, chef, lo que sea: cualquier rubro sirve.
+        Deja la ciudad vacía si te da igual dónde.</p>
+      <div class="fila-busqueda">
+        <input type="text" id="puesto" placeholder="¿Qué puesto buscas? Ej.: practicante de derecho, enfermera, cajero" autocomplete="off">
+        <input type="text" id="ciudad" list="ciudades" placeholder="Ciudad (opcional)" autocomplete="off">
+        <datalist id="ciudades"></datalist>
+        <select id="nivel"></select>
+        <button class="boton primario" id="btn-buscar">Buscar</button>
+      </div>
+      <div class="fila-portales" id="portales"></div>
+      <p class="nota" id="resumen-busqueda"></p>
+    </article>
+
+    <div class="barra-acciones oculto" id="acciones-lote">
+      <span class="nota" id="cuenta-marcadas"></span>
+      <button class="boton secundario" id="btn-lote-revisar">Preparar las marcadas</button>
+      <button class="boton peligro" id="btn-lote-auto">Postular a todas…</button>
+    </div>
+
+    <div class="riesgo oculto" id="bloque-riesgo">
+      <p><strong>⚠️ Esto se envía sin que lo revises.</strong> Marca cada punto solo si lo entiendes.</p>
+      <div id="casillas"></div>
+      <div class="fila-botones">
+        <button class="boton secundario" id="btn-cancelar-auto">Mejor no</button>
+        <button class="boton peligro" id="btn-confirmar-auto" disabled>Entiendo los riesgos, postular</button>
+      </div>
+    </div>
+
+    <div class="oculto" id="progreso">
+      <div class="consola" id="consola" role="status" aria-live="polite"></div>
+      <div class="barra"><div id="relleno"></div></div>
+      <p class="nota" id="texto-progreso"></p>
+      <button class="enlace" id="btn-cancelar-lote">Cancelar tanda</button>
+    </div>
+
+    <div class="rejilla-vacantes" id="lista-vacantes"></div>
+  </section>
+
+  <!-- ══════════ PIPELINE ══════════ -->
+  <section class="vista oculto" id="vista-pipeline">
+    <div class="cabecera-vista">
+      <h2>Tus postulaciones</h2>
+      <button class="enlace" id="btn-exportar">Exportar CSV</button>
+    </div>
+    <p class="pista"><strong>Aquí sabes en qué va cada una sin abrir el correo.</strong>
+      Cuando una empresa te escriba, arrastra su tarjeta a «Entrevista». Si te dicen que no,
+      a «Descartada». Así ves de un vistazo cuántas siguen vivas.</p>
+    <div class="columnas" id="columnas"></div>
+  </section>
+
+  <!-- ══════════ PERFIL ══════════ -->
+  <section class="vista oculto" id="vista-perfil">
+    <div class="rejilla">
+      <article class="tarjeta">
+        <h2>Tu CV</h2>
+        <p class="pista">Se lee una vez y sirve para todas las postulaciones.
+          Para cada vacante se reordena solo, resaltando lo que esa empresa pide.</p>
+        <p class="nota" id="estado-perfil">Sin CV cargado.</p>
+        <div id="resumen-cv"></div>
+        <div class="fila-botones">
+          <input type="file" id="archivo-cv" accept=".pdf,.docx,.doc,.txt" hidden>
+          <button class="boton primario" id="btn-cargar-cv">Cargar CV</button>
+          <a class="boton secundario" id="enlace-harvard" href="https://chamba-lista.onrender.com" target="_blank" rel="noopener">Ver en formato Harvard</a>
+        </div>
+      </article>
+
+      <article class="tarjeta">
+        <h2>Portales</h2>
+        <p class="nota">Tu sesión la abres tú. La extensión nunca ve tu contraseña.</p>
+        <div id="lista-portales"></div>
+
+        <h2 style="margin-top:22px">Inteligencia artificial</h2>
+        <p class="nota" id="estado-cuota">Incluida. No tienes que configurar nada.</p>
+        <details>
+          <summary class="nota">Usar mi propia clave (opcional)</summary>
+          <p class="nota">Clave gratuita en <a href="https://aistudio.google.com/apikey" target="_blank" rel="noopener">Google AI Studio</a>. Se guarda solo en tu navegador y no consume cuota.</p>
+          <div class="fila-botones">
+            <input type="password" id="clave-ia" placeholder="Pega tu clave">
+            <button class="boton secundario" id="btn-guardar-clave">Guardar</button>
+          </div>
+        </details>
+      </article>
+    </div>
+
+    <article class="tarjeta">
+      <h2>Datos para llenar formularios</h2>
+      <p class="nota">Los portales piden esto y no está en tu CV. Lo que guardes se rellena solo; lo que no, te lo avisamos al postular. <strong>Todo es opcional</strong> y vive únicamente en tu navegador.</p>
+      <div class="rejilla-datos" id="campos-datos"></div>
+      <div class="fila-botones">
+        <button class="boton primario" id="btn-guardar-datos">Guardar</button>
+        <button class="enlace" id="btn-borrar-datos">Borrar todos</button>
+      </div>
+      <p class="nota" id="estado-datos"></p>
+    </article>
+  </section>
+
+</main>
+
+<!-- Qué versión se está ejecutando de verdad.
+   ~ Chrome carga la extensión descomprimida desde la CARPETA del disco, así
+   ~ que «tengo la última» y «estoy corriendo la última» son cosas distintas:
+   ~ se puede pasar una tarde arreglando un fallo que ya estaba arreglado.
+   ~ Esto lo lee del propio manifest cargado, no de un número escrito a mano,
+   ~ así que si dice 0.2.0 es porque Chrome tiene 0.2.0. -->
+<footer class="pie-version">
+  <span class="nota" id="version-extension"></span>
+</footer>
+
+<!-- Detalle de una vacante -->
+<div class="modal oculto" id="modal">
+  <div class="caja">
+    <button class="cerrar" id="btn-cerrar-modal" aria-label="Cerrar">×</button>
+    <div id="modal-contenido"></div>
+  </div>
+</div>
+
+<script type="module" src="panel.js?v=1790112626"></script>
+</body>
+</html>

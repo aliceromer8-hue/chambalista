@@ -159,10 +159,24 @@ async function pintarInicio() {
  * facturación en Gemini— el titular cambia solo.
  */
 function titularPortada() {
+  const cuantas = enLetra(PACK_MAYOR);
   if (TOPE_POR_TANDA >= PACK_MAYOR) {
-    return `Un clic.<br>${PACK_MAYOR} postulaciones.`;
+    return `Un clic.<br>${cuantas} postulaciones.`;
   }
-  return `${PACK_MAYOR} postulaciones.<br>Sin escribir ninguna.`;
+  return `${cuantas} postulaciones.<br>Sin escribir ninguna.`;
+}
+
+/**
+ * El número del titular, en palabra.
+ *
+ * «Cien postulaciones» y «100 postulaciones» no se leen igual en un
+ * titular: el dígito parece un dato de tabla y la palabra parece una
+ * promesa. Si el pack cambiara a uno que no está en la lista, se cae al
+ * dígito — feo, pero nunca en blanco ni mal escrito.
+ */
+function enLetra(n) {
+  return { 5: "Cinco", 15: "Quince", 20: "Veinte", 30: "Treinta",
+           50: "Cincuenta", 100: "Cien" }[n] || String(n);
 }
 
 /**
@@ -197,6 +211,34 @@ function pintarPortada(resumen) {
   // escritorio empuja el tablero fuera de la vista. Solo se enseña
   // mientras la persona aún no tiene CV.
   $("#hace").classList.toggle("oculto", etapa >= 2);
+
+  // El sello «15 por tanda» solo cuando ya significa algo.
+  //
+  // En la primera pantalla flotaba junto a un titular que promete cien
+  // postulaciones: dos numeros peleandose antes de que la persona haya
+  // hecho nada. Y el 15 no le sirve de nada a quien todavia no tiene CV
+  // — solo la hace dudar del 100. A partir de la etapa 2 si informa,
+  // porque ya esta a punto de lanzar una tanda.
+  $("#sello")?.classList.toggle("oculto", etapa < 2);
+
+  // Las pestañas que todavia no llevan a ningun sitio, apagadas.
+  //
+  // Sin CV, «Vacantes» y «Postulaciones» estan vacias: ofrecerlas con el
+  // mismo peso que «Inicio» es mandar a la persona a dos pantallas en
+  // blanco y dejarla decidiendo entre cuatro cosas cuando solo hay una
+  // que hacer. Se apagan hasta que tengan contenido, con el porque en el
+  // title — apagar sin explicar es peor que no apagar.
+  //
+  // «Mi perfil» se queda siempre viva: ahi estan los datos y el cierre
+  // de sesion, y bloquear la salida de alguien nunca es correcto.
+  const bloqueadas = { vacantes: etapa < 2, pipeline: etapa < 2 };
+  for (const tab of document.querySelectorAll(".menu .tab")) {
+    const cerrada = Boolean(bloqueadas[tab.dataset.vista]);
+    tab.disabled = cerrada;
+    tab.classList.toggle("apagada", cerrada);
+    if (cerrada) tab.title = "Sube tu CV para empezar a usar esta pestaña.";
+    else tab.removeAttribute("title");
+  }
   // El tablero: se enseña cuando hay algo que enseñar, y no antes.
   //
   // Antes se dejaba SIEMPRE visible, atenuado al 38 % y sin poder

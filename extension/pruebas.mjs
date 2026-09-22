@@ -1019,6 +1019,41 @@ titulo("LA PESTAÑA SIN CONTENT SCRIPT — el fallo mas probable del primer inte
     enHtml.replace(/<br>/g, " "));
 }
 
+// ══════════════════════════════════════════════════════════════════════
+// EL RECORRIDO — una sola cosa que hacer cada vez
+// ══════════════════════════════════════════════════════════════════════
+// La primera pantalla ofrecia cuatro pestañas con el mismo peso cuando
+// solo una servia: «Vacantes» y «Postulaciones» estaban vacias sin CV.
+// Y el sello «15 por tanda» flotaba al lado de un titular que promete
+// cien — dos numeros peleandose antes de que la persona hiciera nada.
+{
+  titulo("RECORRIDO — sin CV, una sola cosa que hacer");
+
+  const fsp4 = await import("node:fs/promises");
+  const pjs2 = await fsp4.readFile(new URL("panel/panel.js", BASE), "utf8");
+  const pcss = await fsp4.readFile(new URL("panel/panel.css", BASE), "utf8");
+
+  check("el sello se esconde hasta que significa algo",
+    /#sello"\)\?\.classList\.toggle\("oculto", etapa < 2\)/.test(pjs2));
+
+  check("las pestañas vacias se apagan sin CV",
+    /bloqueadas\s*=\s*\{[^}]*vacantes:\s*etapa < 2/.test(pjs2) &&
+    /pipeline:\s*etapa < 2/.test(pjs2));
+
+  // Apagar sin decir por que se lee como una averia.
+  check("y dicen por que estan apagadas", /tab\.title\s*=/.test(pjs2));
+  check("hay estilo para la pestaña apagada", /\.menu \.tab\.apagada\s*\{/.test(pcss));
+
+  // «Mi perfil» guarda los datos y el cierre de sesion: bloquear la
+  // salida de alguien no es correcto en ningun momento.
+  check("«Mi perfil» nunca se bloquea",
+    !/perfil:\s*etapa/.test(pjs2));
+
+  // Y la unica accion de la etapa sin CV es subirlo.
+  check("sin CV, la portada solo ofrece subir el CV",
+    /Subir mi CV/.test(pjs2));
+}
+
 console.log(`
 ${fallos === 0 ? "TODO OK" : `${fallos} FALLO(S)`}`);
 

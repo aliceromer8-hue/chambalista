@@ -994,3 +994,18 @@ main { max-width: 1120px; }
   text-align: center;
 }
 .pie-version .nota { color: var(--tinta-2); font-size: 11.5px; }
+
+/* Pestañas que aún no llevan a ninguna parte.
+ *
+ * Sin CV, «Vacantes» y «Postulaciones» están vacías. Apagarlas deja una
+ * sola cosa que hacer en pantalla, que es justo lo que una primera vez
+ * necesita. No se ocultan —saber que existen es parte de entender el
+ * producto— pero se ven claramente fuera de juego, y el `title` dice por
+ * qué. Apagar algo sin explicarlo se lee como una avería. */
+.menu .tab.apagada {
+  opacity: .38;
+  cursor: not-allowed;
+  text-decoration: line-through;
+  text-decoration-thickness: 2px;
+}
+.menu .tab.apagada:hover { background: none; }
