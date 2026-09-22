@@ -1244,5 +1244,69 @@ check("el arranque va después de declarar la sesión",
       _pos_arranque > _pos_sesion,
       f"arranque en {_pos_arranque}, SESION en {_pos_sesion}")
 
+
+# ======================================================================
+# OLLAMA — el proveedor de fase de pruebas, que no cuesta nada
+# ======================================================================
+# Mientras se prueba en solitario no tiene sentido gastar en IA. Ollama
+# corre en la máquina de quien desarrolla: cero soles y el CV no sale
+# del disco. Por eso va PRIMERO en proveedor(), y por eso elegir mal el
+# modelo sale caro — falla cada petición sin decir por qué.
+titulo("OLLAMA — probar sin gastar")
+
+import redactor_ia as _ria
+from unittest import mock as _mock
+
+
+def _con_modelos(nombres):
+    """Simula el /api/tags de Ollama con esos modelos instalados."""
+    cuerpo = json.dumps({"models": [{"name": n} for n in nombres]}).encode()
+    ctx = _mock.MagicMock()
+    ctx.__enter__.return_value = io.BytesIO(cuerpo)
+    ctx.__exit__.return_value = False
+    return _mock.patch.object(_ria.urllib.request, "urlopen", return_value=ctx)
+
+
+_limpio = {k: v for k, v in os.environ.items() if k != "OLLAMA_MODEL"}
+
+with _mock.patch.dict(os.environ, _limpio, clear=True):
+    with _con_modelos(["llama3.2:latest"]):
+        check("con un modelo instalado, lo usa",
+              _ria._ollama_modelo() == "llama3.2:latest", str(_ria._ollama_modelo()))
+
+    # El caso que rompía: cualquier tutorial de RAG instala un modelo de
+    # embeddings, y ese no sabe conversar. Antes se cogía modelos[0].
+    with _con_modelos(["nomic-embed-text:latest", "llama3.2:latest"]):
+        check("salta los modelos de embeddings",
+              _ria._ollama_modelo() == "llama3.2:latest", str(_ria._ollama_modelo()))
+
+    with _con_modelos(["nomic-embed-text:latest"]):
+        check("si SOLO hay embeddings, dice que no hay modelo",
+              _ria._ollama_modelo() is None, str(_ria._ollama_modelo()))
+
+    with _con_modelos([]):
+        check("sin modelos instalados, no inventa ninguno",
+              _ria._ollama_modelo() is None)
+
+# Fijarlo a mano: con dos instalados, «el primero» depende del orden en
+# que se bajaron, y el mismo CV da resultados distintos sin explicación.
+with _mock.patch.dict(os.environ, {**_limpio, "OLLAMA_MODEL": "qwen2.5"}, clear=True):
+    with _con_modelos(["llama3.2:latest", "qwen2.5:7b"]):
+        check("OLLAMA_MODEL manda sobre el orden de instalación",
+              _ria._ollama_modelo() == "qwen2.5:7b", str(_ria._ollama_modelo()))
+
+    with _con_modelos(["llama3.2:latest"]):
+        check("y si el fijado no está, no usa otro a escondidas",
+              _ria._ollama_modelo() is None, str(_ria._ollama_modelo()))
+
+# El piso de todo: sin ningún proveedor la plataforma no se cae, cae a
+# reglas. Es lo que permite probar gastando exactamente cero.
+_sin_claves = {k: v for k, v in _limpio.items()
+               if k not in ("GEMINI_API_KEY", "GROQ_API_KEY")}
+with _mock.patch.dict(os.environ, _sin_claves, clear=True):
+    with _mock.patch.object(_ria, "_ollama_modelo", return_value=None):
+        check("sin proveedor, disponible() dice que no (no revienta)",
+              _ria.disponible() is False)
+
 print(f"\n{'TODO OK' if fallos == 0 else f'{fallos} FALLO(S)'}")
 sys.exit(1 if fallos else 0)

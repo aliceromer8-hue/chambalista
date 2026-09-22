@@ -171,14 +171,48 @@ def _pedir(url, cuerpo, cabeceras=None, reintentos=None):
     return {}
 
 
+# Modelos de Ollama que NO saben conversar: convierten texto en vectores
+# y devuelven un error si se les manda un chat. Nunca deben elegirse solos.
+_OLLAMA_NO_CHATEAN = ("embed", "bge-", "nomic-", "minilm", "rerank")
+
+
 def _ollama_modelo():
-    """Primer modelo instalado en Ollama, si el servidor está levantado."""
+    """El modelo local con el que hablar, si el servidor está levantado.
+
+    Ollama es el proveedor de fase de pruebas: corre en la máquina de
+    quien desarrolla, no cuesta nada y el CV no sale del disco. Por eso
+    va primero en `proveedor()`.
+
+    Se elige en este orden:
+
+    1. `OLLAMA_MODEL`, si está puesta. Con dos modelos instalados, «el
+       primero» depende de en qué orden los bajaste — y entonces el
+       mismo CV da resultados distintos sin que nada lo explique.
+    2. El primero que sepa conversar. Antes se cogía `modelos[0]` a
+       secas, así que tener instalado un modelo de embeddings (muy
+       común: los instala cualquier tutorial de RAG) hacía fallar todas
+       las peticiones con un error del servidor, no con «no hay modelo».
+    """
     try:
         with urllib.request.urlopen("http://localhost:11434/api/tags", timeout=3) as r:
-            modelos = json.load(r).get("models", [])
-        return modelos[0]["name"] if modelos else None
+            modelos = [m.get("name", "") for m in json.load(r).get("models", [])]
     except Exception:
         return None
+
+    modelos = [m for m in modelos if m]
+    fijado = os.environ.get("OLLAMA_MODEL")
+    if fijado:
+        # Ollama acepta «llama3.2» para una etiqueta «llama3.2:latest».
+        exacto = next((m for m in modelos if m == fijado or m.split(":")[0] == fijado), None)
+        if exacto:
+            return exacto
+        log.warning("OLLAMA_MODEL=%s no está instalado; instalados: %s", fijado, modelos or "ninguno")
+        return None
+
+    return next(
+        (m for m in modelos if not any(p in m.lower() for p in _OLLAMA_NO_CHATEAN)),
+        None,
+    )
 
 
 def _con_ollama(prompt, modelo):
