@@ -176,8 +176,46 @@ def _pedir(url, cuerpo, cabeceras=None, reintentos=None):
 _OLLAMA_NO_CHATEAN = ("embed", "bge-", "nomic-", "minilm", "rerank")
 
 
+# Lo que costó mirar si Ollama está: preguntar «¿hay modelo local?» valía
+# 4,1 s con Ollama apagado, y `proveedor()` se llama en CADA operación de
+# IA. O sea 4 segundos regalados por postulación, en la máquina de quien
+# desarrolla y en el servidor.
+#
+# Dos arreglos, los dos necesarios:
+#
+#   · El timeout baja de 3 s a los de abajo. Ollama vive en localhost y
+#     contesta en milisegundos; tres segundos no rescatan a nadie, solo
+#     pagan el precio completo cuando no está.
+#   · Y se recuerda la respuesta. Que Ollama esté o no no cambia entre
+#     dos llamadas seguidas, así que preguntarlo cada vez es puro peaje.
+#
+# El «no hay» se recuerda poco a propósito: si levantas Ollama con la web
+# ya corriendo, se nota enseguida en vez de obligarte a reiniciar.
+# 127.0.0.1 y no «localhost»: en Windows el nombre resuelve primero por
+# IPv6 (::1) y ese intento se agota antes de probar IPv4 — 900 ms de
+# los que Ollama no tiene ninguna culpa. OLLAMA_HOST existe por si
+# alguien lo corre en otro sitio.
+_OLLAMA_URL = os.environ.get("OLLAMA_HOST", "http://127.0.0.1:11434").rstrip("/")
+_OLLAMA_TIMEOUT = float(os.environ.get("OLLAMA_TIMEOUT", "0.4"))
+_OLLAMA_RECUERDA_SI = 300.0
+_OLLAMA_RECUERDA_NO = 20.0
+_ollama_cache = {"valor": None, "hasta": 0.0}
+
+
 def _ollama_modelo():
-    """El modelo local con el que hablar, si el servidor está levantado.
+    """El modelo local con el que hablar, si el servidor está levantado."""
+    ahora = time.monotonic()
+    if ahora < _ollama_cache["hasta"]:
+        return _ollama_cache["valor"]
+
+    valor = _ollama_modelo_sin_cache()
+    _ollama_cache["valor"] = valor
+    _ollama_cache["hasta"] = ahora + (_OLLAMA_RECUERDA_SI if valor else _OLLAMA_RECUERDA_NO)
+    return valor
+
+
+def _ollama_modelo_sin_cache():
+    """Pregunta de verdad al servidor local. Ver `_ollama_modelo`.
 
     Ollama es el proveedor de fase de pruebas: corre en la máquina de
     quien desarrolla, no cuesta nada y el CV no sale del disco. Por eso
@@ -194,7 +232,7 @@ def _ollama_modelo():
        las peticiones con un error del servidor, no con «no hay modelo».
     """
     try:
-        with urllib.request.urlopen("http://localhost:11434/api/tags", timeout=3) as r:
+        with urllib.request.urlopen(f"{_OLLAMA_URL}/api/tags", timeout=_OLLAMA_TIMEOUT) as r:
             modelos = [m.get("name", "") for m in json.load(r).get("models", [])]
     except Exception:
         return None
@@ -216,7 +254,7 @@ def _ollama_modelo():
 
 
 def _con_ollama(prompt, modelo):
-    r = _pedir("http://localhost:11434/api/chat", {
+    r = _pedir(f"{_OLLAMA_URL}/api/chat", {
         "model": modelo,
         "messages": [
             {"role": "system", "content": INSTRUCCIONES},

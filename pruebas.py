@@ -1264,6 +1264,7 @@ def _con_modelos(nombres):
     ctx = _mock.MagicMock()
     ctx.__enter__.return_value = io.BytesIO(cuerpo)
     ctx.__exit__.return_value = False
+    _ria._ollama_cache["hasta"] = 0.0   # sin esto, el caso anterior contesta por este
     return _mock.patch.object(_ria.urllib.request, "urlopen", return_value=ctx)
 
 
@@ -1298,6 +1299,24 @@ with _mock.patch.dict(os.environ, {**_limpio, "OLLAMA_MODEL": "qwen2.5"}, clear=
     with _con_modelos(["llama3.2:latest"]):
         check("y si el fijado no está, no usa otro a escondidas",
               _ria._ollama_modelo() is None, str(_ria._ollama_modelo()))
+
+# El peaje que costaba 4 segundos por postulacion: preguntar «¿hay Ollama?»
+# en CADA operacion de IA, con un timeout de 3 s, en una maquina sin Ollama.
+# Ahora se recuerda la respuesta; si esto deja de cumplirse, vuelve la
+# espera y no se nota hasta que alguien cronometra.
+_ria._ollama_cache["hasta"] = 0.0
+with _con_modelos(["llama3.2:latest"]):
+    _ria._ollama_modelo()
+with _mock.patch.object(_ria, "_ollama_modelo_sin_cache") as _espia:
+    for _ in range(5):
+        _ria._ollama_modelo()
+    check("no vuelve a sondear Ollama en cada llamada",
+          _espia.call_count == 0, f"{_espia.call_count} sondeos de mas")
+
+check("el sondeo tiene un timeout corto", _ria._OLLAMA_TIMEOUT <= 1.0,
+      f"{_ria._OLLAMA_TIMEOUT}s")
+check("sondea por IP, no por nombre (en Windows «localhost» prueba IPv6 primero)",
+      "127.0.0.1" in _ria._OLLAMA_URL, _ria._OLLAMA_URL)
 
 # El piso de todo: sin ningún proveedor la plataforma no se cae, cae a
 # reglas. Es lo que permite probar gastando exactamente cero.
