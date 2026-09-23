@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Chamba Lista — postula sin escribir lo mismo mil veces",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "Busca vacantes en los portales peruanos, adapta tu CV a cada una y prepara la postulación. Tú das el último clic.",
   "permissions": [
     "storage",
