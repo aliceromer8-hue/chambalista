@@ -797,8 +797,11 @@ titulo("UN PORTAL, NO CUATRO — el tercer punto de fuga");
 
   check("solo se pide uno al principio", /ordenados\.slice\(0, 1\)/.test(pjs));
   check("los demas quedan plegados", /mas-portales/.test(pjs) && /<details/.test(pjs));
+  // Lo que importa es que el <summary> NOMBRE los portales plegados, no la
+  // frase exacta que los presenta.
+  const resumenPlegado = (pjs.match(/<summary>[\s\S]*?<\/summary>/) || [""])[0];
   check("y se nombran, para que se sepa que estan ahi",
-    /Añadir \$\{resto\.map/.test(pjs));
+    /resto\.map\(\(p\) => escapar\(p\.nombre\)\)/.test(resumenPlegado), resumenPlegado.slice(0, 80));
   check("hay estilo para el desplegable", /\.mas-portales/.test(css));
 
   // El primero es el que tiene la postulacion COMPROBADA, no el primero
@@ -1154,6 +1157,86 @@ titulo("LA PESTAÑA SIN CONTENT SCRIPT — el fallo mas probable del primer inte
       sinSellos(banco).includes(sinSellos(phtml3).trim()),
       "regenera prueba-banco.html desde panel.html");
   }
+}
+
+// ══════════════════════════════════════════════════════════════════════
+// SIN FRASES QUE DESPIERTEN MIEDO
+// ══════════════════════════════════════════════════════════════════════
+// «Nunca vemos tu contraseña» planta justo la idea de que podríamos verla:
+// negar algo lo instala. La landing ya lo sabía (hay un comentario en
+// web.html que lo dice); el panel no. Esto impide que vuelvan.
+//
+// OJO: no aplica a los avisos de consentimiento del modo automático. Eso
+// es consentimiento informado de un riesgo real, y quitarlo sería peor
+// que asustar. Por eso se miran frases concretas de «tranquilización»,
+// no cualquier «no».
+{
+  titulo("TONO — sin negaciones que asusten");
+  const fsp7 = await import("node:fs/promises");
+  const sinComentarios = (s) => s
+    .replace(/<!--[\s\S]*?-->/g, "")
+    .replace(/\/\*[\s\S]*?\*\//g, "")
+    .replace(/^\s*\/\/.*$/gm, "");
+  const html = sinComentarios(await fsp7.readFile(new URL("panel/panel.html", BASE), "utf8"));
+  const js = sinComentarios(await fsp7.readFile(new URL("panel/panel.js", BASE), "utf8"));
+
+  const MIEDO = [
+    /nunca (vemos|ve|pedimos|te pedimos|guardamos|compartimos)/i,
+    /no (vemos|guardamos|compartimos|vendemos|pedimos) tu/i,
+    /nada sale sin/i,
+    /no te preocupes/i,
+  ];
+  for (const [nombre, texto] of [["panel.html", html], ["panel.js", js]]) {
+    const hallado = MIEDO.map((re) => (texto.match(re) || [])[0]).filter(Boolean);
+    check(`${nombre} no tranquiliza negando`, hallado.length === 0, hallado.join(" · "));
+  }
+}
+
+// ══════════════════════════════════════════════════════════════════════
+// LA PORTADA SE LEE EN LOS DOS TEMAS
+// ══════════════════════════════════════════════════════════════════════
+// La portada es lima SIEMPRE. La tarjeta del portal, el sello y la hoja de
+// CV usaban colores del tema: en oscuro se volvían oscuros con texto
+// oscuro encima. «Computrabajo» y el número del sello eran invisibles.
+{
+  titulo("PORTADA — colores fijos sobre fondo fijo");
+  const fsp8 = await import("node:fs/promises");
+  const css = await fsp8.readFile(new URL("panel/panel.css", BASE), "utf8");
+  const pjs4 = await fsp8.readFile(new URL("panel/panel.js", BASE), "utf8");
+
+  for (const pieza of [".portada .portal-tarjeta", ".portada .sello", ".portada .hoja-flotante"]) {
+    const re = new RegExp(pieza.replace(/\./g, "\\.") + "\\s*\\{[^}]*background:\\s*#[0-9A-Fa-f]{6}");
+    check(`${pieza} lleva fondo fijo`, re.test(css));
+  }
+  // El punto de estado no tenía tamaño: nunca se había visto.
+  check("el punto de estado del portal tiene tamaño",
+    /\.marca-punto\s*\{[^}]*width:\s*\d+px/.test(css));
+  // «Entrar» ya es el botón de la cuenta; dos «Entrar» distintos confunden.
+  check("el botón del portal dice «Conectar», no «Entrar»",
+    /"Conectar"/.test(pjs4) && !/: "Entrar"\}?\s*\n\s*<\/button>/.test(pjs4));
+  // El «−» del desplegable se había corrompido en un «2».
+  check("no queda el «2» corrupto del desplegable", !/content:\s*"2/.test(css));
+}
+
+// ══════════════════════════════════════════════════════════════════════
+// «ASÍ TRABAJA UNA TANDA»
+// ══════════════════════════════════════════════════════════════════════
+{
+  titulo("TANDA DE EJEMPLO — honesta y ligera");
+  const fsp9 = await import("node:fs/promises");
+  const html2 = await fsp9.readFile(new URL("panel/panel.html", BASE), "utf8");
+  const pjs5 = await fsp9.readFile(new URL("panel/panel.js", BASE), "utf8");
+
+  // Son puestos inventados: tiene que decirlo, o se leen como vacantes.
+  check("dice que es un ejemplo", /class="marcha-ejemplo">Ejemplo</.test(html2));
+  check("no ensucia el lector de pantalla", /id="en-marcha"[^>]*aria-hidden="true"/.test(html2));
+  check("respeta el movimiento reducido", /prefers-reduced-motion: reduce\)"\)\.matches/.test(pjs5));
+  check("se para con la pestaña oculta", /if \(document\.hidden\) return;/.test(pjs5));
+  check("no se reinicia en cada repintado", /firma === marchaFirma/.test(pjs5));
+  check("usa puestos de la carrera del CV", /ejemplosPara\(estado\.perfil\)/.test(pjs5));
+  // Nada de cifras de tiempo: el bucle no promete cuánto tarda.
+  const bloque = pjs5.slice(pjs5.indexOf("function pintarEnMarcha"), pjs5.indexOf("function pintarEnMarcha") + 3500);
+  check("no promete tiempos", !/segundos|minutos/.test(bloque.replace(/\/\/.*$/gm, "")));
 }
 
 console.log(`

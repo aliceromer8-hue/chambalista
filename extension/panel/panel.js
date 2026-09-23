@@ -208,7 +208,7 @@ const PASOS = {
   },
   portales: {
     titulo: "Conecta dónde quieres que busque",
-    porque: "Inicias sesión tú en cada portal; nunca te pedimos la contraseña. "
+    porque: "Entras una vez en la web de cada portal y queda conectado. "
           + "Desde ahí buscamos y llenamos los formularios por ti.",
     boton: "Elegir portales",
     hacer: () => { irA("inicio"); $("#portada")?.scrollIntoView({ behavior: "smooth", block: "start" }); },
@@ -256,6 +256,125 @@ function pintarGuias(etapa) {
   }
 }
 
+
+
+// ---------------------------------------------------------------------
+// «Así trabaja una tanda»: el bucle debajo de la portada
+// ---------------------------------------------------------------------
+
+/**
+ * Puestos de ejemplo según la carrera del CV.
+ *
+ * Gonzalo estudia Marketing: si el ejemplo dice «Practicante de
+ * Contabilidad», la animación deja de ser suya y pasa a ser un anuncio.
+ * Con su área, se lee como «esto es lo que me va a pasar a mí».
+ *
+ * Se mira solo la educación, que es donde está la carrera; buscar en todo
+ * el CV encontraba «marketing» en la línea de habilidades de un contador.
+ */
+const EJEMPLOS_POR_AREA = [
+  [/marketing|publicidad|comunicaci/, ["Practicante de Marketing", "Asistente de Redes Sociales", "Practicante de Marketing Digital"]],
+  [/sistemas|software|computaci|inform[aá]tica/, ["Practicante de Desarrollo", "Practicante de Soporte TI", "Practicante de Sistemas"]],
+  [/contab|finanz|econom/, ["Practicante de Contabilidad", "Asistente de Finanzas", "Practicante de Tesorería"]],
+  [/administ|negocios|gesti[oó]n/, ["Practicante de Administración", "Asistente Comercial", "Practicante de Recursos Humanos"]],
+  [/psicolog/, ["Practicante de Recursos Humanos", "Asistente de Selección", "Practicante de Psicología"]],
+  [/derecho|leyes/, ["Practicante de Derecho", "Asistente Legal", "Practicante de Cumplimiento"]],
+  [/industrial|mec[aá]nic|mantenimiento|el[eé]ctric/, ["Practicante de Producción", "Técnico de Mantenimiento", "Practicante de Calidad"]],
+];
+const EJEMPLOS_GENERALES = ["Practicante de Administración", "Asistente Comercial", "Practicante de Atención al Cliente"];
+const DISTRITOS = ["Miraflores", "San Isidro", "Surco", "La Molina", "Lima Cercado", "Jesús María"];
+
+function ejemplosPara(perfil) {
+  const carrera = JSON.stringify(perfil?.educacion || "").toLowerCase();
+  const encontrado = EJEMPLOS_POR_AREA.find(([re]) => re.test(carrera));
+  return encontrado ? encontrado[1] : EJEMPLOS_GENERALES;
+}
+
+// Los cuatro momentos de una postulación, en el orden en que ocurren.
+const MOMENTOS = ["Encontrada", "CV adaptado", "Formulario lleno", "Lista para tu clic"];
+
+let relojMarcha = null;
+let marchaFirma = "";
+
+/**
+ * Enciende o apaga el bucle.
+ *
+ * pintarInicio() se llama muchas veces (al volver a la pestaña, al
+ * conectar un portal...). Si cada llamada reiniciara la animación, daría
+ * tirones cada vez que la persona cambia de pestaña. Por eso se firma
+ * con lo que se enseña y solo se reinicia si eso cambió.
+ */
+function pintarEnMarcha(mostrar) {
+  const caja = $("#en-marcha");
+  if (!caja) return;
+  caja.classList.toggle("oculto", !mostrar);
+  if (!mostrar) {
+    clearInterval(relojMarcha);
+    relojMarcha = null;
+    marchaFirma = "";
+    return;
+  }
+
+  const puestos = ejemplosPara(estado.perfil);
+  // El mismo portal que la portada ofrece primero: el conectado, o si no
+  // el que tiene la postulación verificada. Enseñar otro sería un ejemplo
+  // de algo que la portada no le está proponiendo.
+  const portal = (sesionesCache.find((p) => p.sesion)
+    || sesionesCache.find((p) => queHace(p).tono === "bien")
+    || {}).nombre || "Computrabajo";
+  const firma = puestos.join("|") + portal;
+  if (relojMarcha && firma === marchaFirma) return;
+  marchaFirma = firma;
+  clearInterval(relojMarcha);
+
+  const lista = $("#marcha-lista");
+  lista.innerHTML = puestos.map((puesto, i) => `
+    <li class="marcha-fila" data-n="0">
+      <span class="marcha-punto"></span>
+      <span class="marcha-texto">
+        <b>${escapar(puesto)}</b>
+        <small>${escapar(portal)} · ${escapar(DISTRITOS[i % DISTRITOS.length])}</small>
+      </span>
+      <span class="marcha-estado">En cola</span>
+      <span class="marcha-barra"><i></i></span>
+    </li>`).join("");
+  $("#marcha-de").textContent = puestos.length;
+
+  const filas = [...lista.children];
+  // Cada fila arranca dos pasos después de la anterior, avanza un momento
+  // por paso, y al final todo se queda quieto un rato antes de repetir:
+  // sin esa pausa no da tiempo a leer «3 de 3 listas», que es el remate.
+  const DESFASE = 2;
+  const FIN = (filas.length - 1) * DESFASE + MOMENTOS.length;
+  const CICLO = FIN + 4;
+
+  const pintar = (tick) => {
+    let listas = 0;
+    filas.forEach((fila, i) => {
+      const n = Math.max(0, Math.min(MOMENTOS.length, tick - i * DESFASE));
+      fila.dataset.n = n;
+      fila.querySelector(".marcha-estado").textContent = n ? MOMENTOS[n - 1] : "En cola";
+      fila.querySelector(".marcha-barra i").style.width = `${(n / MOMENTOS.length) * 100}%`;
+      if (n === MOMENTOS.length) listas++;
+    });
+    $("#marcha-listas").textContent = listas;
+    $("#marcha-barra").style.width = `${Math.min(100, (Math.min(tick, FIN) / FIN) * 100)}%`;
+  };
+
+  // Con movimiento reducido: el final, quieto. Se entiende igual.
+  if (matchMedia("(prefers-reduced-motion: reduce)").matches) {
+    pintar(FIN);
+    return;
+  }
+
+  let tick = 0;
+  pintar(tick);
+  relojMarcha = setInterval(() => {
+    if (document.hidden) return;          // pestaña oculta: sin gastar nada
+    tick = (tick + 1) % CICLO;
+    pintar(tick);
+  }, 850);
+}
 
 /**
  * La portada cambia según en qué punto está la persona. El panel entero
@@ -321,6 +440,7 @@ function pintarPortada(resumen) {
   }
 
   pintarGuias(etapa);
+  pintarEnMarcha(etapa === 2);
   // El tablero: se enseña cuando hay algo que enseñar, y no antes.
   //
   // Antes se dejaba SIEMPRE visible, atenuado al 38 % y sin poder
@@ -395,9 +515,12 @@ function pintarPortada(resumen) {
   if (etapa === 2) {
     const nombre = (estado.perfil.nombre || "").split(" ")[0];
     $("#portada-titulo").innerHTML = `Listo${nombre ? `, ${escapar(nombre)}` : ""}.<br>¿Dónde buscamos?`;
+    // Sin negaciones. «Nunca vemos tu contraseña» planta justo la idea
+    // de que podríamos verla: negar algo lo instala. Se dice lo que SÍ
+    // pasa, que además es lo que la persona necesita saber para actuar.
     $("#portada-bajada").textContent =
-      "Con uno basta para empezar. Entras una vez y ya no vuelves a hacerlo: la sesión "
-      + "queda en tu navegador y nunca vemos tu contraseña.";
+      "Conecta un portal y empezamos. Entras una sola vez, desde su propia web, "
+      + "y queda listo para todas las postulaciones.";
 
     // Uno primero, los demás después.
     //
@@ -421,10 +544,15 @@ function pintarPortada(resumen) {
     const fila = (p) => `
         <div class="portal-tarjeta${p.sesion ? " conectado" : ""}">
           <span class="marca-punto ${p.sesion ? "si" : conectando.has(p.id) ? "esperando" : "no"}"></span>
-          <span class="portal-nombre">${escapar(p.nombre)}</span>
-          <span class="portal-chip ${queHace(p).tono}" title="${queHace(p).etiqueta}">${queHace(p).etiqueta}</span>
-          <button class="boton chico" data-portada-acceso="${p.id}">
-            ${p.sesion ? "Abrir" : conectando.has(p.id) ? "Reintentando…" : "Entrar"}
+          <span class="portal-texto">
+            <span class="portal-nombre">${escapar(p.nombre)}</span>
+            <span class="portal-chip ${queHace(p).tono}" title="${queHace(p).etiqueta}">${queHace(p).etiqueta}</span>
+          </span>
+          <!-- «Conectar» y no «Entrar»: «Entrar» ya es el botón de la
+               cuenta de Chamba Lista, y dos «Entrar» que hacen cosas
+               distintas en dos pantallas seguidas se confunden. -->
+          <button class="boton ${p.sesion ? "secundario" : "primario"}" data-portada-acceso="${p.id}">
+            ${p.sesion ? "Abrir" : conectando.has(p.id) ? "Esperando…" : "Conectar"}
           </button>
           ${conectando.has(p.id) && !p.sesion
             ? `<span class="portal-aviso">Entra en la pestaña que se abrió. Esto se marca solo.</span>`
@@ -435,7 +563,8 @@ function pintarPortada(resumen) {
       + primeros.map(fila).join("")
       + (resto.length
         ? `<details class="mas-portales">
-             <summary>Añadir ${resto.map((p) => escapar(p.nombre)).join(", ")}</summary>
+             <summary><span class="mas-signo" aria-hidden="true">+</span> Añadir otro portal
+               <small>${resto.map((p) => escapar(p.nombre)).join(" · ")}</small></summary>
              <div class="portales-portada">${resto.map(fila).join("")}</div>
            </details>`
         : "")
@@ -941,7 +1070,7 @@ async function arrancarLote(modo) {
   consola.escribir(
     modo === "automatico"
       ? `Postulando a ${marcadas.length} vacantes. No tienes que hacer nada.`
-      : `Preparando ${marcadas.length} vacantes. Nada se envía todavía.`, true);
+      : `Preparando ${marcadas.length} vacantes. Las revisas antes de enviarlas.`, true);
   await enviar({
     accion: "lotePreparar", vacantes: marcadas, modo,
     aprobacion: estado.aprobacion, respuestasPersona: estado.respuestasPersona,

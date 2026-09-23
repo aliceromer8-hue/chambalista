@@ -971,16 +971,6 @@ main { max-width: 1120px; }
  * funcionar uno: cuatro sesiones seguidas antes de ver una sola vacante
  * es el sitio perfecto para abandonar, y ademas sobra — con uno ya se
  * busca y se postula. */
-.mas-portales { grid-column: 1 / -1; margin-top: 4px; }
-.mas-portales summary {
-  cursor: pointer; list-style: none; padding: 9px 2px;
-  font-size: 12.5px; font-weight: 700; color: #131316; opacity: .72;
-}
-.mas-portales summary::-webkit-details-marker { display: none; }
-.mas-portales summary::before { content: "+ "; font-weight: 800; }
-.mas-portales[open] summary::before { content: "2  "; }
-.mas-portales summary:hover { opacity: 1; }
-.mas-portales .portales-portada { margin-top: 2px; }
 
 /* ══════════ pie de versión ══════════
  * Discreto a propósito: no es información que se necesite mientras se
@@ -1050,3 +1040,130 @@ main { max-width: 1120px; }
 }
 .cuenta-linea b { color: var(--tinta); }
 .cuenta-linea .enlace { margin-left: auto; }
+
+
+/* ══════════ la portada en la etapa 2: «¿dónde buscamos?» ══════════
+ *
+ * La portada es lima en los DOS temas. Todo lo que va encima necesita
+ * color fijo: con `var(--papel)` la tarjeta del portal, el sello y la
+ * hoja de CV se volvían oscuros en modo oscuro, con el texto también
+ * oscuro encima — «Computrabajo» y el número del sello no se leían.
+ * Es la misma regla que ya está escrita más arriba para el titular; estas
+ * tres piezas se la saltaban. */
+
+/* El punto de estado de cada portal. No tenía estilo base —ni tamaño—,
+ * así que nunca se había visto. */
+.marca-punto {
+  width: 10px; height: 10px; border-radius: 99px; flex-shrink: 0;
+  border: 2px solid #131316; background: #FBFAF6;
+}
+.marca-punto.si { background: var(--menta); }
+
+.portada .portales-portada {
+  grid-template-columns: minmax(0, 1fr); max-width: 470px; gap: 10px;
+}
+
+/* Nombre y etiqueta apilados, UN botón a la derecha. Antes eran cuatro
+ * piezas en fila —punto, nombre, chip, botón chico— de alturas y pesos
+ * distintos, y la fila se veía desordenada. */
+.portada .portal-tarjeta {
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  gap: 12px; padding: 13px 14px 13px 16px; border-radius: 12px;
+  background: #FBFAF6; color: #131316;
+  border: 2px solid #131316; box-shadow: 3px 3px 0 #131316;
+}
+.portada .portal-tarjeta + .portal-tarjeta { margin-top: 0; }
+.portal-texto { display: flex; flex-direction: column; align-items: flex-start; gap: 4px; min-width: 0; }
+.portada .portal-nombre { font-size: 15px; letter-spacing: -.01em; }
+.portada .portal-chip.neutro { background: #F1EFE7; color: #55555F; border-color: #E6E3D8; }
+.portada .portal-chip.aviso  { background: #FFF3D6; color: #131316; border-color: #FFC53D; }
+.portada .portal-tarjeta .boton { padding: 9px 18px; font-size: 13px; }
+.portada .portal-tarjeta .boton.secundario { background: #FBFAF6; color: #131316; border-color: #131316; }
+.portada .portal-aviso { color: #55555F; }
+
+/* «Añadir otro portal»: con forma de botón. Antes era una línea de
+ * texto flotando sola debajo de la tarjeta y no parecía pulsable. */
+.mas-portales { margin-top: 2px; }
+.mas-portales summary {
+  cursor: pointer; list-style: none;
+  display: inline-flex; align-items: center; gap: 8px; flex-wrap: wrap;
+  padding: 8px 15px 8px 10px; border-radius: 99px;
+  border: 2px dashed #131316; color: #131316;
+  font-size: 13px; font-weight: 800;
+}
+.mas-portales summary::-webkit-details-marker { display: none; }
+.mas-portales summary small { font-weight: 600; opacity: .62; font-size: 11.5px; }
+.mas-signo {
+  display: inline-grid; place-items: center; width: 20px; height: 20px;
+  border-radius: 99px; background: #131316; color: var(--lima);
+  font-size: 14px; line-height: 1; transition: transform .15s;
+}
+.mas-portales[open] .mas-signo { transform: rotate(45deg); }
+.mas-portales summary:hover { border-style: solid; }
+.mas-portales .portales-portada { margin-top: 10px; }
+
+/* El arte de la derecha, también con colores fijos. */
+.portada .sello { background: #FBFAF6; color: #131316; border-color: #131316; box-shadow: 4px 4px 0 #131316; }
+.portada .hoja-flotante { background: #FBFAF6; border-color: #131316; box-shadow: 5px 5px 0 #131316; }
+.portada .hoja-flotante .linea { background: #E6E3D8; }
+.portada .hoja-flotante .linea.larga,
+.portada .hoja-flotante .linea.acento { background: #131316; }
+
+
+/* ══════════ «Así trabaja una tanda» ══════════
+ *
+ * Fuera de la portada, así que usa los colores del tema. Lo único fijo es
+ * el lima del estado final, que lleva tinta fija encima. */
+.en-marcha {
+  container-type: inline-size;
+  border: 2px solid var(--linea); border-radius: var(--r);
+  background: var(--papel); box-shadow: var(--dura);
+  padding: 18px 20px 16px; margin-bottom: 22px;
+}
+.marcha-cabecera { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 8px; }
+.marcha-titulo { font-weight: 800; font-size: 1rem; letter-spacing: -.02em; }
+.marcha-ejemplo {
+  font-family: var(--mono); font-size: 10px; font-weight: 700; letter-spacing: .08em;
+  text-transform: uppercase; color: var(--tinta-2);
+  border: 1.5px solid var(--papel-3); border-radius: 99px; padding: 2px 9px;
+}
+.marcha-lista { list-style: none; margin: 0; padding: 0; }
+.marcha-fila {
+  display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center;
+  gap: 6px 12px; padding: 11px 0; border-bottom: 2px solid var(--papel-3);
+  transition: opacity .35s;
+}
+.marcha-fila[data-n="0"] { opacity: .38; }
+.marcha-punto {
+  width: 10px; height: 10px; border-radius: 99px;
+  border: 2px solid var(--tinta); background: var(--papel);
+  transition: background .3s;
+}
+.marcha-fila:not([data-n="0"]) .marcha-punto { background: var(--sol); }
+.marcha-fila[data-n="4"] .marcha-punto { background: var(--lima); }
+.marcha-texto { display: flex; flex-direction: column; min-width: 0; }
+.marcha-texto b { font-size: 14px; letter-spacing: -.01em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.marcha-texto small { font-size: 12px; color: var(--tinta-2); }
+.marcha-estado {
+  font-family: var(--mono); font-size: 11px; font-weight: 700; white-space: nowrap;
+  padding: 3px 10px; border-radius: 99px;
+  border: 1.5px solid var(--papel-3); color: var(--tinta-2); background: var(--papel-2);
+  transition: background .3s, color .3s;
+}
+.marcha-fila[data-n="4"] .marcha-estado { background: var(--lima); color: #131316; border-color: #131316; }
+.marcha-barra {
+  grid-column: 2 / -1; height: 4px; border-radius: 99px; background: var(--papel-2); overflow: hidden;
+}
+.marcha-barra i { display: block; height: 100%; width: 0; background: var(--tinta); border-radius: 99px; transition: width .6s ease; }
+.marcha-fila[data-n="4"] .marcha-barra i { background: var(--menta); }
+
+.marcha-pie { display: flex; align-items: center; gap: 14px; margin-top: 13px; flex-wrap: wrap; }
+.marcha-total { font-size: 13px; color: var(--tinta-2); white-space: nowrap; }
+.marcha-total b { color: var(--tinta); font-size: 15px; font-variant-numeric: tabular-nums; }
+.marcha-progreso { flex: 1; min-width: 120px; height: 8px; border-radius: 99px; border: 2px solid var(--linea); overflow: hidden; background: var(--papel-2); }
+.marcha-progreso i { display: block; height: 100%; width: 0; background: var(--lima); transition: width .6s ease; }
+
+@media (prefers-reduced-motion: reduce) {
+  .marcha-fila, .marcha-punto, .marcha-estado, .marcha-barra i, .marcha-progreso i, .mas-signo { transition: none; }
+}
+@container (max-width: 420px) { .marcha-estado { grid-column: 2 / -1; justify-self: start; } }
