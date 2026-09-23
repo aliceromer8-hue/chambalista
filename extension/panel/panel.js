@@ -180,6 +180,72 @@ function enLetra(n) {
 }
 
 /**
+ * Qué falta para que una pantalla sirva, y el botón que lo resuelve.
+ *
+ * Ali entraba a «Mi perfil» y no sabía qué hacer. El problema no era esa
+ * pantalla: era que ninguna decía cuál es el paso siguiente. Una pantalla
+ * vacía sin instrucción se lee como una avería.
+ *
+ * Indexado por lo que falta, no por la vista: el paso siguiente es el
+ * mismo se entre por donde se entre, y tenerlo en un sitio evita que las
+ * tres pantallas acaben diciendo cosas distintas.
+ */
+const QUE_FALTA = {
+  0: {
+    titulo: "Primero sube tu CV",
+    porque: "Se lee una vez y sirve para todas las postulaciones. PDF o Word.",
+    boton: "Subir mi CV",
+    hacer: () => { irA("perfil"); $("#archivo-cv")?.click(); },
+  },
+  1: {
+    titulo: "Conecta dónde quieres que busque",
+    porque: "Inicias sesión tú en cada portal; nunca te pedimos la contraseña. "
+          + "Desde ahí buscamos y llenamos los formularios por ti.",
+    boton: "Elegir portales",
+    hacer: () => irA("inicio"),
+  },
+};
+
+/**
+ * Pone (o quita) el cartel de «te falta esto» arriba de cada vista.
+ *
+ * Se inyecta desde aquí en vez de dejarlo escrito en el HTML porque el
+ * texto depende de en qué punto está la persona, y un cartel fijo que
+ * dice «sube tu CV» a quien ya lo subió es peor que no tener cartel.
+ */
+function queFalta(etapa) {
+  if (etapa < 2) return QUE_FALTA[0];   // sin cuenta o sin CV: el CV
+  if (etapa < 3) return QUE_FALTA[1];   // con CV, sin portales
+  return null;
+}
+
+function pintarGuias(etapa) {
+  const falta = queFalta(etapa);
+
+  // «Mi perfil» tambien lleva cartel: Ali entraba ahi y no sabia que
+  // hacer. Es donde se resuelve el paso, asi que el boton cae en el
+  // sitio — abre el selector de archivo sin moverla de pantalla.
+  for (const id of ["vista-vacantes", "vista-pipeline", "vista-perfil"]) {
+    const vista = $(`#${id}`);
+    if (!vista) continue;
+    vista.querySelector(".guia")?.remove();
+    if (!falta) continue;
+
+    const caja = document.createElement("div");
+    caja.className = "guia";
+    caja.innerHTML = `
+      <div>
+        <b>${escapar(falta.titulo)}</b>
+        <p class="nota">${escapar(falta.porque)}</p>
+      </div>
+      <button class="boton primario" type="button">${escapar(falta.boton)}</button>`;
+    caja.querySelector("button").addEventListener("click", falta.hacer);
+    vista.prepend(caja);
+  }
+}
+
+
+/**
  * La portada cambia según en qué punto está la persona. El panel entero
  * se comporta como una landing cuando es nueva —una sola cosa que hacer,
  * el resto atenuado— y se convierte en tablero cuando ya está lista.
@@ -221,24 +287,29 @@ function pintarPortada(resumen) {
   // porque ya esta a punto de lanzar una tanda.
   $("#sello")?.classList.toggle("oculto", etapa < 2);
 
-  // Las pestañas que todavia no llevan a ningun sitio, apagadas.
+  // Las pestañas que aun no tienen contenido: marcadas, NO bloqueadas.
   //
-  // Sin CV, «Vacantes» y «Postulaciones» estan vacias: ofrecerlas con el
-  // mismo peso que «Inicio» es mandar a la persona a dos pantallas en
-  // blanco y dejarla decidiendo entre cuatro cosas cuando solo hay una
-  // que hacer. Se apagan hasta que tengan contenido, con el porque en el
-  // title — apagar sin explicar es peor que no apagar.
+  // Primero se deshabilitaban. Estaba mal: quien pulsa una pestaña
+  // apagada no aprende nada, solo choca contra una pared. Ahora se
+  // entra igual y la pantalla explica que falta y trae el boton para
+  // resolverlo — la curiosidad acaba en el sitio correcto en vez de en
+  // un callejon.
   //
-  // «Mi perfil» se queda siempre viva: ahi estan los datos y el cierre
-  // de sesion, y bloquear la salida de alguien nunca es correcto.
-  const bloqueadas = { vacantes: etapa < 2, pipeline: etapa < 2 };
+  // El punto al lado del nombre avisa antes de pulsar, y el title lo
+  // dice con palabras para quien llegue con el teclado o con lector.
+  //
+  // «Mi perfil» nunca se marca: ahi estan los datos y el cierre de
+  // sesion, y esos tienen que estar siempre disponibles.
+  const pendientes = { vacantes: etapa < 2, pipeline: etapa < 2 };
   for (const tab of document.querySelectorAll(".menu .tab")) {
-    const cerrada = Boolean(bloqueadas[tab.dataset.vista]);
-    tab.disabled = cerrada;
-    tab.classList.toggle("apagada", cerrada);
-    if (cerrada) tab.title = "Sube tu CV para empezar a usar esta pestaña.";
+    const pendiente = Boolean(pendientes[tab.dataset.vista]);
+    tab.disabled = false;
+    tab.classList.toggle("pendiente", pendiente);
+    if (pendiente) tab.title = queFalta(etapa)?.titulo || "";
     else tab.removeAttribute("title");
   }
+
+  pintarGuias(etapa);
   // El tablero: se enseña cuando hay algo que enseñar, y no antes.
   //
   // Antes se dejaba SIEMPRE visible, atenuado al 38 % y sin poder

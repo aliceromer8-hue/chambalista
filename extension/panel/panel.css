@@ -995,17 +995,35 @@ main { max-width: 1120px; }
 }
 .pie-version .nota { color: var(--tinta-2); font-size: 11.5px; }
 
-/* Pestañas que aún no llevan a ninguna parte.
+/* Pestañas que todavía no tienen contenido.
  *
- * Sin CV, «Vacantes» y «Postulaciones» están vacías. Apagarlas deja una
- * sola cosa que hacer en pantalla, que es justo lo que una primera vez
- * necesita. No se ocultan —saber que existen es parte de entender el
- * producto— pero se ven claramente fuera de juego, y el `title` dice por
- * qué. Apagar algo sin explicarlo se lee como una avería. */
-.menu .tab.apagada {
-  opacity: .38;
-  cursor: not-allowed;
-  text-decoration: line-through;
-  text-decoration-thickness: 2px;
+ * Se entra igual: bloquearlas solo hacía chocar contra una pared. El
+ * punto avisa de que ahí falta algo, y al entrar la propia pantalla
+ * explica qué y trae el botón. Un aviso que se puede seguir vale más
+ * que un candado. */
+.menu .tab.pendiente { opacity: .62; }
+.menu .tab.pendiente::after {
+  content: "";
+  width: 6px; height: 6px; margin-left: 6px;
+  border-radius: 99px; background: var(--sol);
+  border: 1.5px solid var(--tinta);
+  display: inline-block; vertical-align: middle;
 }
-.menu .tab.apagada:hover { background: none; }
+
+/* El cartel de «te falta esto», arriba de una pantalla que aún no sirve.
+ *
+ * Va en lima como la portada: es la misma voz —«esto es lo siguiente»—
+ * y no un error. Un aviso rojo aquí asustaría por algo que no ha salido
+ * mal, simplemente todavía no ha pasado. */
+.guia {
+  display: flex; align-items: center; gap: 16px; flex-wrap: wrap;
+  justify-content: space-between;
+  background: var(--lima); color: #131316;
+  border: 3px solid #131316; border-radius: var(--r);
+  box-shadow: var(--dura);
+  padding: 16px 20px; margin-bottom: 18px;
+}
+.guia b { font-size: 1.05rem; letter-spacing: -.02em; display: block; }
+.guia .nota { color: #131316; opacity: .78; margin: 4px 0 0; max-width: 60ch; }
+.guia .boton { background: #131316; color: var(--lima); border-color: #131316; flex-shrink: 0; }
+.guia .boton:hover:not(:disabled) { background: #2A2A31; }

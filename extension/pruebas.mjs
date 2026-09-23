@@ -984,13 +984,16 @@ titulo("LA PESTAÑA SIN CONTENT SCRIPT — el fallo mas probable del primer inte
   const phtml = await fsp3.readFile(new URL("panel/panel.html", BASE), "utf8");
 
   check("el tope vive en verificados.js, con los packs",
-    /export const TOPE_POR_TANDA\s*=\s*\d+/.test(ver));
+    /export const TOPE_POR_TANDA\s*=\s*(?:\d+|PACK_MAYOR)/.test(ver));
   check("background.js lo importa en vez de declararlo",
     fondo2.includes('import { TOPE_POR_TANDA }') &&
     !/^const TOPE_POR_TANDA/m.test(fondo2));
 
-  const tope = Number((ver.match(/TOPE_POR_TANDA\s*=\s*(\d+)/) || [])[1]);
   const pack = Number((ver.match(/PACK_MAYOR\s*=\s*(\d+)/) || [])[1]);
+  // El tope puede estar escrito como numero o como `PACK_MAYOR`. Lo
+  // segundo es lo deseable: asi no hay dos numeros que desincronizar.
+  const topeCrudo = (ver.match(/TOPE_POR_TANDA\s*=\s*([A-Z_\d]+)/) || [])[1];
+  const tope = topeCrudo === "PACK_MAYOR" ? pack : Number(topeCrudo);
   check("los dos numeros se leen", Number.isFinite(tope) && Number.isFinite(pack),
     `tope ${tope}, pack ${pack}`);
 
@@ -1036,13 +1039,23 @@ titulo("LA PESTAÑA SIN CONTENT SCRIPT — el fallo mas probable del primer inte
   check("el sello se esconde hasta que significa algo",
     /#sello"\)\?\.classList\.toggle\("oculto", etapa < 2\)/.test(pjs2));
 
-  check("las pestañas vacias se apagan sin CV",
-    /bloqueadas\s*=\s*\{[^}]*vacantes:\s*etapa < 2/.test(pjs2) &&
+  // Se marcan, NO se bloquean: quien pulsa una pestaña apagada no
+  // aprende nada, solo choca. Ahora entra y la pantalla le explica.
+  check("las pestañas sin contenido se marcan sin CV",
+    /pendientes\s*=\s*\{[^}]*vacantes:\s*etapa < 2/.test(pjs2) &&
     /pipeline:\s*etapa < 2/.test(pjs2));
+  check("y NUNCA se deshabilitan", /tab\.disabled\s*=\s*false/.test(pjs2)
+    && !/tab\.disabled\s*=\s*cerrada/.test(pjs2));
+  check("dicen que falta antes de pulsar", /tab\.title\s*=\s*queFalta/.test(pjs2));
+  check("hay estilo para la pestaña pendiente", /\.menu \.tab\.pendiente\s*\{/.test(pcss));
 
-  // Apagar sin decir por que se lee como una averia.
-  check("y dicen por que estan apagadas", /tab\.title\s*=/.test(pjs2));
-  check("hay estilo para la pestaña apagada", /\.menu \.tab\.apagada\s*\{/.test(pcss));
+  // Y al entrar, la pantalla trae el cartel con el boton que lo resuelve.
+  check("las tres vistas llevan cartel de «que falta»",
+    /\["vista-vacantes", "vista-pipeline", "vista-perfil"\]/.test(pjs2));
+  check("el cartel sale de UN solo calculo del paso siguiente",
+    /function queFalta\(etapa\)/.test(pjs2)
+    && (pjs2.match(/queFalta\(etapa\)/g) || []).length >= 2);
+  check("y tiene estilo propio", /\.guia\s*\{/.test(pcss));
 
   // «Mi perfil» guarda los datos y el cierre de sesion: bloquear la
   // salida de alguien no es correcto en ningun momento.

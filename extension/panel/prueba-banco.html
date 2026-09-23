@@ -45,6 +45,26 @@
   // Las claves son las de verdad: sesion.js usa "sesion" y almacen.js
   // "perfil"/"preferencias". Inventarlas aqui pinta siempre la etapa 0 y
   // uno cree que el panel esta roto.
+  // El fetch de verdad, capturado antes de sustituirlo. Sin esto, la
+  // propia lectura de verificados.js cae en el stub de mas abajo y
+  // recibe «{}»: el banco se miente a si mismo.
+  const fetchDeVerdad = window.fetch.bind(window);
+
+  // El tope se lee de verificados.js, no se escribe aqui: un numero a
+  // mano en el banco ya hizo creer que el sello estaba desactualizado
+  // cuando el desactualizado era el banco.
+  let _tope = null;
+  async function topeReal() {
+    if (_tope !== null) return _tope;
+    try {
+      const src = await (await fetchDeVerdad("../lib/verificados.js")).text();
+      const pack = Number((src.match(/PACK_MAYOR\s*=\s*(\d+)/) || [])[1]);
+      const crudo = (src.match(/TOPE_POR_TANDA\s*=\s*([A-Z_\d]+)/) || [])[1];
+      _tope = crudo === "PACK_MAYOR" ? pack : Number(crudo);
+    } catch { _tope = 0; }
+    return _tope;
+  }
+
   const almacen = {};
   if (etapa >= 1) almacen.sesion = { token: "banco", correo: "mariana@ejemplo.pe" };
   if (etapa >= 2) almacen.perfil = CV;
@@ -58,7 +78,7 @@
       // no se quede esperando. Si algo pide más, sale en la consola.
       sendMessage: async (msg) => {
         const a = msg && msg.accion;
-        if (a === "consentimiento") return { casillas: [], tope: 15 };
+        if (a === "consentimiento") return { casillas: [], tope: await topeReal() };
         if (a === "sesiones") return { portales: [] };
         if (a === "estadoLote") return { fase: "inactivo", items: [] };
         console.log("[banco] sendMessage sin respuesta:", a, msg);
@@ -81,9 +101,13 @@
 
   // La sesión se verifica contra el servidor real; aquí se contesta que
   // vale, para no depender de la red ni gastar una cuenta de verdad.
-  const fetchReal = window.fetch;
   window.fetch = async (url, opts) => {
     const u = String(url);
+    // Los archivos del propio proyecto se piden de verdad: interceptarlos
+    // convierte cualquier lectura de codigo en un «{}» silencioso.
+    if (!/^https?:/i.test(u) || u.startsWith(location.origin)) {
+      return fetchDeVerdad(url, opts);
+    }
     if (u.includes("/api/cuenta/yo")) {
       // OJO con la forma: verificar() lee `j.usuario`. Si se devuelve
       // otra cosa da la sesion por muerta, la BORRA y el panel cae a la
@@ -116,7 +140,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Chamba Lista — Panel</title>
-<link rel="stylesheet" href="panel.css?v=1790112626">
+<link rel="stylesheet" href="panel.css?v=1790134060">
 </head>
 <body>
 
@@ -354,6 +378,6 @@
   </div>
 </div>
 
-<script type="module" src="panel.js?v=1790112626"></script>
+<script type="module" src="panel.js?v=1790134060"></script>
 </body>
 </html>

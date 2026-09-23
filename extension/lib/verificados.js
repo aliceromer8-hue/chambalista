@@ -47,11 +47,16 @@ export const SOLO_RELLENA = ["linkedin"];
 // importa y el panel escribe el titular con él. Suban o bajen, coinciden;
 // y una prueba falla si alguien los vuelve a separar.
 //
-// Por qué sigue en 15 y no en 100: el tope real no es este número, es la
-// cuota de IA. Cada postulación gasta ~2 llamadas al modelo y la capa
-// gratuita da 40 cada 24 h — una tanda de cien se quedaría tiesa cerca de
-// la veinte, con ochenta «llegaste al límite» en pantalla. Subirlo a cien
-// es una línea, pero solo después de activar facturación en Gemini.
+// Por qué es 100 y no 15: porque el titular dice «un clic, cien
+// postulaciones» y un número que el código no cumple no es una opción.
+// Si la promesa es cien, una tanda prepara cien.
+//
+// Lo que NO desaparece por subirlo es la cuota de IA: cada postulación
+// gasta ~2 llamadas al modelo y la capa gratuita da 40 cada 24 h, así
+// que sin facturación activa la tanda se queda sin combustible cerca de
+// la veinte. Eso no se disimula — `correrLote` para en seco y lo dice
+// con el número exacto de las que sí salieron, en vez de pintar ochenta
+// tarjetas rojas idénticas. Con facturación en Gemini, las cien entran.
 export const PACKS = [
   { postulaciones: 5, soles: 0, nombre: "Para probar" },
   { postulaciones: 30, soles: 15, nombre: "Pack chico" },
@@ -60,4 +65,4 @@ export const PACKS = [
 export const PACK_MAYOR = 100;
 
 // Cuántas prepara una tanda de un clic. Ver el bloque de arriba.
-export const TOPE_POR_TANDA = 15;
+export const TOPE_POR_TANDA = PACK_MAYOR;

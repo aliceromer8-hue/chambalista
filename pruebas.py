@@ -1037,7 +1037,12 @@ _fondo = pathlib.Path("extension/background.js").read_text(encoding="utf-8")
 # número que el código cumple tienen que salir del MISMO sitio o vuelven
 # a decir cosas distintas. background.js ahora lo importa.
 _verif_tope = pathlib.Path("extension/lib/verificados.js").read_text(encoding="utf-8")
-_tope = int(_re.search(r"TOPE_POR_TANDA = (\d+)", _verif_tope).group(1))
+# El tope puede estar escrito como número o como `PACK_MAYOR` —que es
+# lo deseable: así el titular y el código no pueden desincronizarse—.
+# Leer solo dígitos reventaba el suite entero a mitad, en silencio.
+_tope_crudo = _re.search(r"TOPE_POR_TANDA = ([A-Z_0-9]+)", _verif_tope).group(1)
+_tope = (int(_re.search(r"PACK_MAYOR = (\d+)", _verif_tope).group(1))
+         if _tope_crudo == "PACK_MAYOR" else int(_tope_crudo))
 check("el tope real está declarado en un solo sitio", _tope > 0, f"{_tope} por tanda")
 check("y el background lo importa, no lo redeclara",
       "import { TOPE_POR_TANDA }" in _fondo
@@ -1078,10 +1083,30 @@ if _esperado:
 check("el precio anunciado corresponde a ese pack",
       f"{_pack_mayor} postulaciones" in _visible_web, f"{_pack_mayor} postulaciones")
 
-# Y el titular no puede prometer que van todas de un clic.
-for _falso in ["un clic. cien postulaciones", "un clic, cien postulaciones",
-               f"un clic. {_pack_mayor}", "cien postulaciones de un clic"]:
-    check(f"no promete «{_falso}»", _falso not in _visible_web)
+# «Un clic, cien postulaciones» solo se puede decir si una tanda prepara
+# de verdad el pack entero.
+#
+# Antes estaba prohibido a secas, y era correcto: el codigo mandaba 15.
+# Ahora TOPE_POR_TANDA es PACK_MAYOR, asi que la frase es cierta y la
+# prohibicion habria sido una regla que ya no describe nada. Lo que se
+# vigila es la condicion, no la frase — si alguien baja el tope, la
+# promesa vuelve a ser mentira y esto lo caza.
+# Sin quitar las etiquetas, «Un clic.<br>Cien postulaciones.» no coincide
+# con ninguna frase buscada y el guard queda VACIO: pasa siempre, incluso
+# con el tope bajado. Un test que no puede fallar es peor que ninguno,
+# porque da confianza sin darla.
+def _sin_etiquetas(html):
+    return " ".join(_re.sub(r"<[^>]+>", " ", html).split()).lower()
+
+_LO_PROMETEN = [("web", _sin_etiquetas(_visible_web)),
+                ("panel", _sin_etiquetas(_visible_panel))]
+_frases = ["un clic. cien postulaciones", "un clic, cien postulaciones",
+           "cien postulaciones de un clic"]
+for _donde, _texto in _LO_PROMETEN:
+    _promete = any(f in _texto for f in _frases)
+    check(f"la {_donde} solo promete «un clic, cien» si el codigo lo cumple",
+          not _promete or _tope >= _pack_mayor,
+          f"promete={_promete}, tope={_tope}, pack={_pack_mayor}")
 
 # ---------------------------------------------------------------------
 titulo("EL ARCHIVO QUE RECIBE LA EMPRESA")

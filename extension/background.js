@@ -14,6 +14,10 @@ import * as sesion from "./lib/sesion.js";
 import { medir } from "./lib/medir.js";
 import { TOPE_POR_TANDA } from "./lib/verificados.js";
 
+// Lo que dice el servidor cuando se agota la cuota gratuita de IA.
+// Viene de proxy_ia.py: «Llegaste al límite de N usos gratis.»
+const SIN_CUOTA = /l[ií]mite de \d+ usos gratis|cuota|quota|429/i;
+
 const PAUSA_ENTRE_VACANTES = 2500;
 
 let lote = { fase: "inactivo", modo: "", total: 0, hechas: 0, mensaje: "", items: [], cancelado: false };
@@ -357,6 +361,24 @@ async function correrLote({ vacantes, modo, aprobacion, respuestasPersona }) {
     } catch (e) {
       item.estado = "fallida";
       item.motivo = e.message;
+
+      // Quedarse sin cuota de IA no es «esta vacante fallo»: es que se
+      // acabo el combustible y las que quedan van a fallar igual.
+      //
+      // Con el tope en cien y la capa gratuita en 40 llamadas cada 24 h,
+      // seguir el bucle pinta ochenta tarjetas rojas identicas y entierra
+      // las que SI salieron. Se para en seco y se dice el numero exacto,
+      // que es lo unico accionable: cuantas entraron y cuando se renueva.
+      if (SIN_CUOTA.test(e.message || "")) {
+        const hechas = lote.items.filter((x) => x.estado === "enviada").length;
+        const listas = lote.items.filter((x) => x.estado === "preparada").length;
+        lote.cancelado = true;
+        lote.mensaje = `Se acabo la cuota de IA. ${hechas} enviada(s) y ${listas} lista(s) `
+          + `de ${cola.length}. Las demas quedaron sin preparar: vuelve cuando se renueve, `
+          + `o pon tu propia clave en Mi perfil.`;
+        item.motivo = "Se acabo la cuota de IA antes de llegar aqui.";
+        break;
+      }
     }
 
     // El candado de LinkedIn.
