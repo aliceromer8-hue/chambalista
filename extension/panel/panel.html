@@ -178,6 +178,13 @@
 
   <!-- ══════════ PERFIL ══════════ -->
   <section class="vista oculto" id="vista-perfil">
+    <!-- Con qué cuenta estás, y cómo salir. sesion.salir() existía desde
+         que hay cuentas, pero el panel no lo llamaba en ningún sitio: no
+         había forma de cerrar sesión ni de cambiar de cuenta. -->
+    <p class="cuenta-linea" id="cuenta-linea">
+      Entraste como <b id="cuenta-correo">—</b>
+      <button class="enlace" type="button" id="btn-salir">Cerrar sesión</button>
+    </p>
     <div class="rejilla">
       <article class="tarjeta">
         <h2>Tu CV</h2>

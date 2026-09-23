@@ -114,6 +114,15 @@
       // etapa 0 — que parece un fallo del panel y es del banco.
       return new Response(JSON.stringify({ usuario: { correo: "mariana@ejemplo.pe" } }), { status: 200 });
     }
+    // La subida del CV: se cuenta cuántas veces llega, para poder
+    // comprobar que SIN cuenta ni siquiera se intenta.
+    if (u.includes("/api/cv/procesar")) {
+      window.__subidas = (window.__subidas || 0) + 1;
+      const conToken = /Bearer/.test(JSON.stringify(opts?.headers || {}));
+      if (!conToken) return new Response(JSON.stringify({ error: "Inicia sesión para continuar." }), { status: 401 });
+      return new Response(JSON.stringify({ perfil: { ...CV, analizado_con: "ia" } }), { status: 200 });
+    }
+    if (u.includes("/api/cuenta/salir")) return new Response("{}", { status: 200 });
     if (u.includes("/api/cv/sugerencias")) {
       return new Response(JSON.stringify({ momento: "estudiante-final", puestos: [
         { texto: "Practicante de Análisis de Datos", razon: "es lo que más respalda tu CV (61 %)" },
@@ -140,7 +149,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Chamba Lista — Panel</title>
-<link rel="stylesheet" href="panel.css?v=1790134060">
+<link rel="stylesheet" href="panel.css?v=1790134737">
 </head>
 <body>
 
@@ -184,7 +193,7 @@
         <p class="antetitulo">Prácticas y primer empleo en Perú</p>
         <!-- Lo reescribe panel.js con titularPortada(), desde PACK_MAYOR y
            TOPE_POR_TANDA. Esto es solo el primer fotograma. -->
-        <h1 id="portada-titulo">Cien postulaciones.<br>Sin escribir ninguna.</h1>
+        <h1 id="portada-titulo">Un clic.<br>Cien postulaciones.</h1>
         <p class="bajada" id="portada-bajada">
           Sube tu CV, elige dónde buscar y postula a todo lo que encaje contigo.
           Tú das el último clic, siempre.
@@ -314,6 +323,13 @@
 
   <!-- ══════════ PERFIL ══════════ -->
   <section class="vista oculto" id="vista-perfil">
+    <!-- Con qué cuenta estás, y cómo salir. sesion.salir() existía desde
+         que hay cuentas, pero el panel no lo llamaba en ningún sitio: no
+         había forma de cerrar sesión ni de cambiar de cuenta. -->
+    <p class="cuenta-linea" id="cuenta-linea">
+      Entraste como <b id="cuenta-correo">—</b>
+      <button class="enlace" type="button" id="btn-salir">Cerrar sesión</button>
+    </p>
     <div class="rejilla">
       <article class="tarjeta">
         <h2>Tu CV</h2>
@@ -378,6 +394,6 @@
   </div>
 </div>
 
-<script type="module" src="panel.js?v=1790134060"></script>
+<script type="module" src="panel.js?v=1790134737"></script>
 </body>
 </html>

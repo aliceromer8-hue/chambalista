@@ -569,8 +569,11 @@ titulo("EL RECORRIDO — que subir el CV no sea un callejon");
   // bien, la portada avanzaba... y esa portada esta en la pestaña de
   // Inicio, que ya no estas mirando. Te quedabas con el CV cargado y sin
   // un solo boton que dijera «sigue por aqui».
-  const trasSubir = pjs.slice(pjs.indexOf("almacen.perfil.guardar"),
-                              pjs.indexOf("almacen.perfil.guardar") + 900);
+  // El manejador entero, no «900 caracteres despues de guardar»: esa
+  // ventana fija se rompio en cuanto el manejador gano un bloque de
+  // errores, sin que el comportamiento cambiara nada.
+  const iniSubida = pjs.indexOf('$("#archivo-cv").addEventListener("change"');
+  const trasSubir = pjs.slice(iniSubida, pjs.indexOf("\n});", iniSubida));
   check("al subir el CV se vuelve al recorrido", /irA\("inicio"\)/.test(trasSubir),
     "subir el CV es el paso uno de cuatro, no el final");
   check("y se avisa de que se cargo", /avisar\(/.test(trasSubir));
@@ -1041,9 +1044,13 @@ titulo("LA PESTAÑA SIN CONTENT SCRIPT — el fallo mas probable del primer inte
 
   // Se marcan, NO se bloquean: quien pulsa una pestaña apagada no
   // aprende nada, solo choca. Ahora entra y la pantalla le explica.
-  check("las pestañas sin contenido se marcan sin CV",
-    /pendientes\s*=\s*\{[^}]*vacantes:\s*etapa < 2/.test(pjs2) &&
-    /pipeline:\s*etapa < 2/.test(pjs2));
+  // Cada pestaña declara desde que etapa sirve; sin cuenta (etapa 0) no
+  // sirve ninguna salvo Inicio, que es donde se entra.
+  const sirve = (pjs2.match(/SIRVE_DESDE\s*=\s*\{([^}]*)\}/) || [])[1] || "";
+  check("cada pestaña dice desde que etapa sirve",
+    /perfil:\s*1/.test(sirve) && /vacantes:\s*3/.test(sirve) && /pipeline:\s*3/.test(sirve), sirve);
+  check("las pestañas se marcan con esa tabla, no a mano",
+    /etapa < \(SIRVE_DESDE\[tab\.dataset\.vista\]/.test(pjs2));
   check("y NUNCA se deshabilitan", /tab\.disabled\s*=\s*false/.test(pjs2)
     && !/tab\.disabled\s*=\s*cerrada/.test(pjs2));
   check("dicen que falta antes de pulsar", /tab\.title\s*=\s*queFalta/.test(pjs2));
@@ -1051,7 +1058,15 @@ titulo("LA PESTAÑA SIN CONTENT SCRIPT — el fallo mas probable del primer inte
 
   // Y al entrar, la pantalla trae el cartel con el boton que lo resuelve.
   check("las tres vistas llevan cartel de «que falta»",
-    /\["vista-vacantes", "vista-pipeline", "vista-perfil"\]/.test(pjs2));
+    /for \(const \[vista, desde\] of Object\.entries\(SIRVE_DESDE\)\)/.test(pjs2));
+  // Y lo que no sirve todavia se TAPA, no solo se anuncia: con el cartel
+  // encima y los botones debajo, sin cuenta se podia subir el CV y
+  // acabar en un 401.
+  check("lo que aun no sirve se tapa entero",
+    /classList\.toggle\("cerrada", etapa < desde\)/.test(pjs2)
+    && /\.vista\.cerrada > :not\(\.guia\)/.test(pcss));
+  check("el primer paso es la cuenta, no el CV",
+    /\[PASOS\.cuenta, PASOS\.cv, PASOS\.portales\]\[etapa\]/.test(pjs2));
   check("el cartel sale de UN solo calculo del paso siguiente",
     /function queFalta\(etapa\)/.test(pjs2)
     && (pjs2.match(/queFalta\(etapa\)/g) || []).length >= 2);
@@ -1065,6 +1080,80 @@ titulo("LA PESTAÑA SIN CONTENT SCRIPT — el fallo mas probable del primer inte
   // Y la unica accion de la etapa sin CV es subirlo.
   check("sin CV, la portada solo ofrece subir el CV",
     /Subir mi CV/.test(pjs2));
+}
+
+// ══════════════════════════════════════════════════════════════════════
+// SUBIR EL CV SIN QUE SE «CUELGUE»
+// ══════════════════════════════════════════════════════════════════════
+{
+  titulo("SUBIDA — sin cuenta no se intenta, y se puede reintentar");
+  const fsp5 = await import("node:fs/promises");
+  const pj = await fsp5.readFile(new URL("panel/panel.js", BASE), "utf8");
+  const ph = await fsp5.readFile(new URL("panel/panel.html", BASE), "utf8");
+  const i = pj.indexOf('$("#archivo-cv").addEventListener("change"');
+  const h = pj.slice(i, pj.indexOf("\n});", i));
+
+  // Sin esto, elegir el mismo archivo tras un error no dispara `change`
+  // y el boton parece muerto.
+  check("el selector se vacia para poder reintentar", /e\.target\.value\s*=\s*""/.test(h));
+  check("sin cuenta no se llega a llamar al servidor",
+    h.indexOf("hayCuenta()") > -1 && h.indexOf("hayCuenta()") < h.indexOf("/api/cv/procesar"));
+  check("una respuesta sin perfil es un error claro, no un TypeError",
+    /!j\.perfil/.test(h));
+  // Guardado el CV, un fallo al pintar no puede decir «fallo la subida».
+  check("pintar despues de guardar va en su propio try",
+    (h.match(/try \{/g) || []).length >= 2);
+
+  check("hay boton de cerrar sesion", /id="btn-salir"/.test(ph));
+  check("y llama de verdad a sesion.salir()", /sesion\.salir\(\)/.test(pj));
+  // Otra cuenta en el mismo ordenador no puede heredar el CV de la anterior.
+  const s = pj.slice(pj.indexOf('$("#btn-salir")'), pj.indexOf('$("#btn-salir")') + 500);
+  check("al salir se borra el CV guardado en el navegador", /almacen\.perfil\.borrar\(\)/.test(s));
+}
+
+// ══════════════════════════════════════════════════════════════════════
+// NINGÚN ELEMENTO QUE FALTE PUEDE TUMBAR EL PANEL
+// ══════════════════════════════════════════════════════════════════════
+// panel.js engancha sus botones al cargar: `$("#btn-salir").addEventListener`.
+// Si ese id no existe en el HTML, `$()` devuelve null, la línea revienta y
+// se lleva el módulo ENTERO — ni portada, ni pestañas, ni nada. Desde
+// fuera se ve como «se crashea», sin ninguna pista.
+//
+// Pasó de verdad: el banco de pruebas llevaba una copia vieja del HTML
+// sin «Cerrar sesión», y el panel no arrancó. Esto lo caza antes.
+{
+  titulo("IDS — todo lo que panel.js busca existe");
+
+  const fsp6 = await import("node:fs/promises");
+  const pjs3 = await fsp6.readFile(new URL("panel/panel.js", BASE), "utf8");
+  const phtml3 = await fsp6.readFile(new URL("panel/panel.html", BASE), "utf8");
+
+  // Ids que existen: los del HTML, y los que panel.js crea él mismo en
+  // sus plantillas (formulario de acceso, botones de la portada...).
+  const existen = new Set([
+    ...[...phtml3.matchAll(/id="([\w-]+)"/g)].map((m) => m[1]),
+    ...[...pjs3.matchAll(/id="([\w-]+)"/g)].map((m) => m[1]),
+    // Los que el código crea bajo demanda: `p.id = "aviso-lote"`.
+    ...[...pjs3.matchAll(/\.id\s*=\s*"([\w-]+)"/g)].map((m) => m[1]),
+  ]);
+
+  const buscados = [...new Set(
+    [...pjs3.matchAll(/\$\("#([\w-]+)"\)/g)].map((m) => m[1]),
+  )];
+  const faltan = buscados.filter((id) => !existen.has(id));
+  check(`los ${buscados.length} ids que usa panel.js existen`, faltan.length === 0,
+    faltan.join(", "));
+
+  // Y el banco no puede quedarse con una copia vieja del panel: si el
+  // HTML cambia, el banco miente sobre lo que ve la persona.
+  const banco = await fsp6.readFile(new URL("panel/prueba-banco.html", BASE), "utf8")
+    .catch(() => "");
+  if (banco) {
+    const sinSellos = (s) => s.replace(/\?v=\d+/g, "").replace(/\r\n/g, "\n");
+    check("el banco lleva el panel.html actual, no una copia vieja",
+      sinSellos(banco).includes(sinSellos(phtml3).trim()),
+      "regenera prueba-banco.html desde panel.html");
+  }
 }
 
 console.log(`

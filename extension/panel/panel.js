@@ -112,6 +112,7 @@ document.querySelectorAll("[data-ir]").forEach((b) => b.addEventListener("click"
 // Inicio: kanban de cifras, gráfico y últimos movimientos
 // ---------------------------------------------------------------------
 async function pintarInicio() {
+  pintarCuenta();
   const r = await almacen.tracker.resumen();
 
   pintarPortada(r);
@@ -180,67 +181,78 @@ function enLetra(n) {
 }
 
 /**
- * Qué falta para que una pantalla sirva, y el botón que lo resuelve.
+ * El recorrido, en orden: cuenta → CV → portales → buscar.
  *
- * Ali entraba a «Mi perfil» y no sabía qué hacer. El problema no era esa
- * pantalla: era que ninguna decía cuál es el paso siguiente. Una pantalla
- * vacía sin instrucción se lee como una avería.
+ * Es ESTRICTO a propósito. Antes cada pantalla dejaba tocar su contenido
+ * aunque faltara el paso anterior, y el resultado era un error: sin
+ * cuenta se podía subir el CV, `/api/cv/procesar` devolvía 401 y la
+ * persona se quedaba en «Mi perfil» con un mensaje de sesión caducada
+ * —de una sesión que nunca existió—. Ali lo vivió como «se crashea».
  *
- * Indexado por lo que falta, no por la vista: el paso siguiente es el
- * mismo se entre por donde se entre, y tenerlo en un sitio evita que las
- * tres pantallas acaben diciendo cosas distintas.
+ * Así que cada paso tiene su cartel, y lo que depende de un paso que
+ * aún no está hecho no se enseña: se enseña el cartel y su botón.
  */
-const QUE_FALTA = {
-  0: {
-    titulo: "Primero sube tu CV",
+const PASOS = {
+  cuenta: {
+    titulo: "Entra a tu cuenta",
+    porque: "Tu CV, tus postulaciones y tu cuota van atados a tu cuenta. "
+          + "Sin entrar no se guarda nada, así que es lo primero.",
+    boton: "Entrar",
+    hacer: () => { irA("inicio"); setTimeout(() => $("#acceso-correo")?.focus(), 50); },
+  },
+  cv: {
+    titulo: "Sube tu CV",
     porque: "Se lee una vez y sirve para todas las postulaciones. PDF o Word.",
     boton: "Subir mi CV",
     hacer: () => { irA("perfil"); $("#archivo-cv")?.click(); },
   },
-  1: {
+  portales: {
     titulo: "Conecta dónde quieres que busque",
     porque: "Inicias sesión tú en cada portal; nunca te pedimos la contraseña. "
           + "Desde ahí buscamos y llenamos los formularios por ti.",
     boton: "Elegir portales",
-    hacer: () => irA("inicio"),
+    hacer: () => { irA("inicio"); $("#portada")?.scrollIntoView({ behavior: "smooth", block: "start" }); },
   },
 };
 
-/**
- * Pone (o quita) el cartel de «te falta esto» arriba de cada vista.
- *
- * Se inyecta desde aquí en vez de dejarlo escrito en el HTML porque el
- * texto depende de en qué punto está la persona, y un cartel fijo que
- * dice «sube tu CV» a quien ya lo subió es peor que no tener cartel.
- */
+/** El paso que toca ahora. Un solo cálculo: con dos, el tooltip y la
+ *  pantalla llegaron a decir pasos distintos. */
 function queFalta(etapa) {
-  if (etapa < 2) return QUE_FALTA[0];   // sin cuenta o sin CV: el CV
-  if (etapa < 3) return QUE_FALTA[1];   // con CV, sin portales
-  return null;
+  return [PASOS.cuenta, PASOS.cv, PASOS.portales][etapa] || null;
 }
 
+/** Desde qué etapa sirve cada pestaña. Antes de eso se ve el cartel y
+ *  NADA del contenido: ni botones que acaben en 401, ni listas vacías. */
+const SIRVE_DESDE = { perfil: 1, vacantes: 3, pipeline: 3 };
+
+/**
+ * Pone el cartel del paso siguiente en cada pestaña, y tapa el
+ * contenido de las que todavía no sirven.
+ *
+ * «Mi perfil» se abre en cuanto hay cuenta, aunque falte el CV: ahí es
+ * justo donde se sube. El resto espera a que el recorrido llegue.
+ */
 function pintarGuias(etapa) {
   const falta = queFalta(etapa);
 
-  // «Mi perfil» tambien lleva cartel: Ali entraba ahi y no sabia que
-  // hacer. Es donde se resuelve el paso, asi que el boton cae en el
-  // sitio — abre el selector de archivo sin moverla de pantalla.
-  for (const id of ["vista-vacantes", "vista-pipeline", "vista-perfil"]) {
-    const vista = $(`#${id}`);
-    if (!vista) continue;
-    vista.querySelector(".guia")?.remove();
+  for (const [vista, desde] of Object.entries(SIRVE_DESDE)) {
+    const el = $(`#vista-${vista}`);
+    if (!el) continue;
+    el.querySelector(".guia")?.remove();
+    el.classList.toggle("cerrada", etapa < desde);
     if (!falta) continue;
 
     const caja = document.createElement("div");
     caja.className = "guia";
     caja.innerHTML = `
       <div>
+        <span class="guia-paso">Paso ${etapa + 1} de 3</span>
         <b>${escapar(falta.titulo)}</b>
         <p class="nota">${escapar(falta.porque)}</p>
       </div>
       <button class="boton primario" type="button">${escapar(falta.boton)}</button>`;
     caja.querySelector("button").addEventListener("click", falta.hacer);
-    vista.prepend(caja);
+    el.prepend(caja);
   }
 }
 
@@ -298,11 +310,10 @@ function pintarPortada(resumen) {
   // El punto al lado del nombre avisa antes de pulsar, y el title lo
   // dice con palabras para quien llegue con el teclado o con lector.
   //
-  // «Mi perfil» nunca se marca: ahi estan los datos y el cierre de
-  // sesion, y esos tienen que estar siempre disponibles.
-  const pendientes = { vacantes: etapa < 2, pipeline: etapa < 2 };
+  // Cuáles y desde cuándo lo dice SIRVE_DESDE. Sin cuenta se marcan
+  // todas menos Inicio, que es donde se entra.
   for (const tab of document.querySelectorAll(".menu .tab")) {
-    const pendiente = Boolean(pendientes[tab.dataset.vista]);
+    const pendiente = etapa < (SIRVE_DESDE[tab.dataset.vista] ?? 0);
     tab.disabled = false;
     tab.classList.toggle("pendiente", pendiente);
     if (pendiente) tab.title = queFalta(etapa)?.titulo || "";
@@ -1066,10 +1077,50 @@ $("#btn-exportar").addEventListener("click", async () => {
 // ---------------------------------------------------------------------
 $("#btn-cargar-cv").addEventListener("click", () => $("#archivo-cv").click());
 
+// Cerrar sesión. Vuelve al paso 1 del recorrido y lo dice: quien sale
+// tiene que ver que salió, no encontrarse el panel igual que antes.
+//
+// El CV guardado en este navegador se borra también. Si no, quien entra
+// después con OTRA cuenta en el mismo ordenador se encuentra el CV de la
+// persona anterior ya cargado — y postula con él.
+$("#btn-salir").addEventListener("click", async () => {
+  await sesion.salir();
+  await almacen.perfil.borrar();
+  estado.conCuenta = false;
+  estado.perfil = null;
+  pintarPerfil();
+  await pintarInicio();
+  irA("inicio");
+  avisar("Sesión cerrada.");
+});
+
+async function pintarCuenta() {
+  const s = await sesion.obtener();
+  $("#cuenta-correo").textContent = s?.usuario?.correo || s?.correo || "tu cuenta";
+  $("#cuenta-linea").classList.toggle("oculto", !s?.token);
+}
+
 $("#archivo-cv").addEventListener("change", async (e) => {
   const f = e.target.files[0];
+  // Se vacía YA. Si no, elegir el mismo archivo otra vez tras un error
+  // no dispara `change` y el botón parece muerto — que es exactamente
+  // como se ve un cuelgue desde fuera.
+  e.target.value = "";
   if (!f) return;
-  $("#estado-perfil").textContent = "Leyendo tu CV…";
+
+  // Sin cuenta no se intenta. El servidor contestaría 401 y el mensaje
+  // hablaría de una «sesión caducada» que nunca existió.
+  if (!(await sesion.hayCuenta())) {
+    estado.conCuenta = false;
+    avisar("Primero entra a tu cuenta.");
+    await pintarInicio();
+    irA("inicio");
+    return;
+  }
+
+  const caja = $("#estado-perfil");
+  caja.textContent = `Leyendo ${f.name}…`;
+  let perfil;
   try {
     const fd = new FormData();
     fd.append("cv", f);
@@ -1085,8 +1136,26 @@ $("#archivo-cv").addEventListener("change", async (e) => {
       throw new Error("Tu sesión de Chamba Lista caducó. Vuelve a entrar arriba.");
     }
     if (!r.ok) throw new Error(j.error || `El servidor respondió ${r.status}`);
-    estado.perfil = j.perfil;
-    await almacen.perfil.guardar(j.perfil);
+    if (!j.perfil || typeof j.perfil !== "object") {
+      throw new Error("No pudimos leer ese archivo. Prueba con el PDF o el Word original.");
+    }
+    perfil = j.perfil;
+    estado.perfil = perfil;
+    await almacen.perfil.guardar(perfil);
+  } catch (err) {
+    // Sin coletillas sobre el estado del servidor: «si el servicio está
+    // dormido» no significa nada para quien lo lee y encima suele ser
+    // falso — casi siempre el problema es otro. El mensaje del servidor
+    // ya explica qué pasa.
+    caja.textContent = err.message;
+    avisar(err.message);
+    return;
+  }
+
+  // A partir de aquí el CV YA está guardado. Si algo falla al pintar,
+  // no es que la subida fallara — decirle «error» a quien ya tiene su CV
+  // dentro la hace subirlo otra vez, y otra. Se anota y se sigue.
+  try {
     pintarPerfil();
     await pintarInicio();   // cargar el CV cambia de etapa
 
@@ -1101,16 +1170,12 @@ $("#archivo-cv").addEventListener("change", async (e) => {
     //
     // Subir el CV no es el final de nada: es el paso uno de cuatro. Así
     // que al terminar se vuelve a donde está el paso dos.
-    avisar(`CV de ${(j.perfil.nombre || "").split(" ")[0] || "listo"} cargado`, "bien");
-    irA("inicio");
-    $("#portada")?.scrollIntoView({ behavior: "smooth", block: "start" });
   } catch (err) {
-    // Sin coletillas sobre el estado del servidor: «si el servicio está
-    // dormido» no significa nada para quien lo lee y encima suele ser
-    // falso — casi siempre el problema es otro. El mensaje del servidor
-    // ya explica qué pasa.
-    $("#estado-perfil").textContent = err.message;
+    console.error("[panel] el CV se guardó pero falló al pintar:", err);
   }
+  avisar(`CV de ${(perfil.nombre || "").split(" ")[0] || "listo"} cargado`, "bien");
+  irA("inicio");
+  $("#portada")?.scrollIntoView({ behavior: "smooth", block: "start" });
 });
 
 /**
