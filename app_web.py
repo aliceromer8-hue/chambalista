@@ -287,7 +287,7 @@ def cuenta_registrar():
                                  "y las condiciones para crear tu cuenta."}), 400
     if not _pasa_cuenta():
         return jsonify({"error": "Demasiados intentos. Espera unos minutos."}), 429
-    ok, r = cuentas.registrar(d.get("correo"), d.get("contrasena"))
+    ok, r = cuentas.registrar(d.get("correo"), d.get("contrasena"), d.get("nombre"))
     if ok:
         # Se anota DESPUÉS de que la cuenta exista, porque la constancia
         # apunta a un id de usuario. Si esto falla, la cuenta ya está
@@ -371,6 +371,22 @@ def cuenta_yo():
     import cuentas
     usuario = cuentas.quien_es(_token())
     return jsonify({"usuario": usuario}) if usuario else (jsonify({"usuario": None}), 200)
+
+
+@app.post("/api/cuenta/nombre")
+@con_sesion
+def cuenta_nombre():
+    """Pone o cambia el nombre de la cuenta: con él saluda el panel.
+
+    El nombre es de la cuenta, no del CV. Las cuentas creadas antes de que
+    el registro lo pidiera lo ponen desde Mi perfil.
+    """
+    import cuentas
+    if not _pasa_cuenta():
+        return jsonify({"error": "Demasiados intentos. Espera unos minutos."}), 429
+    d = request.get_json(silent=True) or {}
+    ok, r = cuentas.cambiar_nombre(_token(), d.get("nombre"))
+    return (jsonify(r), 200) if ok else (jsonify(r), 400)
 
 
 @app.route("/api/nube/perfil", methods=["GET", "POST"])

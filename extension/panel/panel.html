@@ -71,37 +71,6 @@
       </div>
     </section>
 
-    <!-- Una tanda trabajando, en bucle. Se enseña mientras la persona
-         está a un paso de empezar (etapa 2): es el momento en que más
-         falta ver qué pasa después, y la pantalla tenía un hueco vacío.
-         Es un EJEMPLO y lo dice: los puestos salen de su carrera para que
-         se vea suyo, pero no son vacantes reales. aria-hidden porque un
-         texto que cambia cada segundo es ruido para un lector de pantalla. -->
-    <section class="en-marcha oculto" id="en-marcha" aria-hidden="true">
-      <div class="marcha-cabecera">
-        <span class="marcha-titulo">Así trabaja una tanda</span>
-        <span class="marcha-ejemplo">Ejemplo</span>
-      </div>
-      <ol class="marcha-lista" id="marcha-lista"></ol>
-      <div class="marcha-pie">
-        <span class="marcha-total"><b id="marcha-listas">0</b> de <span id="marcha-de">3</span> listas para tu clic</span>
-        <span class="marcha-progreso"><i id="marcha-barra"></i></span>
-      </div>
-    </section>
-
-    <!-- Lo que hace la web sola. Es la promesa del producto puesta en
-         términos de trabajo que la persona NO tiene que hacer. -->
-    <section class="hace" id="hace">
-      <h2 class="titulo-seccion">Cómo postula por ti</h2>
-      <ol class="cadena">
-        <li class="entra entra-1"><span class="paso-num">01</span><b>Encuentra</b><span>Barre cuatro portales a la vez y trae todo lo que salió hoy</span></li>
-        <li class="entra entra-2"><span class="paso-num">02</span><b>Descarta</b><span>Deja arriba lo que va contigo y hunde lo que no</span></li>
-        <li class="entra entra-3"><span class="paso-num">03</span><b>Postula</b><span>Abre la vacante, llena el formulario y contesta sus preguntas</span></li>
-        <li class="entra entra-4"><span class="paso-num">04</span><b>Repite</b><span>Una tras otra, sin que vuelvas a escribir lo mismo</span></li>
-      </ol>
-      <p class="tuyo"><span class="marca-tuyo">Lo tuyo</span> es leer y decir que sí. Dos segundos por vacante, y cada una sale con tu visto bueno.</p>
-    </section>
-
     <div id="arranque" class="oculto"></div>
 
     <div class="kanban" id="kanban-resumen"></div>
@@ -199,10 +168,18 @@
     <!-- Con qué cuenta estás, y cómo salir. sesion.salir() existía desde
          que hay cuentas, pero el panel no lo llamaba en ningún sitio: no
          había forma de cerrar sesión ni de cambiar de cuenta. -->
-    <p class="cuenta-linea" id="cuenta-linea">
-      Entraste como <b id="cuenta-correo">—</b>
+    <div class="cuenta-linea" id="cuenta-linea">
+      <span>Entraste como <b id="cuenta-quien">—</b> <small id="cuenta-correo"></small></span>
+      <!-- Sin nombre en la cuenta se ofrece solo: es el nombre con el que
+           te saluda el panel, no el que venga escrito en el CV. -->
+      <form class="form-nombre oculto" id="form-nombre">
+        <input type="text" id="input-nombre" maxlength="60" autocomplete="given-name"
+               placeholder="¿Cómo te llamas?" aria-label="Tu nombre">
+        <button class="boton chico primario" type="submit">Guardar</button>
+      </form>
+      <button class="enlace oculto" type="button" id="btn-cambiar-nombre">Cambiar nombre</button>
       <button class="enlace" type="button" id="btn-salir">Cerrar sesión</button>
-    </p>
+    </div>
     <div class="rejilla">
       <article class="tarjeta">
         <h2>Tu CV</h2>

@@ -452,6 +452,8 @@ function pintarModo() {
   // y volver a pedirla en cada inicio de sesión la convierte en un
   // trámite que se marca sin leer.
   $("#fila-acepta").classList.toggle("oculto", !modoRegistro);
+  $("#fila-nombre").classList.toggle("oculto", !modoRegistro);
+  $("#nombre").required = modoRegistro;
   $("#acepta").checked = false;
   errorCuenta("");
 }
@@ -500,7 +502,8 @@ $("#form-cuenta").addEventListener("submit", async (ev) => {
   try {
     const r = await fetch(`/api/cuenta/${modoRegistro ? "registrar" : "entrar"}`, {
       method: "POST", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ correo, contrasena, acepta: $("#acepta").checked }),
+      body: JSON.stringify({ correo, contrasena, acepta: $("#acepta").checked,
+                             nombre: modoRegistro ? $("#nombre").value.trim() : undefined }),
     });
     const j = await r.json();
     if (!r.ok) { errorCuenta(j.error || "No se pudo completar."); return; }

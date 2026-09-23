@@ -195,21 +195,16 @@ function enLetra(n) {
 const PASOS = {
   cuenta: {
     titulo: "Entra a tu cuenta",
-    porque: "Tu CV, tus postulaciones y tu cuota van atados a tu cuenta. "
-          + "Sin entrar no se guarda nada, así que es lo primero.",
     boton: "Entrar",
     hacer: () => { irA("inicio"); setTimeout(() => $("#acceso-correo")?.focus(), 50); },
   },
   cv: {
     titulo: "Sube tu CV",
-    porque: "Se lee una vez y sirve para todas las postulaciones. PDF o Word.",
     boton: "Subir mi CV",
     hacer: () => { irA("perfil"); $("#archivo-cv")?.click(); },
   },
   portales: {
     titulo: "Conecta dónde quieres que busque",
-    porque: "Entras una vez en la web de cada portal y queda conectado. "
-          + "Desde ahí buscamos y llenamos los formularios por ti.",
     boton: "Elegir portales",
     hacer: () => { irA("inicio"); $("#portada")?.scrollIntoView({ behavior: "smooth", block: "start" }); },
   },
@@ -248,7 +243,6 @@ function pintarGuias(etapa) {
       <div>
         <span class="guia-paso">Paso ${etapa + 1} de 3</span>
         <b>${escapar(falta.titulo)}</b>
-        <p class="nota">${escapar(falta.porque)}</p>
       </div>
       <button class="boton primario" type="button">${escapar(falta.boton)}</button>`;
     caja.querySelector("button").addEventListener("click", falta.hacer);
@@ -258,122 +252,22 @@ function pintarGuias(etapa) {
 
 
 
-// ---------------------------------------------------------------------
-// «Así trabaja una tanda»: el bucle debajo de la portada
-// ---------------------------------------------------------------------
 
 /**
- * Puestos de ejemplo según la carrera del CV.
+ * El nombre con el que se saluda: el de la CUENTA, nunca el del CV.
  *
- * Gonzalo estudia Marketing: si el ejemplo dice «Practicante de
- * Contabilidad», la animación deja de ser suya y pasa a ser un anuncio.
- * Con su área, se lee como «esto es lo que me va a pasar a mí».
+ * Antes salía del CV —en mayúsculas, como lo escribe el formato
+ * Harvard— y si alguien entraba con su cuenta y cargaba el CV de otra
+ * persona, el panel pasaba a llamarla como esa persona. La identidad es
+ * la cuenta; el CV es un documento que se usa.
  *
- * Se mira solo la educación, que es donde está la carrera; buscar en todo
- * el CV encontraba «marketing» en la línea de habilidades de un contador.
+ * Sin nombre en la cuenta no se inventa ninguno: se saluda sin nombre.
  */
-const EJEMPLOS_POR_AREA = [
-  [/marketing|publicidad|comunicaci/, ["Practicante de Marketing", "Asistente de Redes Sociales", "Practicante de Marketing Digital"]],
-  [/sistemas|software|computaci|inform[aá]tica/, ["Practicante de Desarrollo", "Practicante de Soporte TI", "Practicante de Sistemas"]],
-  [/contab|finanz|econom/, ["Practicante de Contabilidad", "Asistente de Finanzas", "Practicante de Tesorería"]],
-  [/administ|negocios|gesti[oó]n/, ["Practicante de Administración", "Asistente Comercial", "Practicante de Recursos Humanos"]],
-  [/psicolog/, ["Practicante de Recursos Humanos", "Asistente de Selección", "Practicante de Psicología"]],
-  [/derecho|leyes/, ["Practicante de Derecho", "Asistente Legal", "Practicante de Cumplimiento"]],
-  [/industrial|mec[aá]nic|mantenimiento|el[eé]ctric/, ["Practicante de Producción", "Técnico de Mantenimiento", "Practicante de Calidad"]],
-];
-const EJEMPLOS_GENERALES = ["Practicante de Administración", "Asistente Comercial", "Practicante de Atención al Cliente"];
-const DISTRITOS = ["Miraflores", "San Isidro", "Surco", "La Molina", "Lima Cercado", "Jesús María"];
-
-function ejemplosPara(perfil) {
-  const carrera = JSON.stringify(perfil?.educacion || "").toLowerCase();
-  const encontrado = EJEMPLOS_POR_AREA.find(([re]) => re.test(carrera));
-  return encontrado ? encontrado[1] : EJEMPLOS_GENERALES;
-}
-
-// Los cuatro momentos de una postulación, en el orden en que ocurren.
-const MOMENTOS = ["Encontrada", "CV adaptado", "Formulario lleno", "Lista para tu clic"];
-
-let relojMarcha = null;
-let marchaFirma = "";
-
-/**
- * Enciende o apaga el bucle.
- *
- * pintarInicio() se llama muchas veces (al volver a la pestaña, al
- * conectar un portal...). Si cada llamada reiniciara la animación, daría
- * tirones cada vez que la persona cambia de pestaña. Por eso se firma
- * con lo que se enseña y solo se reinicia si eso cambió.
- */
-function pintarEnMarcha(mostrar) {
-  const caja = $("#en-marcha");
-  if (!caja) return;
-  caja.classList.toggle("oculto", !mostrar);
-  if (!mostrar) {
-    clearInterval(relojMarcha);
-    relojMarcha = null;
-    marchaFirma = "";
-    return;
-  }
-
-  const puestos = ejemplosPara(estado.perfil);
-  // El mismo portal que la portada ofrece primero: el conectado, o si no
-  // el que tiene la postulación verificada. Enseñar otro sería un ejemplo
-  // de algo que la portada no le está proponiendo.
-  const portal = (sesionesCache.find((p) => p.sesion)
-    || sesionesCache.find((p) => queHace(p).tono === "bien")
-    || {}).nombre || "Computrabajo";
-  const firma = puestos.join("|") + portal;
-  if (relojMarcha && firma === marchaFirma) return;
-  marchaFirma = firma;
-  clearInterval(relojMarcha);
-
-  const lista = $("#marcha-lista");
-  lista.innerHTML = puestos.map((puesto, i) => `
-    <li class="marcha-fila" data-n="0">
-      <span class="marcha-punto"></span>
-      <span class="marcha-texto">
-        <b>${escapar(puesto)}</b>
-        <small>${escapar(portal)} · ${escapar(DISTRITOS[i % DISTRITOS.length])}</small>
-      </span>
-      <span class="marcha-estado">En cola</span>
-      <span class="marcha-barra"><i></i></span>
-    </li>`).join("");
-  $("#marcha-de").textContent = puestos.length;
-
-  const filas = [...lista.children];
-  // Cada fila arranca dos pasos después de la anterior, avanza un momento
-  // por paso, y al final todo se queda quieto un rato antes de repetir:
-  // sin esa pausa no da tiempo a leer «3 de 3 listas», que es el remate.
-  const DESFASE = 2;
-  const FIN = (filas.length - 1) * DESFASE + MOMENTOS.length;
-  const CICLO = FIN + 4;
-
-  const pintar = (tick) => {
-    let listas = 0;
-    filas.forEach((fila, i) => {
-      const n = Math.max(0, Math.min(MOMENTOS.length, tick - i * DESFASE));
-      fila.dataset.n = n;
-      fila.querySelector(".marcha-estado").textContent = n ? MOMENTOS[n - 1] : "En cola";
-      fila.querySelector(".marcha-barra i").style.width = `${(n / MOMENTOS.length) * 100}%`;
-      if (n === MOMENTOS.length) listas++;
-    });
-    $("#marcha-listas").textContent = listas;
-    $("#marcha-barra").style.width = `${Math.min(100, (Math.min(tick, FIN) / FIN) * 100)}%`;
-  };
-
-  // Con movimiento reducido: el final, quieto. Se entiende igual.
-  if (matchMedia("(prefers-reduced-motion: reduce)").matches) {
-    pintar(FIN);
-    return;
-  }
-
-  let tick = 0;
-  pintar(tick);
-  relojMarcha = setInterval(() => {
-    if (document.hidden) return;          // pestaña oculta: sin gastar nada
-    tick = (tick + 1) % CICLO;
-    pintar(tick);
-  }, 850);
+function nombreCuenta({ completo = false } = {}) {
+  const n = (estado.usuario?.nombre || "").trim();
+  if (!n) return "";
+  const bien = n.toLowerCase().replace(/(^|\s)(\p{L})/gu, (_, a, b) => a + b.toUpperCase());
+  return completo ? bien : bien.split(/\s+/)[0];
 }
 
 /**
@@ -402,12 +296,6 @@ function pintarPortada(resumen) {
   const etapa = !estado.conCuenta ? 0 : !estado.perfil ? 1 : !conectados.length ? 2 : 3;
 
   portada.classList.toggle("compacta", etapa === 3);
-  // La promesa solo hace falta mientras no la haya comprobado.
-  // El bloque «cómo postula por ti» es el argumento de venta, y quien ya
-  // subió su CV lo compró: a partir de ahí estorba, y en una pantalla de
-  // escritorio empuja el tablero fuera de la vista. Solo se enseña
-  // mientras la persona aún no tiene CV.
-  $("#hace").classList.toggle("oculto", etapa >= 2);
 
   // El sello «15 por tanda» solo cuando ya significa algo.
   //
@@ -440,7 +328,6 @@ function pintarPortada(resumen) {
   }
 
   pintarGuias(etapa);
-  pintarEnMarcha(etapa === 2);
   // El tablero: se enseña cuando hay algo que enseñar, y no antes.
   //
   // Antes se dejaba SIEMPRE visible, atenuado al 38 % y sin poder
@@ -462,7 +349,7 @@ function pintarPortada(resumen) {
   if (etapa === 0) {
     $("#portada-titulo").innerHTML = titularPortada();
     $("#portada-bajada").textContent =
-      "Entra con tu cuenta de Chamba Lista para empezar. Es la misma de la web.";
+      "Entra con tu cuenta de Chamba Lista.";
     acciones.innerHTML = `
       <form class="acceso-panel" id="form-acceso" style="width:100%">
         <input type="email" id="acceso-correo" placeholder="tu@correo.com"
@@ -494,6 +381,7 @@ function pintarPortada(resumen) {
         return;
       }
       estado.conCuenta = true;
+      estado.usuario = r.usuario || null;
       avisar(`Hola, ${r.usuario?.correo || "de nuevo"}.`);
       await pintarInicio();
     });
@@ -503,8 +391,7 @@ function pintarPortada(resumen) {
   if (etapa === 1) {
     $("#portada-titulo").innerHTML = titularPortada();
     $("#portada-bajada").textContent =
-      "Sube tu CV una vez. Desde ahí esto busca, llena los formularios y contesta "
-      + "las preguntas de cada empresa. Tú solo lees y dices que sí.";
+      "Sube tu CV y empezamos.";
     acciones.innerHTML =
       `<button class="boton primario" id="p-cv">Subir mi CV y empezar</button>` +
       `<span class="nota">PDF o Word · listo en unos segundos</span>`;
@@ -513,14 +400,13 @@ function pintarPortada(resumen) {
   }
 
   if (etapa === 2) {
-    const nombre = (estado.perfil.nombre || "").split(" ")[0];
+    const nombre = nombreCuenta();
     $("#portada-titulo").innerHTML = `Listo${nombre ? `, ${escapar(nombre)}` : ""}.<br>¿Dónde buscamos?`;
     // Sin negaciones. «Nunca vemos tu contraseña» planta justo la idea
     // de que podríamos verla: negar algo lo instala. Se dice lo que SÍ
     // pasa, que además es lo que la persona necesita saber para actuar.
     $("#portada-bajada").textContent =
-      "Conecta un portal y empezamos. Entras una sola vez, desde su propia web, "
-      + "y queda listo para todas las postulaciones.";
+      "Conecta un portal para empezar a postular.";
 
     // Uno primero, los demás después.
     //
@@ -588,7 +474,7 @@ function pintarPortada(resumen) {
 
   // Etapa 3: ya está todo listo. La portada resume y deja pasar.
   const cuantas = resumen.total;
-  const nombreCorto = (estado.perfil?.nombre || "").split(" ")[0];
+  const nombreCorto = nombreCuenta();
   $("#portada-titulo").textContent = cuantas
     // «postulación» pierde la tilde en plural: no se puede pegar «es».
     ? `Llevas ${cuantas} ${cuantas === 1 ? "postulación" : "postulaciones"}`
@@ -1216,6 +1102,7 @@ $("#btn-salir").addEventListener("click", async () => {
   await sesion.salir();
   await almacen.perfil.borrar();
   estado.conCuenta = false;
+  estado.usuario = null;
   estado.perfil = null;
   pintarPerfil();
   await pintarInicio();
@@ -1223,10 +1110,44 @@ $("#btn-salir").addEventListener("click", async () => {
   avisar("Sesión cerrada.");
 });
 
+$("#form-nombre").addEventListener("submit", async (ev) => {
+  ev.preventDefault();
+  const valor = $("#input-nombre").value.trim();
+  if (!valor) return;
+  const boton = $("#form-nombre button");
+  boton.disabled = true;
+  const r = await sesion.ponerNombre(valor);
+  boton.disabled = false;
+  if (r.error) { avisar(r.error); return; }
+  estado.usuario = r.usuario;
+  $("#input-nombre").value = "";
+  avisar(`Listo, ${nombreCuenta()}.`, "bien");
+  await pintarInicio();
+});
+
+$("#btn-cambiar-nombre").addEventListener("click", () => {
+  $("#form-nombre").classList.remove("oculto");
+  $("#btn-cambiar-nombre").classList.add("oculto");
+  $("#input-nombre").value = nombreCuenta({ completo: true });
+  $("#input-nombre").focus();
+});
+
 async function pintarCuenta() {
-  const s = await sesion.obtener();
-  $("#cuenta-correo").textContent = s?.usuario?.correo || s?.correo || "tu cuenta";
-  $("#cuenta-linea").classList.toggle("oculto", !s?.token);
+  const u = estado.usuario || await sesion.usuario();
+  if (u) estado.usuario = u;
+  const hay = Boolean(estado.conCuenta && u);
+  $("#cuenta-linea").classList.toggle("oculto", !hay);
+  if (hay) {
+    const nombre = nombreCuenta({ completo: true });
+    $("#cuenta-quien").textContent = nombre || u.correo || "tu cuenta";
+    $("#cuenta-correo").textContent = nombre ? u.correo || "" : "";
+    // Sin nombre, el campo se ofrece solo: es la única forma de que el
+    // panel sepa cómo llamarte, y esconderlo detrás de un botón es
+    // garantizar que nadie lo ponga.
+    $("#form-nombre").classList.toggle("oculto", Boolean(nombre));
+    $("#btn-cambiar-nombre").classList.toggle("oculto", !nombre);
+  }
+  pintarQuienSoy();
 }
 
 $("#archivo-cv").addEventListener("change", async (e) => {
@@ -1302,7 +1223,7 @@ $("#archivo-cv").addEventListener("change", async (e) => {
   } catch (err) {
     console.error("[panel] el CV se guardó pero falló al pintar:", err);
   }
-  avisar(`CV de ${(perfil.nombre || "").split(" ")[0] || "listo"} cargado`, "bien");
+  avisar("CV cargado", "bien");
   irA("inicio");
   $("#portada")?.scrollIntoView({ behavior: "smooth", block: "start" });
 });
@@ -1317,25 +1238,21 @@ $("#archivo-cv").addEventListener("change", async (e) => {
  */
 function pintarQuienSoy() {
   const caja = $("#quien-soy-panel");
-  const p = estado.perfil;
   if (!caja) return;
-  if (!p?.nombre) { caja.classList.add("oculto"); return; }
+  const u = estado.usuario;
+  if (!estado.conCuenta || !u) { caja.classList.add("oculto"); return; }
 
-  const nombre = p.nombre.trim();
+  // Arriba, QUIÉN es: la cuenta. Sin nombre puesto, el correo.
+  const nombre = nombreCuenta({ completo: true }) || u.correo || "Tu cuenta";
   $("#quien-inicial").textContent = nombre[0].toUpperCase();
-  // Nombre y primer apellido: el completo no cabe y se corta feo.
-  const trozos = nombre.split(/\s+/);
-  $("#quien-nombre").textContent = trozos.length >= 3
-    ? `${trozos[0]} ${trozos[2]}` : trozos.slice(0, 2).join(" ");
+  $("#quien-nombre").textContent = nombre;
 
-  // La línea de debajo sale de la educación, que es lo que el propio CV
-  // dice de dónde está la persona. El momento de carrera lo deduce el
-  // servidor (sugerencias.py) y aquí no está disponible, así que se
-  // enseña el dato crudo en vez de inventar una etiqueta.
-  const est = (p.educacion || [])[0] || {};
-  const linea = [est.cargo, est.organizacion].filter(Boolean).join(" · ")
-    || (p.perfil || [])[0]
-    || "CV cargado";
+  // Debajo, con QUÉ CV postula. Es otra cosa y se dice aparte.
+  const p = estado.perfil;
+  const est = (p?.educacion || [])[0] || {};
+  const linea = p
+    ? ([est.cargo, est.organizacion].filter(Boolean).join(" · ") || "CV cargado")
+    : "Sin CV todavía";
   $("#quien-linea").textContent = linea.length > 58 ? linea.slice(0, 57) + "…" : linea;
   caja.classList.remove("oculto");
 }
@@ -1553,7 +1470,7 @@ let sugerenciasPedidas = false;
 
 async function pintarArranque() {
   const caja = $("#arranque");
-  const nombre = (estado.perfil?.nombre || "").split(" ")[0];
+  const nombre = nombreCuenta();
   if (!caja.dataset.pintado) {
     caja.innerHTML = `
       <article class="tarjeta arranque-tarjeta">
@@ -1645,9 +1562,11 @@ function pintarPortales() {
   // El puente puede haber traído la sesión de la web mientras el panel
   // estaba cerrado, así que esto se lee después de que corra.
   estado.conCuenta = await sesion.hayCuenta();
-  if (estado.conCuenta && !(await sesion.verificar())) {
+  if (estado.conCuenta) {
+    const u = await sesion.verificar();
     // Token muerto: mejor pedir la contraseña que fallar en cada botón.
-    estado.conCuenta = false;
+    if (!u) estado.conCuenta = false;
+    else estado.usuario = u;
   }
   await revisarSesion();
   await pintarInicio();

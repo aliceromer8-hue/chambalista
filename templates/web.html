@@ -230,6 +230,11 @@
   <form method="dialog" id="form-cuenta">
     <h2 id="titulo-cuenta">Entra a tu cuenta</h2>
     <p class="detalle" id="sub-cuenta">Tu CV y tus postulaciones te siguen entre dispositivos.</p>
+    <!-- Solo al crear la cuenta. Es el nombre con el que te saluda la
+         extensión: el de la cuenta, no el que venga escrito en el CV. -->
+    <label class="oculto" id="fila-nombre">¿Cómo te llamas?
+      <input type="text" id="nombre" autocomplete="given-name" maxlength="60" placeholder="Tu nombre">
+    </label>
     <label>Correo
       <input type="email" id="correo" autocomplete="email" required placeholder="tu@correo.com">
     </label>

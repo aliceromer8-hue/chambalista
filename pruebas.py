@@ -1372,5 +1372,51 @@ with _mock.patch.dict(os.environ, _sin_claves, clear=True):
         check("sin proveedor, disponible() dice que no (no revienta)",
               _ria.disponible() is False)
 
+
+# ======================================================================
+# EL NOMBRE ES DE LA CUENTA, NO DEL CV
+# ======================================================================
+# El panel saludaba con el nombre del CV. Con la cuenta de Ali y el CV de
+# Gonzalo, la llamaba Gonzalo. Ahora la cuenta guarda el nombre.
+titulo("NOMBRE DE LA CUENTA")
+import cuentas as _cu
+from unittest import mock as _mk2
+
+check("el nombre se limpia de espacios", _cu._limpiar_nombre("  Alice   Romero ") == "Alice Romero")
+check("vacío es «no lo dijo», no una cadena vacía", _cu._limpiar_nombre("   ") is None)
+check("tiene tope", len(_cu._limpiar_nombre("x" * 200)) == 60)
+check("se lee de los metadatos de Supabase",
+      _cu._nombre_de({"user_metadata": {"nombre": "Alice"}}) == "Alice")
+check("la sesión devuelve el nombre",
+      _cu._sesion({"access_token": "t", "user": {"id": "1", "email": "a@b.pe",
+                                                 "user_metadata": {"nombre": "Alice"}}})
+      ["usuario"]["nombre"] == "Alice")
+
+_enviado = {}
+
+
+def _falso_pedir(ruta, cuerpo=None, **kw):
+    _enviado["ruta"], _enviado["cuerpo"] = ruta, cuerpo
+    return True, {"id": "1", "email": "a@b.pe",
+                  "user": {"id": "1", "email": "a@b.pe"},
+                  "user_metadata": (cuerpo or {}).get("data", {})}
+
+
+with _mk2.patch.object(_cu, "_pedir", _falso_pedir):
+    _cu.registrar("a@b.pe", "contrasena-larga", "Alice")
+check("al registrarse, el nombre viaja a la cuenta",
+      (_enviado.get("cuerpo") or {}).get("data", {}).get("nombre") == "Alice")
+with _mk2.patch.object(_cu, "_pedir", _falso_pedir):
+    _ok, _r = _cu.cambiar_nombre("tok", "  Alice  ")
+check("cambiar el nombre lo guarda limpio",
+      _ok and _enviado["cuerpo"] == {"data": {"nombre": "Alice"}}, str(_enviado.get("cuerpo")))
+check("y devuelve el usuario con su nombre", _ok and _r["usuario"]["nombre"] == "Alice", str(_r))
+check("sin nombre no se guarda nada", _cu.cambiar_nombre("tok", " ")[0] is False)
+
+_c2 = app_web.app.test_client()
+check("sin sesión, /api/cuenta/nombre se cierra",
+      _c2.post("/api/cuenta/nombre", json={"nombre": "X"}).status_code == 401)
+check("el registro de la web pide el nombre", 'id="nombre"' in BASE_HTML)
+
 print(f"\n{'TODO OK' if fallos == 0 else f'{fallos} FALLO(S)'}")
 sys.exit(1 if fallos else 0)

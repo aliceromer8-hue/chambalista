@@ -127,6 +127,24 @@ def _validar(correo, contrasena):
     return None
 
 
+def _limpiar_nombre(nombre):
+    """El nombre tal como la persona quiere que la llamen. Espacios
+    normalizados y un tope razonable; vacío es «no lo ha dicho»."""
+    n = " ".join(str(nombre or "").split())[:60]
+    return n or None
+
+
+def _nombre_de(usuario):
+    """El nombre de la CUENTA, no el del CV.
+
+    Antes el panel saludaba con el nombre que traía el CV —en mayúsculas,
+    como lo escribe el formato Harvard— y si alguien entraba con su cuenta
+    y cargaba otro CV, el panel pasaba a llamarla como la persona del CV.
+    La identidad es la cuenta; el CV es un documento que se usa.
+    """
+    return _limpiar_nombre((usuario.get("user_metadata") or {}).get("nombre"))
+
+
 def _sesion(d):
     """Lo que se le devuelve al navegador. Solo lo necesario."""
     usuario = d.get("user") or {}
@@ -134,18 +152,22 @@ def _sesion(d):
         "token": d.get("access_token"),
         "refresco": d.get("refresh_token"),
         "expira_en": d.get("expires_in"),
-        "usuario": {"id": usuario.get("id"), "correo": usuario.get("email")},
+        "usuario": {"id": usuario.get("id"), "correo": usuario.get("email"),
+                    "nombre": _nombre_de(usuario)},
         # Sin confirmación de correo no hay token: la cuenta existe pero
         # no puede entrar hasta confirmar.
         "falta_confirmar": bool(usuario.get("id")) and not d.get("access_token"),
     }
 
 
-def registrar(correo, contrasena):
+def registrar(correo, contrasena, nombre=None):
     error = _validar(correo, contrasena)
     if error:
         return False, {"error": error}
-    ok, d = _pedir("signup", {"email": correo.strip().lower(), "password": contrasena})
+    cuerpo = {"email": correo.strip().lower(), "password": contrasena}
+    if _limpiar_nombre(nombre):
+        cuerpo["data"] = {"nombre": _limpiar_nombre(nombre)}
+    ok, d = _pedir("signup", cuerpo)
     return (True, _sesion(d)) if ok else (False, d)
 
 
@@ -177,7 +199,7 @@ def quien_es(token):
     ok, d = _pedir("user", token=token)
     if not ok or not d.get("id"):
         return None
-    return {"id": d["id"], "correo": d.get("email")}
+    return {"id": d["id"], "correo": d.get("email"), "nombre": _nombre_de(d)}
 
 
 def salir(token):
@@ -269,3 +291,22 @@ def anotar_aceptacion(id_usuario, version=VERSION_POLITICA):
             return True
     except (urllib.error.HTTPError, urllib.error.URLError, TimeoutError, OSError):
         return False
+
+
+
+def cambiar_nombre(token, nombre):
+    """Pone o cambia el nombre de la cuenta.
+
+    Para las cuentas creadas antes de que el registro pidiera el nombre —y
+    para quien quiera que la llamen de otra forma—. Devuelve el usuario
+    actualizado para que el panel lo pinte sin otra ida y vuelta.
+    """
+    limpio = _limpiar_nombre(nombre)
+    if not limpio:
+        return False, {"error": "Escribe tu nombre."}
+    if not token:
+        return False, {"error": "Inicia sesión para continuar."}
+    ok, d = _pedir("user", {"data": {"nombre": limpio}}, token=token, metodo="PUT")
+    if not ok:
+        return False, d
+    return True, {"usuario": {"id": d.get("id"), "correo": d.get("email"), "nombre": _nombre_de(d)}}

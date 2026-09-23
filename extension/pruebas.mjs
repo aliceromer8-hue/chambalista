@@ -729,10 +729,11 @@ titulo("ESCRITORIO — el panel se abre en una pestaña entera, no en un popup")
   check("y el ancho de lectura tiene tope, para que no se estire sin fin",
     /main \{[^}]*max-width/.test(css));
 
-  // El argumento de venta estorba a quien ya compro.
-  check("el bloque «como postula por ti» se retira al cargar el CV",
-    /#hace"\)\.classList\.toggle\("oculto", etapa >= 2\)/.test(pjs),
-    "en escritorio empujaba el tablero fuera de la vista");
+  // El argumento de venta ya no está: quien abre el panel ya tiene cuenta,
+  // o sea que ya compró la idea. Ali: «ellos están ahí para lo que
+  // quieren, no les hagamos bolas».
+  const htmlPanel = await fsp.readFile(new URL("panel/panel.html", BASE), "utf8");
+  check("no hay bloque «cómo postula por ti»", !/id="hace"/.test(htmlPanel) && !/#hace"/.test(pjs));
 
   // No tener portales conectados todavia no es una averia.
   check("sin portales conectados el aviso es neutro, no rojo",
@@ -1222,21 +1223,39 @@ titulo("LA PESTAÑA SIN CONTENT SCRIPT — el fallo mas probable del primer inte
 // «ASÍ TRABAJA UNA TANDA»
 // ══════════════════════════════════════════════════════════════════════
 {
-  titulo("TANDA DE EJEMPLO — honesta y ligera");
+  // «Así trabaja una tanda» se quitó: explicaba cómo funciona algo que la
+  // persona solo quiere USAR. Esto impide que vuelvan explicadores así.
+  titulo("SIN EXPLICADORES — la persona viene a postular, no a aprender");
   const fsp9 = await import("node:fs/promises");
   const html2 = await fsp9.readFile(new URL("panel/panel.html", BASE), "utf8");
   const pjs5 = await fsp9.readFile(new URL("panel/panel.js", BASE), "utf8");
+  check("no hay «Así trabaja una tanda»", !/en-marcha|Así trabaja una tanda/.test(html2 + pjs5));
+  // El cartel de cada paso: título y botón. Sin párrafo de «por qué».
+  check("los carteles de paso no llevan explicación", !/falta\.porque/.test(pjs5));
+}
 
-  // Son puestos inventados: tiene que decirlo, o se leen como vacantes.
-  check("dice que es un ejemplo", /class="marcha-ejemplo">Ejemplo</.test(html2));
-  check("no ensucia el lector de pantalla", /id="en-marcha"[^>]*aria-hidden="true"/.test(html2));
-  check("respeta el movimiento reducido", /prefers-reduced-motion: reduce\)"\)\.matches/.test(pjs5));
-  check("se para con la pestaña oculta", /if \(document\.hidden\) return;/.test(pjs5));
-  check("no se reinicia en cada repintado", /firma === marchaFirma/.test(pjs5));
-  check("usa puestos de la carrera del CV", /ejemplosPara\(estado\.perfil\)/.test(pjs5));
-  // Nada de cifras de tiempo: el bucle no promete cuánto tarda.
-  const bloque = pjs5.slice(pjs5.indexOf("function pintarEnMarcha"), pjs5.indexOf("function pintarEnMarcha") + 3500);
-  check("no promete tiempos", !/segundos|minutos/.test(bloque.replace(/\/\/.*$/gm, "")));
+// ══════════════════════════════════════════════════════════════════════
+// EL NOMBRE ES EL DE LA CUENTA, NO EL DEL CV
+// ══════════════════════════════════════════════════════════════════════
+// Ali entró con su cuenta, cargó el CV de Gonzalo, y el panel pasó a
+// llamarla «GONZALO». La identidad es la cuenta; el CV es un documento.
+{
+  titulo("NOMBRE — sale de la cuenta");
+  const fsp10 = await import("node:fs/promises");
+  const pjs6 = await fsp10.readFile(new URL("panel/panel.js", BASE), "utf8");
+  const ses = await fsp10.readFile(new URL("lib/sesion.js", BASE), "utf8");
+  const sinComent = pjs6.replace(/^\s*(\/\/|\*).*$/gm, "");
+
+  check("ningún saludo usa el nombre del CV",
+    !/perfil\??\.nombre/.test(sinComent), (sinComent.match(/.{0,30}perfil\??\.nombre.{0,20}/) || [""])[0]);
+  check("hay una sola fuente del nombre: la cuenta", /function nombreCuenta\(/.test(pjs6)
+    && /estado\.usuario\?\.nombre/.test(pjs6));
+  check("la cabecera se pinta desde la cuenta",
+    /function pintarQuienSoy\(\)[\s\S]{0,300}estado\.usuario/.test(pjs6));
+  check("sin nombre en la cuenta, se ofrece ponerlo", /id="form-nombre"|#form-nombre/.test(pjs6));
+  check("el nombre se guarda en la cuenta", /\/api\/cuenta\/nombre/.test(ses));
+  check("al verificar se recoge el nombre puesto en la web",
+    /guardar\(\{ \.\.\.\(await obtener\(\)\), usuario: j\.usuario \}\)/.test(ses));
 }
 
 console.log(`

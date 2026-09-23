@@ -124,7 +124,12 @@ export async function verificar() {
   try {
     const r = await conCuenta("/api/cuenta/yo");
     const j = await r.json();
-    if (j.usuario) return j.usuario;
+    if (j.usuario) {
+      // Se guarda lo que diga el servidor: si la persona se puso nombre
+      // en la web, el panel lo recoge la siguiente vez que abre.
+      await guardar({ ...(await obtener()), usuario: j.usuario });
+      return j.usuario;
+    }
   } catch {
     return s.usuario;          // sin red: se asume válida hasta saber otra cosa
   }
@@ -192,4 +197,32 @@ export async function bajarPostulaciones() {
     if (!r.ok) return null;
     return (await r.json()).postulaciones || [];
   } catch { return null; }
+}
+
+
+/** El usuario de la cuenta tal como está guardado: id, correo, nombre. */
+export async function usuario() {
+  return (await obtener())?.usuario || null;
+}
+
+/**
+ * Pone el nombre de la CUENTA. Es con el que saluda el panel.
+ *
+ * Existe porque antes el saludo salía del CV: quien entraba con su cuenta
+ * y cargaba el CV de otra persona pasaba a llamarse como ella.
+ */
+export async function ponerNombre(nombre) {
+  try {
+    const r = await conCuenta("/api/cuenta/nombre", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ nombre }),
+    });
+    const j = await r.json().catch(() => ({}));
+    if (!r.ok) return { error: j.error || "No se pudo guardar." };
+    await guardar({ ...(await obtener()), usuario: j.usuario });
+    return { usuario: j.usuario };
+  } catch (e) {
+    return { error: `No se pudo conectar: ${e.message}` };
+  }
 }
