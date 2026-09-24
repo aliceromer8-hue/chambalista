@@ -1628,6 +1628,34 @@ titulo("LA PESTAÑA SIN CONTENT SCRIPT — el fallo mas probable del primer inte
     && /if \(!conectando\.size/.test(pj));
 }
 
+// ══════════════════════════════════════════════════════════════════════
+// LINKEDIN DE VERDAD (medido en el sitio real, 2026-09-24)
+// ══════════════════════════════════════════════════════════════════════
+// Clases con hash, sin #global-nav, dos diseños de la misma ficha (con
+// <a> a /apply o con botones), un FILTRO que también se llama «Solicitud
+// sencilla», y un formulario que LinkedIn ya trae relleno.
+{
+  titulo("LINKEDIN — lo que hay en el sitio real hoy");
+  const fs = await import("node:fs/promises");
+  const li = await fs.readFile(new URL("contenido/linkedin.js", BASE), "utf8");
+
+  check("la sesión se ve por Mensajes/Notificaciones, no solo por #global-nav",
+    /a\[href\*='\/messaging'\]/.test(li) && /a\[href\*='\/notifications'\]/.test(li));
+  check("encuentra el enlace a /apply, no solo botones", /a\[href\*='\/jobs\/view\/'\]\[href\*='\/apply'\]/.test(li));
+  check("solo cuenta lo que se ve (hay un botón viejo oculto y vacío)",
+    /filter\(visible\)/.test(li));
+  check("prefiere el que dice «Solicitud sencilla»", /const conTexto = candidatos\.find/.test(li));
+  check("nunca pulsa el FILTRO «Solicitud sencilla»", /searchFilter/.test(li));
+  check("el formulario se reconoce por su rol de diálogo", /\[role='dialog'\]/.test(li));
+  // Lo que LinkedIn ya rellenó no se toca.
+  check("no toca campos que ya tienen valor", /!esMarca && \(campo\.value \|\| ""\)\.trim\(\)\) continue/.test(li));
+  check("no toca el CV marcado ni «Sigue a la empresa»", /resume\|curr\[ií\]cul\|\\bcv\\b\|sigue a\|follow/.test(li));
+  check("no sube un CV nuevo en LinkedIn", /conArchivo: false/.test(li));
+  // Si LinkedIn no abre la Solicitud Sencilla, se dice y se da la salida.
+  check("si LinkedIn no la abre, se dice cómo seguir", /manual: true/.test(li));
+  check("sin caracteres de control invisibles", !/[\x00-\x08\x0b\x0c\x0e-\x1f]/.test(li));
+}
+
 console.log(`
 ${fallos === 0 ? "TODO OK" : `${fallos} FALLO(S)`}`);
 

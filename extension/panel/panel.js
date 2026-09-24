@@ -786,6 +786,7 @@ function pintarModal() {
     html += `<div class="aviso alerta"><strong>Vas a postular con el CV que ya tienes en el portal.</strong><br>`
           + `${escapar(r.cv.nota || "No se pudo adjuntar el CV adaptado.")}</div>`;
   }
+  if (r.avisoAbrir) html += `<div class="aviso alerta">${escapar(r.avisoAbrir)}</div>`;
   // Cuántas quedaron escritas en el formulario del portal, y cuántas
   // esperan a que las contestes tú. Es lo primero que se comprueba
   // mirando el portal, así que se dice sin tener que ir a mirarlo.

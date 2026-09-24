@@ -27,8 +27,13 @@
     if (document.querySelector("a[href*='/login'], a[href*='/uas/login'], .nav__button-secondary")) {
       return false;
     }
-    // La barra global solo existe con sesión iniciada.
-    return Boolean(document.querySelector("#global-nav, .global-nav, [data-test-global-nav]"));
+    // La barra #global-nav ya NO existe (comprobado en el sitio real el
+    // 2026-09-24): LinkedIn pasó a clases con hash que cambian. Lo estable
+    // son los enlaces que solo ve quien tiene sesión: Mensajes y
+    // Notificaciones. Con solo #global-nav, LinkedIn nunca quedaba
+    // «conectado» aunque Ali estuviera dentro.
+    return Boolean(document.querySelector(
+      "#global-nav, .global-nav, [data-test-global-nav], a[href*='/messaging'], a[href*='/notifications']"));
   }
 
   function leerOfertas() {
@@ -118,17 +123,44 @@
   // click. El modo por lotes además lo bloquea antes, por `soloRevisado`
   // en portales.js.
 
-  const SEL_BOTON = "button.jobs-apply-button";
+  // Ya no es un botón: es un <a> «Solicitud sencilla» que lleva a
+  // /jobs/view/<id>/apply/ (sitio real, 2026-09-24). La clase vieja
+  // jobs-apply-button tampoco existe.
+  const SEL_BOTON = "a[href*='/jobs/view/'][href*='/apply'], button.jobs-apply-button";
 
   function botonPostular() {
-    const b = document.querySelector(SEL_BOTON);
-    if (b) return b;
-    return [...document.querySelectorAll("button")]
-      .find((x) => /solicitud sencilla|easy apply/i.test(x.innerText || "")) || null;
+    // Solo lo que SE VE. En la ficha real queda un <button
+    // class="jobs-apply-button"> oculto y vacío, resto del diseño viejo,
+    // que va antes en la página: con querySelector a secas se encontraba
+    // ese y el clic no hacía nada. Se prefiere el enlace a /apply.
+    //
+    // Y LinkedIn alterna DOS diseños de la misma ficha (visto el mismo día
+    // en el sitio real): uno con un <a> a /apply y otro con botones
+    // .jobs-apply-button, uno de ellos vacío (la barra fija de arriba). Se
+    // juntan los dos y se prefiere el que dice «Solicitud sencilla».
+    const visible = (e) => e && (e.offsetWidth || e.offsetHeight);
+    const candidatos = [...document.querySelectorAll(SEL_BOTON)].filter(visible);
+    const conTexto = candidatos.find((e) => /solicitud sencilla|easy apply/i.test((e.innerText || "").trim()));
+    if (conTexto) return conTexto;
+    if (candidatos[0]) return candidatos[0];
+    // Por texto, como último recurso. OJO: en la búsqueda hay un FILTRO
+    // que también se llama «Solicitud sencilla» (id searchFilter_…). Con
+    // la búsqueda a secas de antes se habría pulsado el filtro en vez de
+    // postular. Se excluye todo lo que sea filtro.
+    return [...document.querySelectorAll("a, button")]
+      .filter((x) => !/^searchFilter/.test(x.id || "") && !x.closest("[class*='filter'], [id*='filter']"))
+      .find((x) => /^(solicitud sencilla|easy apply)$/i.test((x.innerText || "").trim())) || null;
   }
 
+  // El formulario: por su ROL de diálogo, no por clases. Las clases
+  // .jobs-easy-apply-modal / [data-test-modal] ya no existen.
+  const SEL_MODAL = ".jobs-easy-apply-modal, [data-test-modal], [role='dialog'], [aria-modal='true']";
+  function elModal() {
+    return [...document.querySelectorAll(SEL_MODAL)]
+      .find((m) => (m.offsetWidth || m.offsetHeight) && m.querySelector("input, textarea, select, button")) || null;
+  }
   function enFormulario() {
-    return Boolean(document.querySelector(".jobs-easy-apply-modal, [data-test-modal]"));
+    return Boolean(elModal());
   }
 
   async function abrirFormulario() {
@@ -142,26 +174,41 @@
                error: "Esta vacante no tiene Solicitud Sencilla: se postula en la web de la empresa." };
     }
     boton.click();
-    await new Promise((r) => setTimeout(r, 1500));
-    return { abierto: enFormulario(), revisionObligatoria: true,
-             nota: "Se rellena, pero el envío lo das tú en LinkedIn." };
+    for (let i = 0; i < 8 && !enFormulario(); i++) await new Promise((r) => setTimeout(r, 500));
+    if (enFormulario()) return { abierto: true };
+    // Probado desde Claude en Chrome (2026-09-24): LinkedIn no abrió la
+    // Solicitud Sencilla ni con un clic real ni yendo a su dirección —
+    // frena la automatización—. No se finge: se dice, y se da la salida.
+    return { abierto: false, manual: true,
+             nota: "LinkedIn no abrió la Solicitud Sencilla desde aquí. Pulsa «Ver el formulario», "
+                 + "ábrela tú en la oferta y luego «Rellenar esta pantalla»: se completa sola." };
   }
 
   function leerPreguntas() {
     if (!enFormulario()) return [];
-    const modal = document.querySelector(".jobs-easy-apply-modal, [data-test-modal]") || document;
+    const modal = elModal() || document;
     const preguntas = [];
     for (const campo of modal.querySelectorAll(
       "input:not([type=hidden]):not([type=submit]):not([type=button]), textarea, select")) {
       if (campo.offsetParent === null) continue;
       const enunciado = enunciadoDe(campo);
       if (!enunciado) continue;
+      // NO se toca lo que LinkedIn ya rellenó ni lo que no es una pregunta.
+      //
+      // Visto en el formulario real (2026-09-24): LinkedIn trae ya el
+      // correo, el código de país, el teléfono y el CV marcado, más una
+      // casilla «Sigue a <empresa>». Leídos como preguntas, se habrían
+      // sobrescrito: un correo cambiado, el CV desmarcado.
+      const esMarca = campo.type === "radio" || campo.type === "checkbox";
+      if (!esMarca && (campo.value || "").trim()) continue;              // ya tiene valor
+      if (esMarca && /resume|curr[ií]cul|\bcv\b|sigue a|follow/i.test(enunciado)) continue;
+      if (campo.type === "radio" && campo.name
+          && modal.querySelector(`input[type=radio][name="${CSS.escape(campo.name)}"]:checked`)) continue;
       preguntas.push({
         id: campo.id || campo.name || enunciado,
         enunciado,
-        tipo: campo.tagName === "SELECT" ? "lista"
-          : (campo.type === "radio" || campo.type === "checkbox") ? "opcion" : "texto",
-        obligatoria: Boolean(campo.required),
+        tipo: campo.tagName === "SELECT" ? "lista" : esMarca ? "opcion" : "texto",
+        obligatoria: Boolean(campo.required || campo.getAttribute("aria-required") === "true"),
         opciones: campo.tagName === "SELECT"
           ? [...campo.options].map((o) => o.text.trim()).filter(Boolean) : [],
       });
@@ -208,7 +255,7 @@
   // `enviar` solo cuando ya está el botón final.
 
   const botonCon = (re) => [...document.querySelectorAll(
-    ".jobs-easy-apply-modal button, [data-test-modal] button")]
+    SEL_MODAL.split(", ").map((s) => `${s} button`).join(", "))]
     .find((b) => !b.disabled && re.test((b.innerText || b.getAttribute("aria-label") || "").trim())) || null;
 
   const FINAL = /^(enviar solicitud|submit application)$/i;
@@ -255,8 +302,10 @@
       // «abrirFormulario» es lo que manda el fondo. Solo se entendía
       // «abrir», así que la postulación moría en el primer paso.
       else if (msg.accion === "abrir" || msg.accion === "abrirFormulario") abrirFormulario().then(responder);
-      else if (msg.accion === "preguntas") responder({ preguntas: leerPreguntas(),
-        conArchivo: document.querySelectorAll("input[type=file]").length > 0 });
+      // En LinkedIn NO se sube un CV: la persona ya tiene uno marcado, y
+      // LinkedIn guarda como mucho 4. Subir un Word por postulación le
+      // llenaría la lista y reemplazaría el CV que ella eligió.
+      else if (msg.accion === "preguntas") responder({ preguntas: leerPreguntas(), conArchivo: false });
       else if (msg.accion === "rellenar" || msg.accion === "escribir")
         responder(escribirRespuestas(msg.respuestas));
       // Faltaba: el fondo manda «adjuntar» en cada postulación y LinkedIn

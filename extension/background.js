@@ -275,7 +275,11 @@ async function prepararUna(vacante, perfil, guardados, respuestasPersona) {
   // El formulario puede haberse abierto en otra pestaña o en otra web.
   // Antes se seguía en la original, que ya no tenía formulario: se leían
   // cero preguntas y no se escribía nada.
-  if (abierto && !abierto.abierto && !abierto.error) {
+  // «Ábrelo tú» (LinkedIn frena que se abra solo): no es un error. Se
+  // sigue, y el panel enseña el aviso junto a «Ver el formulario» y
+  // «Rellenar esta pantalla», que es la salida.
+  if (abierto?.manual) reporte.avisoAbrir = abierto.nota;
+  if (abierto && !abierto.abierto && !abierto.error && !abierto.manual) {
     const donde = await buscarFormularioAbierto(tabId, urlAntes);
     if (donde) {
       tabId = donde;
