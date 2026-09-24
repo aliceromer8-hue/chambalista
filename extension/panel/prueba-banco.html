@@ -69,7 +69,7 @@
   const nombreCuenta = params.get("nombre");
   if (etapa >= 1) almacen.sesion = { token: "banco", usuario: { correo: "alice@ejemplo.pe", nombre: nombreCuenta } };
   if (etapa >= 2) almacen.perfil = CV;
-  if (etapa >= 3) almacen.preferencias = { puesto: "practicante de marketing", ciudad: "Lima", nivel: "cualquiera", portales: ["computrabajo"] };
+  if (etapa >= 3) almacen.preferencias = { puesto: "practicante de marketing", ciudad: "Lima", nivel: "cualquiera", portales: ["computrabajo"], revisarAntes: params.get("revisar") === "1" };
 
   window.chrome = {
     runtime: {
@@ -79,7 +79,7 @@
       // no se quede esperando. Si algo pide más, sale en la consola.
       sendMessage: async (msg) => {
         const a = msg && msg.accion;
-        if (a === "consentimiento") return { casillas: [], tope: await topeReal() };
+        if (a === "consentimiento") return { casillas: [{ clave: "irreversible", texto: "Entiendo que una postulación enviada NO se puede deshacer." }, { clave: "sinRevisar", texto: "Entiendo que no voy a revisar cada postulación antes de que se envíe." }, { clave: "respuestasIA", texto: "Entiendo que las respuestas las redacta una IA desde mi CV y pueden tener errores." }, { clave: "responsable", texto: "Asumo que soy responsable del contenido que se envíe en mi nombre." }], tope: await topeReal() };
         // La accion real es «sesionPortales» y devuelve los cuatro. Con la
         // lista vacia la etapa 2 no pintaba ninguna tarjeta de portal, que
         // es justo la pantalla que hay que mirar.
@@ -104,10 +104,11 @@
           preguntas: [
             { indice: 0, enunciado: "¿Por qué te interesa el puesto?", texto: "Llevo las redes del centro federado y me interesa medir leads.", necesita: [] },
             { indice: 1, enunciado: "¿Qué herramientas manejas?", texto: "Canva, Meta Business Suite y Excel.", necesita: [] },
-            { indice: 2, enunciado: "¿Tienes disponibilidad para ir a Los Olivos?", texto: "", necesita: [{ clave: "disp_2", etiqueta: "¿Tienes disponibilidad para ir a Los Olivos?", tipo: "opciones", opciones: ["Sí, completa", "No"], respondido: false }] },
+            { indice: 2, enunciado: "¿Tienes disponibilidad para ir a Los Olivos?", texto: "Sí, cuento con disponibilidad.", necesita: [{ clave: "disp_2", etiqueta: "¿Tienes disponibilidad para ir a Los Olivos?", tipo: "opciones", opciones: ["Sí, completa", "No"], respondido: true, automatica: true }] },
           ],
         };
         if (a === "mostrarFormulario") { window.__mostrado = msg; return { ok: true }; }
+        if (a === "enviarUna") { window.__enviado = msg; return { enviada: true, mensaje: "Postulación enviada. Mensaje del portal: «tu postulación fue enviada»" }; }
         if (a === "rellenarPantalla") return { escritas: 1, preguntas: [
           { indice: 0, enunciado: "¿Cuántos años de experiencia tienes?", texto: "Tengo experiencia de un año en redes.", necesita: [] },
         ] };
@@ -184,7 +185,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Chamba Lista — Panel</title>
-<link rel="stylesheet" href="panel.css?v=1790234282">
+<link rel="stylesheet" href="panel.css?v=1790267325">
 </head>
 <body>
 
@@ -316,7 +317,7 @@
     </div>
 
     <div class="riesgo oculto" id="bloque-riesgo">
-      <p><strong>En automático, se envían sin pasar por tu revisión.</strong> Marca cada punto para seguir.</p>
+      <p><strong>Se envían solas, sin pasar por tu revisión.</strong> Marca cada punto para seguir: solo te lo pedimos esta vez.</p>
       <div id="casillas"></div>
       <div class="fila-botones">
         <button class="boton secundario" id="btn-cancelar-auto">Mejor no</button>
@@ -378,7 +379,12 @@
       </article>
 
       <article class="tarjeta">
-        <h2>Portales</h2>
+        <h2>Cómo postula</h2>
+        <label class="confirmar"><input type="checkbox" id="pref-revisar">
+          <span>Revisar cada postulación antes de enviarla</span></label>
+        <p class="nota">Apagado, Chamba Lista postula sola.</p>
+
+        <h2 style="margin-top:22px">Portales</h2>
         <p class="nota">Entras tú en la web de cada portal, una sola vez, y queda conectado.</p>
         <div id="lista-portales"></div>
 
@@ -427,6 +433,6 @@
   </div>
 </div>
 
-<script type="module" src="panel.js?v=1790234282"></script>
+<script type="module" src="panel.js?v=1790267325"></script>
 </body>
 </html>

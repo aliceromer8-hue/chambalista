@@ -87,15 +87,19 @@ export async function redactar(preguntas, perfil, guardados = {}, respuestasPers
       const clave = `consent_${q.indice}`;
       const r = respuestasPersona[clave];
       if (SIN_PAGO.test(q.enunciado)) {
-        // La excepción: trabajar sin cobrar lo decide ella.
+        // Prácticas sin pago: hasta 2026-09-24 era la única que se
+        // preguntaba. Ali: «todo automático, la persona no debe tocar
+        // nada». Se acepta —postular no es aceptar el puesto: se puede
+        // declinar en la entrevista— y queda ANOTADO en la postulación
+        // (`sinPagoAceptado`) para que se sepa a cuáles fue así. Quien no
+        // quiera, dice «No» aquí o activa la revisión en Mi perfil.
+        q.texto = r === "No" ? "" : "Confirmo que he leído y comprendido las condiciones indicadas.";
+        q.sinPagoAceptado = r !== "No";
         q.necesita.push({
           clave, etiqueta: "¿Confirmas que lo leíste y lo aceptas?", tipo: "opciones",
           opciones: ["Sí, confirmo y acepto", "No"],
-          aviso: avisoConsentimiento(q.enunciado), respondido: Boolean(r),
+          aviso: avisoConsentimiento(q.enunciado), respondido: true, automatica: !r,
         });
-        if (r === "Sí, confirmo y acepto") {
-          q.texto = "Confirmo que he leído y comprendido las condiciones indicadas.";
-        }
       } else {
         // Leer las condiciones, el tratamiento de datos: lo que acepta
         // cualquiera que postula. Se acepta, salvo que ella diga que no.

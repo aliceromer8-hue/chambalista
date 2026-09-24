@@ -570,6 +570,7 @@ async function correrLote({ vacantes, modo, aprobacion, respuestasPersona }) {
       await almacen.tracker.anotar({
         portal: item.portal, empresa: item.empresa, puesto: item.titulo,
         url: item.url, estado: item.estado, motivo: item.motivo,
+        sinPago: (item.preguntas || []).some((q) => q.sinPagoAceptado),
       });
       // Y la cuenta anónima, que es lo único que nos llega a nosotros.
       // El motivo importa tanto como el resultado: saber que se omiten
@@ -619,6 +620,7 @@ async function enviarAprobadas(ids) {
     await almacen.tracker.anotar({
       portal: item.portal, empresa: item.empresa, puesto: item.titulo,
       url: item.url, estado: item.estado, motivo: item.motivo,
+      sinPago: (item.preguntas || []).some((q) => q.sinPagoAceptado),
     });
     medir(item.estado === "enviada" ? "postulacion_enviada" : "postulacion_omitida",
           { portal: item.portal, motivo: item.motivo || item.estado });
@@ -739,7 +741,11 @@ chrome.runtime.onMessage.addListener((msg, _e, responder) => {
             portal: msg.vacante?.portal, empresa: msg.vacante?.empresa,
             puesto: msg.vacante?.titulo, url: msg.vacante?.url,
             estado: r?.enviada ? "enviada" : "fallida", motivo: r?.mensaje || r?.error || "",
+            sinPago: Boolean(msg.sinPago),
           });
+          medir(r?.enviada ? "postulacion_enviada" : "postulacion_omitida",
+                { portal: msg.vacante?.portalId || msg.vacante?.portal,
+                  motivo: r?.enviada ? undefined : String(r?.error || r?.mensaje || "").slice(0, 60) });
           return responder(r);
         }
         case "lotePreparar":

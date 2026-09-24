@@ -112,7 +112,10 @@ const PREGUNTAS = [
 const guardados = { dni: "70123456", distrito: "Surco" };
 
 const r1 = await respuestas.redactar(PREGUNTAS, PERFIL, guardados, {});
-check("ad honorem queda VACÍA", r1[0].texto === "", `«${r1[0].texto}»`);
+// Desde 2026-09-24 TODO es automático (Ali): también las prácticas sin
+// pago se aceptan solas, y queda anotado para que se sepa.
+check("ad honorem se acepta sola", /Confirmo que he leído/.test(r1[0].texto), `«${r1[0].texto}»`);
+check("y queda anotado que era sin pago", r1[0].sinPagoAceptado === true);
 check("ad honorem avisa que es SIN PAGO", r1[0].necesita[0].aviso.includes("sin pago"));
 // Desde 2026-09-24 la disponibilidad se contesta sola («sí»): preguntar
 // es el último recurso. Queda editable en el panel.
@@ -122,7 +125,7 @@ check("disponibilidad detecta el lugar",
   r1[1].necesita[0].etiqueta.includes("La Molina"), r1[1].necesita[0].etiqueta);
 check("el distrito guardado se responde solo", r1[2].texto === "Resido en Surco.", r1[2].texto);
 check("el DNI guardado se responde solo", r1[3].texto === "Mi DNI es 70123456.", r1[3].texto);
-check("hay consentimiento pendiente", respuestas.consentimientoPendiente(r1) !== null);
+check("no queda nada pendiente que frene el envío", respuestas.consentimientoPendiente(r1) === null);
 
 const r2 = await respuestas.redactar(PREGUNTAS, PERFIL, guardados, {
   consent_0: "Sí, confirmo y acepto",
@@ -1562,9 +1565,9 @@ titulo("LA PESTAÑA SIN CONTENT SCRIPT — el fallo mas probable del primer inte
   const r = await import(`${BASE}lib/respuestas.js`);
 
   const [adHonorem] = await r.redactar([{ indice: 0, enunciado: "Confirmo que las prácticas son AD HONOREM (sin remuneración)." }], {}, {}, {});
-  check("aceptar prácticas SIN PAGO sigue preguntándose", adHonorem.texto === ""
-    && adHonorem.necesita.some((n) => !n.respondido));
-  check("y eso frena el envío automático", r.consentimientoPendiente([adHonorem]) !== null);
+  check("prácticas SIN PAGO: se aceptan solas y quedan anotadas",
+    /Confirmo/.test(adHonorem.texto) && adHonorem.sinPagoAceptado === true);
+  check("y no frenan el envío automático", r.consentimientoPendiente([adHonorem]) === null);
 
   const [terminos] = await r.redactar([{ indice: 0, enunciado: "Acepto los términos y condiciones y el tratamiento de mis datos." }], {}, {}, {});
   check("unos términos normales se aceptan solos", /acepto las condiciones/.test(terminos.texto));
@@ -1654,6 +1657,29 @@ titulo("LA PESTAÑA SIN CONTENT SCRIPT — el fallo mas probable del primer inte
   // Si LinkedIn no abre la Solicitud Sencilla, se dice y se da la salida.
   check("si LinkedIn no la abre, se dice cómo seguir", /manual: true/.test(li));
   check("sin caracteres de control invisibles", !/[\x00-\x08\x0b\x0c\x0e-\x1f]/.test(li));
+}
+
+// ══════════════════════════════════════════════════════════════════════
+// AUTOMÁTICO POR DEFECTO (Ali, 2026-09-24)
+// ══════════════════════════════════════════════════════════════════════
+// «Todo lo tiene que hacer directamente automático, la persona no debe
+// tocar nada. Habrá gente que ponga la opción de que siempre les avise
+// antes de postular, pero apuntamos a lo que la gran mayoría hará.»
+{
+  titulo("AUTOMÁTICO — postular envía; revisar es una opción");
+  const fs = await import("node:fs/promises");
+  const pj = await fs.readFile(new URL("panel/panel.js", BASE), "utf8");
+  const ph = await fs.readFile(new URL("panel/panel.html", BASE), "utf8");
+  const av = pj.slice(pj.indexOf("async function abrirVacante"), pj.indexOf("function pintarModal"));
+  check("«Postular» prepara y ENVÍA si está todo contestado",
+    /accion: "enviarUna"/.test(av) && /!prefs\.revisarAntes && !noSigue && !faltaAlgo/.test(av));
+  check("solo se para si falta un dato obligatorio o algo impide seguir",
+    /n\) => !n\.respondido/.test(av));
+  check("revisar antes es una opción de Mi perfil", /id="pref-revisar"/.test(ph));
+  check("y viene apagada", !/id="pref-revisar"[^>]*checked/.test(ph));
+  check("el consentimiento del lote se da una sola vez",
+    /almacen\.leer\("aprobacionAuto"/.test(pj) && /almacen\.guardar\("aprobacionAuto"/.test(pj));
+  check("la tarjeta dice «Postular», no «Ver y postular»", !/"Ver y postular"/.test(pj));
 }
 
 console.log(`

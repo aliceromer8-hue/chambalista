@@ -587,7 +587,7 @@ function tarjetaVacante(v, i) {
     <div class="pie">
       <span class="portal-chip">${escapar(v.portal)}</span>
       <button class="boton secundario chico btn-abrir" style="margin-left:auto">
-        ${v.postulable === false ? "Abrir en el portal" : "Ver y postular"}
+        ${v.postulable === false ? "Abrir en el portal" : "Postular"}
       </button>
     </div>
   </article>`;
@@ -645,7 +645,11 @@ $("#btn-buscar").addEventListener("click", async () => {
 
   try {
     const prefs = { puesto, ciudad: $("#ciudad").value.trim(), nivel: $("#nivel").value };
-    await almacen.preferencias.guardar({ ...prefs, portales: elegidos });
+    // Se FUSIONA con lo guardado. Antes se escribía desde cero y cada
+    // búsqueda borraba «Revisar antes de enviar»: quien lo activaba lo
+    // perdía en la siguiente búsqueda, y todo se volvía a enviar solo.
+    const guardadas = await almacen.preferencias.obtener();
+    await almacen.preferencias.guardar({ ...guardadas, ...prefs, portales: elegidos });
     const r = await enviar({ accion: "buscar", ...prefs, portales: elegidos });
     if (r?.error) throw new Error(r.error);
 
@@ -743,7 +747,55 @@ async function abrirVacante(vacante) {
     `<p class="nota">Abriendo el formulario y redactando las respuestas…</p>`;
 
   estado.reporte = await enviar({ accion: "prepararUna", vacante, respuestasPersona: {} });
+
+  // AUTOMÁTICO POR DEFECTO (Ali, 2026-09-24): «todo lo tiene que hacer
+  // directamente automático, la persona no debe tocar nada». Si está todo
+  // contestado, se envía sin pasar por la pantalla de revisión. Solo se
+  // para si: la persona pidió revisar (Mi perfil), algo impide seguir, o
+  // el portal EXIGE un dato que no hay de dónde sacar.
+  const prefs = await almacen.preferencias.obtener();
+  const r = estado.reporte || {};
+  const noSigue = r.soloLectura || r.error || r.requiereLogin || r.captcha || r.enviadaDirecto || r.avisoAbrir;
+  const faltaAlgo = (r.preguntas || []).some((q) => (q.necesita || []).some((n) => !n.respondido));
+  if (!prefs.revisarAntes && !noSigue && !faltaAlgo) {
+    $("#modal-contenido").innerHTML =
+      `<h2>${escapar(vacante.titulo)}</h2><p class="nota">${escapar(vacante.empresa || "")}</p>`
+      + `<p class="nota">Enviando la postulación…</p>`;
+    const respuestas = {};
+    for (const q of r.preguntas || []) if (q.texto) respuestas[q.indice] = q.texto;
+    const env = await enviar({
+      accion: "enviarUna", vacante, respuestas,
+      sinPago: (r.preguntas || []).some((q) => q.sinPagoAceptado),
+    });
+    pintarResultadoAuto(vacante, env);
+    return;
+  }
   pintarModal();
+}
+
+/** El resultado de un envío automático: enviada, o por qué no y cómo seguir. */
+function pintarResultadoAuto(vacante, env) {
+  const c = $("#modal-contenido");
+  const cab = `<h2>${escapar(vacante.titulo)}</h2><p class="nota">${escapar(vacante.empresa || "")}</p>`;
+  if (env?.enviada) {
+    // El portal ya suele empezar su mensaje por «Postulación enviada.»:
+    // sin quitarlo, salía dos veces seguidas.
+    const detalle = String(env.mensaje || "").replace(/^Postulaci[oó]n enviada\.\s*/i, "");
+    c.innerHTML = cab + `<div class="aviso"><strong>Postulación enviada.</strong>`
+      + (detalle ? `<br><span class="nota">${escapar(detalle)}</span>` : "") + `</div>`;
+    avisar("Postulación enviada", "bien");
+    pintarInicio();
+    return;
+  }
+  // No salió: se enseña la pantalla de revisión con el motivo arriba, que
+  // ahí están «Ver el formulario» y «Enviar» para terminarla.
+  pintarModal();
+  const d = env?.diagnostico || {};
+  $("#modal-contenido").insertAdjacentHTML("afterbegin",
+    `<div class="aviso alerta"><strong>No se pudo enviar sola.</strong> `
+    + `${escapar(env?.mensaje || env?.error || "El portal no confirmó el envío.")}`
+    + (d.errores?.length ? `<br>El portal pide: ${escapar(d.errores.join(" · "))}` : "")
+    + `</div>`);
 }
 
 function pintarModal() {
@@ -1003,6 +1055,16 @@ $("#btn-lote-revisar").addEventListener("click", () => arrancarLote("revisado"))
 
 $("#btn-lote-auto").addEventListener("click", async () => {
   const { casillas } = await enviar({ accion: "consentimiento" });
+
+  // El consentimiento se da UNA vez. Antes se pedían las casillas en cada
+  // tanda: «la persona no debe tocar nada» no casa con cuatro casillas
+  // cada vez. La primera se explican y se aceptan; después, directo.
+  const guardada = await almacen.leer("aprobacionAuto", null);
+  if (guardada && casillas.every((c) => guardada[c.clave] === true)) {
+    estado.aprobacion = guardada;
+    const prefs = await almacen.preferencias.obtener();
+    return arrancarLote(prefs.revisarAntes ? "revisado" : "automatico");
+  }
   $("#casillas").innerHTML = "";
 
   // Antes de pedirle que asuma riesgos, decirle qué va a pasar de verdad.
@@ -1069,10 +1131,24 @@ $("#btn-cancelar-auto").addEventListener("click", () => {
   estado.aprobacion = {};
   $("#btn-confirmar-auto").disabled = true;
 });
-$("#btn-confirmar-auto").addEventListener("click", () => {
+$("#btn-confirmar-auto").addEventListener("click", async () => {
   $("#bloque-riesgo").classList.add("oculto");
+  await almacen.guardar("aprobacionAuto", { ...estado.aprobacion });
   arrancarLote("automatico");
 });
+
+// «Revisar cada postulación antes de enviarla»: apagado por defecto. Es
+// para quien lo quiera; el producto va a lo que hace la mayoría: enviar.
+(async () => {
+  const chk = $("#pref-revisar");
+  if (!chk) return;
+  chk.checked = Boolean((await almacen.preferencias.obtener()).revisarAntes);
+  chk.addEventListener("change", async () => {
+    const prefs = await almacen.preferencias.obtener();
+    await almacen.preferencias.guardar({ ...prefs, revisarAntes: chk.checked });
+    avisar(chk.checked ? "Te enseñaremos cada postulación antes de enviarla." : "Se envían solas.", "bien");
+  });
+})();
 
 async function arrancarLote(modo) {
   consola.limpiar();
