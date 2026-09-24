@@ -29,8 +29,10 @@ window.ChambaComun = (() => {
 
   /** Rellena un campo disparando los eventos que espera la página. */
   function rellenar(campo, valor) {
-    const proto = campo instanceof HTMLTextAreaElement
-      ? HTMLTextAreaElement.prototype
+    // Cada tipo de campo con SU setter: el de <input> sobre un <select>
+    // lanza «Illegal invocation» y cortaba el relleno de toda la pantalla.
+    const proto = campo instanceof HTMLTextAreaElement ? HTMLTextAreaElement.prototype
+      : campo instanceof HTMLSelectElement ? HTMLSelectElement.prototype
       : HTMLInputElement.prototype;
     // React y compañía ignoran una asignación directa a .value; hay que
     // usar el setter nativo y luego disparar los eventos.

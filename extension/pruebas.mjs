@@ -1309,7 +1309,11 @@ titulo("LA PESTAÑA SIN CONTENT SCRIPT — el fallo mas probable del primer inte
     /indice:\s*p\.indice\s*\?\?\s*i/.test(fondoC));
   for (const portal of ["linkedin", "indeed"]) {
     const src = await fspc.readFile(new URL(`contenido/${portal}.js`, BASE), "utf8");
-    check(`${portal} escribe por id o por posición`, /dadas\[pregunta\.id\]\s*\?\?\s*dadas\[i\]/.test(src));
+    // Indeed escribe por su `indice` fijo (textos 0…, opciones 100+,
+    // desplegables 200+), que es la posición que le pone el fondo.
+    check(`${portal} escribe por id o por posición`, portal === "indeed"
+      ? /dadas\[pregunta\.indice\]\s*\?\?\s*dadas\[pregunta\.id\]/.test(src)
+      : /dadas\[pregunta\.id\]\s*\?\?\s*dadas\[i\]/.test(src));
     // Contar lo escrito DE VERDAD, no las respuestas recibidas.
     check(`${portal} cuenta lo que escribió, no lo que recibió`,
       !/escritas:\s*Object\.keys\(dadas\)\.length/.test(src));
@@ -1680,6 +1684,40 @@ titulo("LA PESTAÑA SIN CONTENT SCRIPT — el fallo mas probable del primer inte
   check("el consentimiento del lote se da una sola vez",
     /almacen\.leer\("aprobacionAuto"/.test(pj) && /almacen\.guardar\("aprobacionAuto"/.test(pj));
   check("la tarjeta dice «Postular», no «Ver y postular»", !/"Ver y postular"/.test(pj));
+}
+
+// ══════════════════════════════════════════════════════════════════════
+// INDEED DE VERDAD (medido en SmartApply real, 2026-09-24)
+// ══════════════════════════════════════════════════════════════════════
+// El botón ya no era #indeedApplyButton, las preguntas de Sí/No se leían
+// radio a radio, los desplegables propios no se veían y el botón final
+// («Envía tu postulación») no encajaba. Indeed no postulaba ni una.
+// El recorrido completo está en prueba-indeed.html (DOM copiado del real).
+{
+  titulo("INDEED — lo que hay en SmartApply hoy");
+  const fs = await import("node:fs/promises");
+  const src = await fs.readFile(new URL("contenido/indeed.js", BASE), "utf8");
+  const comun = await fs.readFile(new URL("contenido/comun.js", BASE), "utf8");
+
+  check("encuentra el enlace «Postularse ahora»", /a\[data-testid='viewjob-indeed-apply'\]/.test(src));
+  check("y va a su dirección, sin depender de un clic", /location\.assign\(boton\.href\)/.test(src));
+  check("las preguntas de opciones se leen por su <legend>", /querySelector\("legend"\)/.test(src));
+  check("los desplegables propios (role=combobox) se leen y se eligen",
+    /\[role=combobox\]/.test(src) && /\[role=option\]/.test(src) && /d\.items\[k\]\.click\(\)/.test(src));
+  check("índices fijos: textos 0…, opciones 100+, desplegables 200+",
+    /indice: 100 \+ g/.test(src) && /indice: 200 \+ k/.test(src));
+  check("no toca el CV que Indeed ya tiene elegido", /r\.name === "resume-selection"/.test(src));
+  check("ni la casilla de alertas por correo de la revisión", /actualizaciones por email/.test(src));
+  check("pasa sola la pantalla de elegir CV antes de leer preguntas",
+    /accion === "preguntas"\) pasarPantallasVacias\(\)/.test(src));
+  check("reconoce «Envía tu postulación»",
+    /submit-application-button/.test(src) && /env\[ií\]a\(r\)\? tu postulaci/.test(src));
+  check("espera a «Preparando la evaluación» antes de enviar", /i < 40; i\+\+\) \{ await esperar\(750\)/.test(src));
+  check("si Indeed no deja seguir, devuelve lo que dice", /function avisosDelPortal/.test(src)
+    && /errores\.length \? \{ avanzado: false, errores \}/.test(src));
+  check("«Sí» no se confunde con «Sin preferencia»", /const corte = /.test(src));
+  check("un <select> se rellena con su propio setter", /HTMLSelectElement\.prototype/.test(comun));
+  check("sin caracteres de control invisibles", !/[\x00-\x08\x0b\x0c\x0e-\x1f]/.test(src));
 }
 
 console.log(`

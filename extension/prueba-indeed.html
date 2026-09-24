@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<!-- PRUEBA DEL CONTRATO FONDO ↔ INDEED — no viaja en el zip («prueba-…»).
+
+     Carga los content scripts DE VERDAD (comun.js + indeed.js) sobre una
+     copia del DOM que SmartApply tenía el 2026-09-24 (medido en el sitio
+     real, oferta de Banco Falabella): enlace «Postularse ahora», pantalla
+     de CV ya elegido, preguntas en <fieldset>/<legend>, un desplegable
+     propio (role=combobox) obligatorio, «Preparando la evaluación» y
+     «Envía tu postulación».
+
+     Abrir: python -m http.server 8777 --directory extension
+            → /prueba-indeed.html   (el resultado queda en window.__resultado) -->
+<html lang="es">
+<head><meta charset="utf-8"><title>Prueba Indeed</title>
+<style>.oculto{display:none} fieldset{margin:8px 0} li[role=option]{display:none}</style></head>
+<body>
+  <header><a href="/mensajes">Mensajes</a></header>
+  <main id="pantalla">
+    <h1>Practicante de Marketing</h1>
+    <!-- En la vida real el href va a smartapply.indeed.com/beta/indeedapply/… -->
+    <a data-testid="viewjob-indeed-apply" href="#smartapply.indeed.com/resume">Postularse ahora</a>
+  </main>
+  <pre id="resultado">corriendo…</pre>
+
+<script>
+  let oyente = null;
+  window.chrome = { runtime: { onMessage: { addListener: (f) => { oyente = f; } }, sendMessage: () => {} } };
+  window.hablar = (msg) => new Promise((ok) => {
+    const siguio = oyente(msg, {}, ok);
+    if (siguio !== true) setTimeout(() => ok({ __sinRespuesta: true }), 50);
+  });
+
+  const main = document.getElementById("pantalla");
+  const cabecera = `<h1>Practicante de Marketing</h1>
+    <button type="button" data-testid="ExitLinkWithModalComponent-exitButton">Guardar y cerrar</button>`;
+  const radios = (nombre, pregunta, opciones) => `<fieldset role="radiogroup"><legend>${pregunta}</legend>`
+    + opciones.map((o, i) => `<input type="radio" name="${nombre}" id="${nombre}-${i}"><label for="${nombre}-${i}">${o}</label>`).join("")
+    + `</fieldset>`;
+
+  function pantallaCV() {
+    main.innerHTML = cabecera + `<h2>Agrega un CV</h2>
+      <input type="radio" name="resume-selection" id="cv-indeed"><label for="cv-indeed">Usa tu CV Indeed</label>
+      <input type="radio" name="resume-selection" id="cv-pdf" checked><label for="cv-pdf">CV ALICE ROMERO 2026.pdf</label>
+      <input type="number" aria-label="Página actual" value="1">
+      <input type="file" class="oculto">
+      <button type="button" data-testid="continue-button">Continuar</button>`;
+    main.querySelector("button[data-testid=continue-button]").onclick = () => {
+      history.pushState({}, "", "#questions-module/questions/1"); pantallaPreguntas();
+    };
+  }
+
+  function pantallaPreguntas() {
+    main.innerHTML = cabecera + `<h2>Responde las siguientes preguntas formuladas por la empresa</h2>
+      <div data-testid="input-q_anos">
+        <span id="lbl-anos">Años de experiencia en área Marketing *<span>obligatorio</span></span>
+        <div role="combobox" id="single-select-q" aria-haspopup="dialog" aria-labelledby="lbl-anos" aria-controls="Popup-1"><span>Seleccionar una opción</span></div>
+        <ul id="Popup-1">${["0", "1", "2", "3", "4", "5+ años"].map((o) => `<li role="option">${o}</li>`).join("")}</ul>
+        <span class="aviso-anos"></span>
+      </div>
+      ${radios("q_estudiante", "¿Eres estudiante de Marketing, Administración, Comunicaciones o afines? *", ["Sí", "No", "Sin preferencia"])}
+      <label for="q-ciclo">¿En qué ciclo te encuentras actualmente? *</label><input type="text" id="q-ciclo" required>
+      <label for="q-egreso">¿Cuál es tu fecha estimada de egreso? *</label><input type="text" id="q-egreso" required>
+      ${radios("q_hibrido", "¿Tienes disponibilidad para laborar de manera híbrida de L-V en Mallplaza Angamos? (Min. 30 horas semanales) *", ["Sí", "No", "Sin preferencia"])}
+      ${radios("q_office", "Nivel de conocimiento en Microsoft Office", ["Ninguno", "Básico", "Intermedio", "Avanzado", "Experto"])}
+      <button type="button" data-testid="30e6dd3d81aa">Continuar</button>`;
+    const caja = main.querySelector("[role=combobox]");
+    main.querySelectorAll("li[role=option]").forEach((li) => li.addEventListener("click", () => { caja.textContent = li.textContent; }));
+    main.querySelector("button[data-testid='30e6dd3d81aa']").onclick = () => {
+      if (/^Seleccionar/.test(caja.textContent)) {
+        main.querySelector(".aviso-anos").textContent = "Elige una opción para continuar.";
+        return;
+      }
+      history.pushState({}, "", "#review-module"); pantallaRevision();
+    };
+  }
+
+  function pantallaRevision() {
+    main.innerHTML = cabecera + `<p>Preparando la evaluación</p>`;
+    setTimeout(() => {
+      main.innerHTML = cabecera + `<h2>Revisa tu postulación</h2>
+        <input type="checkbox" name="alerta" id="alerta"><label for="alerta">Recibe actualizaciones por email sobre los empleos más recientes</label>
+        <button type="button" data-testid="submit-application-button">Envía tu postulación</button>`;
+      main.querySelector("[data-testid=submit-application-button]").onclick = () => {
+        window.__enviada = true;
+        main.innerHTML = `<h1>Tu postulación se envió</h1>`;
+      };
+    }, 1500);
+  }
+
+  addEventListener("hashchange", () => { if (location.hash.includes("resume")) pantallaCV(); });
+</script>
+<script src="contenido/comun.js"></script>
+<script src="contenido/indeed.js"></script>
+<script>
+  (async () => {
+    const r = {};
+    const espera = (ms) => new Promise((ok) => setTimeout(ok, ms));
+    r.ping = await hablar({ accion: "ping" });
+    r.abrir = await hablar({ accion: "abrirFormulario" });
+    await espera(200);
+    r.enFormulario = (await hablar({ accion: "ping" })).url.includes("resume");
+    r.preguntas = await hablar({ accion: "preguntas" });
+    const qs = r.preguntas.preguntas || [];
+    r.leidas = qs.map((q) => `${q.indice}|${q.tipo}|${q.obligatoria ? "*" : ""}|${q.enunciado}|${(q.opciones || []).join("/")}`);
+    const por = (re) => qs.find((q) => re.test(q.enunciado))?.indice;
+    // Primero SIN el desplegable: Indeed no deja seguir y hay que decirlo.
+    const sinAnos = {
+      [por(/estudiante/)]: "Sí, estudio Marketing en la USIL.",
+      [por(/ciclo/)]: "Estoy en el 11.º ciclo.",
+      [por(/egreso/)]: "Diciembre de 2026",
+      [por(/híbrida/)]: "Sí",
+      [por(/Office/)]: "Avanzado",
+    };
+    r.escribir1 = await hablar({ accion: "escribir", respuestas: sinAnos });
+    r.siguiente1 = await hablar({ accion: "siguiente" });
+    r.escribir2 = await hablar({ accion: "escribir", respuestas: { [por(/Años de experiencia/)]: "1" } });
+    r.valores = {
+      estudiante: [...document.querySelectorAll("input[name=q_estudiante]")].findIndex((x) => x.checked),
+      hibrido: [...document.querySelectorAll("input[name=q_hibrido]")].findIndex((x) => x.checked),
+      office: [...document.querySelectorAll("input[name=q_office]")].findIndex((x) => x.checked),
+      ciclo: document.getElementById("q-ciclo")?.value,
+      anos: document.querySelector("[role=combobox]")?.textContent,
+    };
+    r.siguiente2 = await hablar({ accion: "siguiente" });
+    r.preguntasRevision = (await hablar({ accion: "preguntas" })).preguntas;
+    r.siguiente3 = await hablar({ accion: "siguiente" });
+    r.enviar = await hablar({ accion: "enviar" });
+    r.enviadaDeVerdad = Boolean(window.__enviada);
+    window.__resultado = r;
+    document.getElementById("resultado").textContent = JSON.stringify(r, null, 2);
+  })();
+</script>
+</body>
+</html>
