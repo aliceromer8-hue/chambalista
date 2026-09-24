@@ -473,7 +473,7 @@ function pintarPortada(resumen) {
     acciones.innerHTML = `<div class="portales-portada" style="width:100%">`
       + primeros.map(filaPortal).join("")
       + (resto.length
-        ? `<details class="mas-portales">
+        ? `<details class="mas-portales"${resto.some((p) => conectando.has(p.id)) ? " open" : ""}>
              <summary><span class="mas-signo" aria-hidden="true">+</span> Añadir otro portal
                <small>${resto.map((p) => escapar(p.nombre)).join(" · ")}</small></summary>
              <div class="portales-portada">${resto.map(filaPortal).join("")}</div>
@@ -500,7 +500,7 @@ function pintarPortada(resumen) {
   const sinConectar = sesionesCache.filter((p) => !p.sesion);
   acciones.innerHTML = `<button class="boton primario" id="p-buscar">Buscar y postular</button>`
     + (sinConectar.length
-      ? `<details class="mas-portales">
+      ? `<details class="mas-portales"${sinConectar.some((p) => conectando.has(p.id)) ? " open" : ""}>
            <summary><span class="mas-signo" aria-hidden="true">+</span> Conectar más portales
              <small>${sinConectar.map((p) => escapar(p.nombre)).join(" · ")}</small></summary>
            <div class="portales-portada">${sinConectar.map(filaPortal).join("")}</div>
@@ -656,6 +656,17 @@ $("#btn-buscar").addEventListener("click", async () => {
     const todas = estado.perfil
       ? coincidencia.ordenar(r.vacantes || [], estado.perfil)
       : (r.vacantes || []);
+    // Las que ya postuló con Chamba Lista, fuera. El portal marca las
+    // suyas y el fondo ya las descarta, pero no siempre las marca (Indeed
+    // y Bumeran no lo hacían nunca); lo que pasó por aquí lo sabemos seguro.
+    const yaPostuladas = [];
+    for (const v of [...todas]) {
+      if (await almacen.tracker.yaPostulado(v.url)) {
+        yaPostuladas.push(v);
+        todas.splice(todas.indexOf(v), 1);
+      }
+    }
+    estado.yaPostuladasOcultas = yaPostuladas.length;
     const delTema = todas.filter((v) => coincidencia.relacionada(v, puesto));
     estado.fueraDeTema = todas.filter((v) => !coincidencia.relacionada(v, puesto));
     // Si el filtro se lo come todo, se enseña todo: mejor ruido que nada.
@@ -692,6 +703,10 @@ $("#btn-buscar").addEventListener("click", async () => {
         : " Carga tu CV para ordenarlas por encaje.") +
       (fallos ? ` — ${fallos}` : "");
 
+    if (estado.yaPostuladasOcultas) {
+      $("#resumen-busqueda").append(
+        ` Ocultamos ${estado.yaPostuladasOcultas} a ${estado.yaPostuladasOcultas === 1 ? "la" : "las"} que ya postulaste.`);
+    }
     // Se dice cuántas se quitaron por no ser del tema, y se pueden ver:
     // el filtro puede equivocarse y la persona decide.
     if (estado.fueraDeTema?.length) {

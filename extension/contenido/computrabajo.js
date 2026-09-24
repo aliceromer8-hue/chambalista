@@ -74,6 +74,12 @@
 
   /** Abre el formulario. No envía nada. */
   async function abrirFormulario() {
+    // Ya dentro del flujo de postulación (candidato.pe.computrabajo.com):
+    // aquí NO se pulsa nada. El botón de esta página puede ser el que
+    // envía, y abrir el formulario no puede enviar nunca.
+    if (location.host.startsWith("candidato.")) {
+      return { abierto: true, enFlujo: true };
+    }
     if (!haySesion()) {
       return { requiereLogin: true, nota: "Inicia sesión en Computrabajo en esta pestaña." };
     }
@@ -122,8 +128,14 @@
     return [...document.querySelectorAll("form textarea, textarea")]
       .map((campo, indice) => ({ indice, enunciado: C.enunciadoDe(campo),
                                  max: campo.getAttribute("maxlength") || "",
-                                 actual: (campo.value || "").trim() }))
-      .filter((q) => q.enunciado);
+                                 actual: (campo.value || "").trim(),
+                                 visible: Boolean(campo.offsetWidth || campo.offsetHeight) }))
+      // Solo lo que se ve. En la ficha de la oferta hay un textarea
+      // OCULTO llamado «Comment» (comprobado en el sitio real el
+      // 2026-09-24) que no es una pregunta de la empresa: la IA le habría
+      // escrito una respuesta a un campo que nadie pidió. El `indice` se
+      // queda el de la lista completa, que es el que usa escribirRespuestas.
+      .filter((q) => q.enunciado && q.visible);
   }
 
   /** Rellena los campos simples (nombre, correo, teléfono, datos guardados). */

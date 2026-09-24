@@ -57,7 +57,8 @@
         ubicacion: [ubicacion, modalidad].filter(Boolean).join(" · "),
         publicado: fecha,
         url: href.startsWith("http") ? href : `https://www.bumeran.com.pe${href}`,
-        yaPostulado: false,
+        // Antes `false` fijo. Ver indeed.js.
+        yaPostulado: /\b(postulad[oa]|ya (te )?postulaste|solicitud enviada|solicitado|applied)\b/i.test((a.innerText || "").replace(h2.innerText, "")),
       };
     });
   }

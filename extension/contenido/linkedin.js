@@ -69,7 +69,7 @@
         ubicacion: texto(c, "[class*='metadata'] li, [class*='caption']"),
         publicado: texto(c, "time"),
         url: href.startsWith("http") ? href.split("?")[0] : `https://www.linkedin.com${href.split("?")[0]}`,
-        yaPostulado: /solicitado|applied/i.test(c.innerText || ""),
+        yaPostulado: /\b(postulad[oa]|ya (te )?postulaste|solicitud enviada|solicitado|applied)\b/i.test((c.innerText || "").replace(titulo, "")),
       };
     }).filter((o) => o.titulo && o.url);
   }

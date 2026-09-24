@@ -271,6 +271,9 @@ async function prepararUna(vacante, perfil, guardados, respuestasPersona) {
     }
   }
 
+  // Dónde estaba la pestaña ANTES de pulsar «Postularme»: si después
+  // está en otra página, el formulario está en esa página.
+  const urlAntes = (await chrome.tabs.get(tabId).catch(() => null))?.url || "";
   let abierto;
   try {
     abierto = await hablarCon(tabId, { accion: "abrirFormulario" });
@@ -285,11 +288,16 @@ async function prepararUna(vacante, perfil, guardados, respuestasPersona) {
   // Antes se seguía en la original, que ya no tenía formulario: se leían
   // cero preguntas y no se escribía nada.
   if (abierto && !abierto.abierto && !abierto.error) {
-    const donde = await buscarFormularioAbierto(tabId);
+    const donde = await buscarFormularioAbierto(tabId, urlAntes);
     if (donde) {
       tabId = donde;
       await almacen.guardar("tabTrabajo", tabId);
-      abierto = (await hablarCon(tabId, { accion: "abrirFormulario" }).catch(() => null)) || abierto;
+      // NO se vuelve a llamar a abrirFormulario. En la página nueva el
+      // botón que haya puede ser el de ENVIAR: en Computrabajo, pulsar
+      // «Postularme» lleva a candidato.pe.computrabajo.com/match/, y
+      // abrirFormulario pulsa «Postularme». Volver a llamarlo ahí sería
+      // postular durante la preparación, sin que nadie revisara nada.
+      abierto = { abierto: true, trasNavegar: true };
     }
   }
   if (abierto?.requiereLogin) return { ...reporte, requiereLogin: true, nota: abierto.nota };
@@ -357,11 +365,16 @@ async function rellenarPantalla(tabId, perfil, guardados, respuestasPersona) {
  * Indeed manda a SmartApply, en otra web: a veces en la misma pestaña,
  * a veces en una nueva. Se mira primero la misma, luego las nuevas.
  */
-async function buscarFormularioAbierto(tabIdOriginal) {
+async function buscarFormularioAbierto(tabIdOriginal, urlAntes = "") {
   await esperar(1500);
   const misma = await chrome.tabs.get(tabIdOriginal).catch(() => null);
-  if (misma && /smartapply\.indeed\.com/.test(misma.url || "")) {
-    await pestanaLista(tabIdOriginal, 12000);
+  // La misma pestaña, ahora en OTRA página: Indeed → SmartApply,
+  // Computrabajo → candidato.pe.computrabajo.com/match/. Antes solo se
+  // reconocía SmartApply, y en Computrabajo se seguía hablándole a una
+  // página que se estaba cargando: error, y ni siquiera quedaba anotado.
+  const sinAncla = (u) => String(u || "").split("#")[0];
+  if (misma && sinAncla(misma.url) !== sinAncla(urlAntes)) {
+    await pestanaLista(tabIdOriginal, 15000);
     return tabIdOriginal;
   }
   const nuevas = await chrome.tabs.query({ url: ["https://smartapply.indeed.com/*"] });

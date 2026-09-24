@@ -1443,6 +1443,53 @@ titulo("LA PESTAÑA SIN CONTENT SCRIPT — el fallo mas probable del primer inte
   check("la misma no es más nueva", esMasNueva("0.3.3", "0.3.3") === false);
 }
 
+// ══════════════════════════════════════════════════════════════════════
+// POSTULARME NAVEGA — Y LA PREPARACIÓN NUNCA PUEDE ENVIAR
+// ══════════════════════════════════════════════════════════════════════
+// Comprobado en el sitio real el 2026-09-24: «Postularme» en Computrabajo
+// ya no abre un formulario en la página; lleva a
+// candidato.pe.computrabajo.com/match/. La extensión seguía hablándole a
+// la página vieja, fallaba sin anotar nada, y Ali veía «no hace nada».
+{
+  titulo("NAVEGACIÓN — se sigue a la página nueva sin pulsar nada más");
+  const fspn = await import("node:fs/promises");
+  const fo = await fspn.readFile(new URL("background.js", BASE), "utf8");
+  const ct = await fspn.readFile(new URL("contenido/computrabajo.js", BASE), "utf8");
+  const prep = fo.slice(fo.indexOf("async function prepararUna"), fo.indexOf("async function rellenarPantalla"));
+
+  check("se apunta la URL de antes de pulsar", /const urlAntes = /.test(prep));
+  check("cualquier cambio de página cuenta, no solo SmartApply",
+    /sinAncla\(misma\.url\) !== sinAncla\(urlAntes\)/.test(fo));
+  // Lo importante: tras navegar NO se vuelve a llamar a abrirFormulario,
+  // que en Computrabajo pulsa «Postularme» — en /match/ podría enviar.
+  const trasEncontrar = prep.slice(prep.indexOf("const donde = await buscarFormularioAbierto"));
+  const hastaCierre = trasEncontrar.slice(0, trasEncontrar.indexOf("\n  }\n"));
+  check("tras navegar no se vuelve a pulsar nada",
+    !/accion:\s*"abrirFormulario"/.test(hastaCierre), hastaCierre.slice(0, 80));
+  check("y Computrabajo no pulsa dentro del flujo de postulación",
+    /location\.host\.startsWith\("candidato\."\)[\s\S]{0,120}return \{ abierto: true/.test(ct));
+  // El textarea oculto «Comment» de la ficha no es una pregunta.
+  check("Computrabajo solo lee preguntas visibles", /q\.enunciado && q\.visible/.test(ct));
+}
+
+{
+  titulo("YA POSTULADAS — no vuelven a salir");
+  const fspy = await import("node:fs/promises");
+  for (const portal of ["indeed", "bumeran", "linkedin"]) {
+    const src = await fspy.readFile(new URL(`contenido/${portal}.js`, BASE), "utf8");
+    check(`${portal} detecta «ya postulaste» en la tarjeta`,
+      !/yaPostulado:\s*false/.test(src) && /postulad\[oa\]/.test(src));
+  }
+  const pj = await fspy.readFile(new URL("panel/panel.js", BASE), "utf8");
+  check("el panel quita las que ya postuló con Chamba Lista",
+    /almacen\.tracker\.yaPostulado\(v\.url\)/.test(pj));
+  check("y lo dice", /Ocultamos \$\{estado\.yaPostuladasOcultas\}/.test(pj));
+  // Al conectar un portal el panel se repinta; el desplegable se cerraba
+  // y parecía que todo se reiniciaba.
+  check("el desplegable de portales sigue abierto mientras uno se conecta",
+    (pj.match(/conectando\.has\(p\.id\)\) \? " open" : ""/g) || []).length >= 2);
+}
+
 console.log(`
 ${fallos === 0 ? "TODO OK" : `${fallos} FALLO(S)`}`);
 

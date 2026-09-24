@@ -48,7 +48,10 @@
         ubicacion: texto(c, SEL.ubicacion),
         publicado: texto(c, SEL.fecha),
         url: jk ? `https://pe.indeed.com/viewjob?jk=${jk}` : "",
-        yaPostulado: false,
+        // Antes `false` fijo: nunca se descartaba nada. Se mira el texto
+        // de la tarjeta SIN el título, para no confundir un puesto que se
+        // llame así con una marca de «ya postulaste».
+        yaPostulado: /\b(postulad[oa]|ya (te )?postulaste|solicitud enviada|solicitado|applied)\b/i.test((c.innerText || "").replace(texto(c, SEL.titulo), "")),
       };
     }).filter((o) => o.titulo && o.url);
   }
