@@ -269,7 +269,8 @@
       // «abrirFormulario» es lo que manda el fondo. Solo se entendía
       // «abrir», así que la postulación moría en el primer paso.
       else if (msg.accion === "abrir" || msg.accion === "abrirFormulario") abrirFormulario().then(responder);
-      else if (msg.accion === "preguntas") responder({ preguntas: leerPreguntas() });
+      else if (msg.accion === "preguntas") responder({ preguntas: leerPreguntas(),
+        conArchivo: document.querySelectorAll("input[type=file]").length > 0 });
       else if (msg.accion === "rellenar") responder(escribirRespuestas(msg.respuestas));
       else if (msg.accion === "escribir") responder(escribirRespuestas(msg.respuestas));
       else if (msg.accion === "adjuntar") responder(adjuntarCV(msg.nombre, msg.base64));

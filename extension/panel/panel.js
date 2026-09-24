@@ -305,8 +305,7 @@ function conectarBotonesPortal(raiz) {
       pintarInicio();                       // el punto pasa a ámbar ya
       await enviar({ accion: "abrirAcceso", portal: cual });
       avisar("Inicia sesión en la pestaña que se abrió. Esto se marca solo.");
-      // Sin temporizador a ciegas: el fondo vigila esa pestaña y avisa en
-      // cuanto la sesión aparece.
+      vigilarConexiones();
     });
   });
 }
@@ -1562,6 +1561,33 @@ chrome.runtime.onMessage.addListener((msg) => {
     pintarInicio();
   });
 });
+
+/**
+ * Mientras haya un portal «conectando», se mira cada pocos segundos.
+ *
+ * El fondo avisa cuando ve la sesión, pero si el panel no estaba abierto
+ * en ese instante el aviso se pierde. Esto es la red: cada 4 s, y se
+ * para sola en cuanto no queda nada por conectar (o a los 10 minutos).
+ */
+let relojConexiones = null;
+function vigilarConexiones() {
+  if (relojConexiones) return;
+  const fin = Date.now() + 10 * 60 * 1000;
+  relojConexiones = setInterval(async () => {
+    if (!conectando.size || Date.now() > fin) {
+      clearInterval(relojConexiones);
+      relojConexiones = null;
+      return;
+    }
+    await revisarSesion();
+    let nuevos = 0;
+    for (const p of sesionesCache) if (p.sesion && conectando.delete(p.id)) nuevos++;
+    if (nuevos) {
+      avisar("Portal conectado.", "bien");
+      pintarInicio();
+    }
+  }, 4000);
+}
 
 async function revisarSesion() {
   const chip = $("#estado-sesion");

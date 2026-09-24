@@ -355,7 +355,11 @@
           case "ofertas":       return responder({ ofertas: leerOfertas(), sesion: haySesion() });
           case "detalle":       return responder(leerDetalle());
           case "abrirFormulario": return responder(await abrirFormulario());
-          case "preguntas":     return responder({ preguntas: leerPreguntas() });
+          // `conArchivo`: si hay dónde subir un CV. Si no, el fondo ni
+          // adapta el CV ni genera el Word: la página de preguntas usa el
+          // del perfil y hacerlo era tiempo tirado en cada postulación.
+          case "preguntas":     return responder({ preguntas: leerPreguntas(),
+                                                   conArchivo: C.camposDeArchivo().length > 0 });
           case "rellenar":      return responder(rellenarCampos(msg.perfil, msg.guardados, msg.patrones));
           case "adjuntar":      return responder(C.adjuntarCV(msg.nombre, msg.base64));
           case "escribir":      return responder(escribirRespuestas(msg.respuestas));

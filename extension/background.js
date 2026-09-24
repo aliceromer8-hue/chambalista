@@ -18,7 +18,10 @@ import { TOPE_POR_TANDA } from "./lib/verificados.js";
 // Viene de proxy_ia.py: «Llegaste al límite de N usos gratis.»
 const SIN_CUOTA = /l[ií]mite de \d+ usos gratis|cuota|quota|429/i;
 
-const PAUSA_ENTRE_VACANTES = 2500;
+// 1,5 s y no 2,5: con la postulación ya más corta, la pausa pesaba. No
+// se quita del todo: disparar vacantes sin respiro es lo que los portales
+// miran para decidir que alguien no es una persona.
+const PAUSA_ENTRE_VACANTES = 1500;
 
 let lote = { fase: "inactivo", modo: "", total: 0, hechas: 0, mensaje: "", items: [], cancelado: false };
 
@@ -174,8 +177,8 @@ async function buscar({ puesto, ciudad, nivel, portales: elegidos }) {
  * Que falle no aborta la postulación: se manda con el CV del portal, que
  * es exactamente lo que pasaba antes. Pero se DICE.
  */
-async function adjuntarCVAdaptado(tabId, perfil, vacante, resumen, competenciasExtra) {
-  const pedido = await cv.docxAdaptado(perfil, vacante, { resumen, competenciasExtra });
+/** Adjunta al formulario un .docx ya generado. */
+async function adjuntarPedido(tabId, pedido) {
   if (!pedido || pedido.error) {
     return {
       adjuntado: false,
@@ -256,21 +259,6 @@ async function prepararUna(vacante, perfil, guardados, respuestasPersona) {
   reporte.huecos = huecos.detectar(vacante, perfil);
   const confirmadas = huecos.aCompetencias(reporte.huecos, respuestasPersona?.habilidades || {});
 
-  // Resumen del CV reenfocado a esta vacante.
-  let resumenAdaptado = null;
-  if (await ia.disponible()) {
-    try {
-      const ad = await ia.adaptarAVacante(perfil, vacante);
-      if (ad?.resumen?.length) {
-        resumenAdaptado = ad.resumen;
-        perfil = { ...perfil, perfil: ad.resumen };
-        reporte.cambiosCV = ad.cambios || [];
-      }
-    } catch {
-      // el CV base sirve igual
-    }
-  }
-
   // Dónde estaba la pestaña ANTES de pulsar «Postularme»: si después
   // está en otra página, el formulario está en esa página.
   const urlAntes = (await chrome.tabs.get(tabId).catch(() => null))?.url || "";
@@ -312,25 +300,53 @@ async function prepararUna(vacante, perfil, guardados, respuestasPersona) {
   if (abierto?.captcha) return { ...reporte, captcha: true, nota: abierto.nota };
   if (abierto?.error) return { ...reporte, error: abierto.error };
 
-  // El .docx adaptado, adjuntado de verdad al formulario.
+  // La vacante queda a mano para «rellenar esta pantalla» desde el panel.
+  await almacen.guardar("vacanteTrabajo", {
+    titulo: vacante.titulo, empresa: vacante.empresa, descripcion: vacante.descripcion || "",
+  });
+
+  // RÁPIDO: lo que no depende de nada, a la vez.
   //
-  // Va DESPUÉS de abrir el formulario porque el campo de archivo no
-  // existe hasta entonces, y antes de rellenar para que si el portal
-  // autocompleta algo al recibir el CV, lo de después mande.
-  reporte.cv = await adjuntarCVAdaptado(tabId, perfil, vacante, resumenAdaptado, confirmadas);
+  // Antes iba todo en fila: adaptar el CV con la IA → abrir → generar el
+  // Word en el servidor → adjuntar → rellenar → leer → redactar con la IA
+  // → escribir. Y adaptar + Word se hacían SIEMPRE, aunque el formulario
+  // no tuviera dónde subir un archivo: la página de preguntas de
+  // Computrabajo usa el CV del perfil, así que en cada postulación se
+  // tiraban una llamada a la IA y una al servidor. Ali: «es casi igual que
+  // los 15 minutos que haría alguien manual».
+  //
+  // Ahora se mira primero si hay dónde adjuntar. Si no, eso no se hace.
+  // Si sí, las dos llamadas a la IA —redactar y adaptar— van en paralelo.
+  const leido = await hablarCon(tabId, { accion: "preguntas" }).catch(() => ({}));
+  const conArchivo = Boolean(leido?.conArchivo);
+  const [redaccion, cvListo] = await Promise.all([
+    redactarPantalla(leido?.preguntas || [], perfil, guardados, respuestasPersona, vacante),
+    conArchivo ? cvAdaptado(perfil, vacante, confirmadas) : Promise.resolve(null),
+  ]);
+
+  // El Word antes que las respuestas: si el portal autocompleta algo al
+  // recibirlo, lo que se escriba después es lo que manda.
+  if (cvListo?.pedido && !cvListo.pedido.error) {
+    reporte.cambiosCV = cvListo.cambios || [];
+    reporte.cv = await adjuntarPedido(tabId, cvListo.pedido);
+  } else if (conArchivo) {
+    reporte.cv = { adjuntado: false,
+                   nota: "No se pudo generar el CV adaptado. Se postula con el que ya tienes en el portal." };
+  } else {
+    reporte.cv = { adjuntado: false, nota: "Este formulario usa el CV que ya tienes guardado en el portal." };
+  }
 
   const patrones = datos.CAMPOS.map((c) => ({
     clave: c.clave, etiqueta: c.etiqueta, patron: c.patron.source,
   }));
   const relleno = await hablarCon(tabId, {
     accion: "rellenar", perfil, guardados, patrones,
-  });
+  }).catch(() => ({}));
   reporte.completados = relleno?.completados || [];
   reporte.pendientes = relleno?.pendientes || [];
 
-  const pantalla = await rellenarPantalla(tabId, perfil, guardados, respuestasPersona);
-  reporte.preguntas = pantalla.preguntas;
-  reporte.escritas = pantalla.escritas;
+  reporte.preguntas = redaccion.preguntas;
+  reporte.escritas = await escribirRedactadas(tabId, redaccion.preguntas);
   reporte.listoParaEnviar = true;
   return reporte;
 }
@@ -344,27 +360,52 @@ async function prepararUna(vacante, perfil, guardados, respuestasPersona) {
  * «Siguiente» en el propio portal. Por eso no se avanza solo: avanzar a
  * ciegas enviaría pantallas que nadie ha mirado.
  */
-async function rellenarPantalla(tabId, perfil, guardados, respuestasPersona) {
-  const { preguntas } = await hablarCon(tabId, { accion: "preguntas" });
+async function rellenarPantalla(tabId, perfil, guardados, respuestasPersona, contexto) {
+  const leido = await hablarCon(tabId, { accion: "preguntas" });
+  const { preguntas } = await redactarPantalla(leido?.preguntas || [], perfil, guardados,
+                                               respuestasPersona, contexto);
+  return { preguntas, escritas: await escribirRedactadas(tabId, preguntas) };
+}
+
+/** Redacta sin escribir: para poder hacerlo a la vez que otras cosas. */
+async function redactarPantalla(preguntas, perfil, guardados, respuestasPersona, contexto) {
   // Cada pregunta con su posición. Computrabajo ya la traía; LinkedIn,
   // Indeed y Bumeran no, y el panel —que guarda las respuestas por
   // posición— las metía todas bajo la clave «undefined», pisándose.
   const leidas = (preguntas || []).map((p, i) => ({ ...p, indice: p.indice ?? i }));
-  const redactadas = await respuestas.redactar(leidas, perfil, guardados, respuestasPersona || {});
+  // La vacante va con las preguntas: sin ella, «¿por qué te interesa este
+  // puesto?» no tenía con qué contestarse.
+  return { preguntas: await respuestas.redactar(leidas, perfil, guardados,
+                                                respuestasPersona || {}, contexto || {}) };
+}
 
-  // Lo redactado se escribe YA. Lo que decide la persona (consentimiento,
-  // disponibilidad, datos que no están en el CV) se queda vacío hasta que
-  // lo conteste en el panel.
+/** Escribe en el formulario lo que ya tiene texto. Devuelve cuántas. */
+async function escribirRedactadas(tabId, redactadas) {
   const listas = {};
-  for (const q of redactadas) if (q.texto) listas[q.indice] = q.texto;
-  let escritas = 0;
-  if (Object.keys(listas).length) {
-    try {
-      const r = await hablarCon(tabId, { accion: "escribir", respuestas: listas });
-      escritas = Array.isArray(r?.escritas) ? r.escritas.length : Number(r?.escritas) || 0;
-    } catch { /* se escriben igual al enviar */ }
+  for (const q of redactadas || []) if (q.texto) listas[q.indice] = q.texto;
+  if (!Object.keys(listas).length) return 0;
+  try {
+    const r = await hablarCon(tabId, { accion: "escribir", respuestas: listas });
+    return Array.isArray(r?.escritas) ? r.escritas.length : Number(r?.escritas) || 0;
+  } catch {
+    return 0;            // se escriben igual al enviar
   }
-  return { preguntas: redactadas, escritas };
+}
+
+/** El CV reenfocado a la vacante y su .docx. Solo si hay dónde subirlo. */
+async function cvAdaptado(perfil, vacante, confirmadas) {
+  let resumen = null, cambios = [], base = perfil;
+  try {
+    const ad = await ia.adaptarAVacante(perfil, vacante);
+    if (ad?.resumen?.length) {
+      resumen = ad.resumen;
+      base = { ...perfil, perfil: ad.resumen };
+      cambios = ad.cambios || [];
+    }
+  } catch { /* el CV base sirve igual */ }
+  const pedido = await cv.docxAdaptado(base, vacante, { resumen, competenciasExtra: confirmadas })
+    .catch((e) => ({ error: e.message }));
+  return { pedido, cambios };
 }
 
 /**
@@ -420,7 +461,7 @@ async function escribirYEnviar(respuestasAprobadas) {
       return { enviada: false, error: `El portal pide completar: ${s.errores.slice(0, 3).join(" · ")}` };
     }
     if (!s?.avanzado) break;
-    await rellenarPantalla(tabId, perfil, guardados, {});
+    await rellenarPantalla(tabId, perfil, guardados, {}, await almacen.leer("vacanteTrabajo", {}));
   }
   return hablarCon(tabId, { accion: "enviar" });
 }
@@ -602,34 +643,59 @@ async function enviarAprobadas(ids) {
  * minutos, y avisa al panel en cuanto la sesión aparece. No navega ni
  * toca nada: solo pregunta al content script que ya está ahí.
  */
-function vigilarAcceso(tabId, portalId) {
-  const hasta = Date.now() + 5 * 60 * 1000;
+// La pestaña de acceso de un portal, vigilada hasta que haya sesión.
+//
+// Antes los oyentes se registraban DENTRO de esta función. Chrome duerme
+// el proceso de fondo de la extensión a los ~30 s sin actividad, y al
+// despertarlo solo vuelve a registrar los oyentes de nivel superior: los
+// de aquí se perdían. Quien tardaba más de medio minuto en entrar —con
+// verificación por correo, casi todos— no quedaba nunca conectado.
+//
+// Ahora lo vigilado se guarda en el almacén y el oyente vive arriba, así
+// que sobrevive a que Chrome duerma y despierte la extensión.
+async function vigilarAcceso(tabId, portalId) {
+  const vigilando = await almacen.leer("vigilando", {});
+  vigilando[tabId] = { portal: portalId, hasta: Date.now() + 15 * 60 * 1000 };
+  await almacen.guardar("vigilando", vigilando);
+}
 
-  const alCargar = async (idCargada, info) => {
-    if (idCargada !== tabId || info.status !== "complete") return;
-    if (Date.now() > hasta) return parar();
+async function revisarVigilada(tabId) {
+  const vigilando = await almacen.leer("vigilando", {});
+  const v = vigilando[tabId];
+  if (!v) return;
+  if (Date.now() > v.hasta) {
+    delete vigilando[tabId];
+    return almacen.guardar("vigilando", vigilando);
+  }
+  // Muchos portales pintan la cabecera con sesión un momento DESPUÉS de
+  // cargar: se mira ya y se vuelve a mirar al rato.
+  for (const espera of [0, 1500, 4000]) {
+    if (espera) await esperar(espera);
     try {
       const r = await hablarCon(tabId, { accion: "sesion" });
       if (r?.sesion) {
-        parar();
-        // El panel puede estar cerrado; si nadie escucha, no pasa nada.
-        chrome.runtime.sendMessage({ aviso: "sesionPortal", portal: portalId })
-          .catch(() => {});
+        const actual = await almacen.leer("vigilando", {});
+        delete actual[tabId];
+        await almacen.guardar("vigilando", actual);
+        const recordadas = await almacen.leer("sesionesRecordadas", {});
+        recordadas[v.portal] = Date.now();
+        await almacen.guardar("sesionesRecordadas", recordadas);
+        chrome.runtime.sendMessage({ aviso: "sesionPortal", portal: v.portal }).catch(() => {});
+        return;
       }
     } catch { /* aún sin content script en esa pestaña */ }
-  };
-
-  const alCerrar = (idCerrada) => { if (idCerrada === tabId) parar(); };
-
-  function parar() {
-    chrome.tabs.onUpdated.removeListener(alCargar);
-    chrome.tabs.onRemoved.removeListener(alCerrar);
   }
-
-  chrome.tabs.onUpdated.addListener(alCargar);
-  chrome.tabs.onRemoved.addListener(alCerrar);
-  setTimeout(parar, 5 * 60 * 1000);
 }
+
+// Al completar una carga Y al cambiar de dirección sin recargar (muchos
+// accesos son de una sola página y no «completan» nada al entrar).
+chrome.tabs.onUpdated.addListener((tabId, info) => {
+  if (info.status === "complete" || info.url) revisarVigilada(tabId);
+});
+chrome.tabs.onRemoved.addListener(async (tabId) => {
+  const vigilando = await almacen.leer("vigilando", {});
+  if (vigilando[tabId]) { delete vigilando[tabId]; await almacen.guardar("vigilando", vigilando); }
+});
 
 chrome.runtime.onMessage.addListener((msg, _e, responder) => {
   (async () => {
@@ -707,6 +773,22 @@ chrome.runtime.onMessage.addListener((msg, _e, responder) => {
                        acceso: p.acceso, sesion: null, abierto: false };
             }),
           );
+          // La sesión se RECUERDA. Antes solo se veía mirando una pestaña
+          // abierta del portal: Ali entraba en Bumeran, cerraba la
+          // pestaña —lo normal— y el panel se quedaba «Esperando…» para
+          // siempre. Ahora, vista una vez, cuenta como conectada hasta que
+          // una pestaña de ese portal diga lo contrario.
+          const recordadas = await almacen.leer("sesionesRecordadas", {});
+          const HOY = Date.now(), CADUCA = 14 * 24 * 3600 * 1000;
+          for (const e of estados) {
+            if (e.sesion === true) recordadas[e.id] = HOY;
+            else if (e.sesion === false) delete recordadas[e.id];
+            else if (recordadas[e.id] && HOY - recordadas[e.id] < CADUCA) {
+              e.sesion = true;
+              e.recordada = true;
+            }
+          }
+          await almacen.guardar("sesionesRecordadas", recordadas);
           return responder({ portales: estados });
         }
         // La sesión que la persona creó en la web, traída por el puente.
@@ -751,7 +833,8 @@ chrome.runtime.onMessage.addListener((msg, _e, responder) => {
           const perfil = await almacen.perfil.obtener();
           const guardados = await almacen.datosPersonales.obtener();
           try {
-            return responder(await rellenarPantalla(id, perfil, guardados, msg.respuestasPersona));
+            return responder(await rellenarPantalla(id, perfil, guardados, msg.respuestasPersona,
+                                                    await almacen.leer("vacanteTrabajo", {})));
           } catch (e) {
             return responder({ error: `No se pudo leer esa pantalla: ${e.message}` });
           }

@@ -114,7 +114,10 @@ const guardados = { dni: "70123456", distrito: "Surco" };
 const r1 = await respuestas.redactar(PREGUNTAS, PERFIL, guardados, {});
 check("ad honorem queda VACÍA", r1[0].texto === "", `«${r1[0].texto}»`);
 check("ad honorem avisa que es SIN PAGO", r1[0].necesita[0].aviso.includes("sin pago"));
-check("disponibilidad queda VACÍA", r1[1].texto === "");
+// Desde 2026-09-24 la disponibilidad se contesta sola («sí»): preguntar
+// es el último recurso. Queda editable en el panel.
+check("disponibilidad se contesta sola, con un sí",
+  /^Sí, cuento con disponibilidad/.test(r1[1].texto), r1[1].texto);
 check("disponibilidad detecta el lugar",
   r1[1].necesita[0].etiqueta.includes("La Molina"), r1[1].necesita[0].etiqueta);
 check("el distrito guardado se responde solo", r1[2].texto === "Resido en Surco.", r1[2].texto);
@@ -1521,7 +1524,10 @@ titulo("LA PESTAÑA SIN CONTENT SCRIPT — el fallo mas probable del primer inte
   const horario = { indice: 100, tipo: "opcion", enunciado: "En que horario te encuentras con mayor disponibilidad",
                     opciones: ["8:00AM - 1:00PM", "1:00PM - 6:00PM", "2:00PM - 7:00PM"] };
   const [sinElegir] = await resp.redactar([horario], {}, {}, {});
-  check("un horario no lo contesta nadie más que la persona", sinElegir.texto === "");
+  // Se elige SOLO entre los turnos del portal (sin preguntar), y se puede
+  // cambiar en el panel.
+  check("un horario se elige solo, entre los turnos del portal",
+    horario.opciones.includes(sinElegir.texto), sinElegir.texto);
   check("y se le ofrecen los turnos del portal, no «Sí / No»",
     JSON.stringify(sinElegir.necesita[0]?.opciones) === JSON.stringify(horario.opciones),
     JSON.stringify(sinElegir.necesita[0]?.opciones));
@@ -1533,13 +1539,93 @@ titulo("LA PESTAÑA SIN CONTENT SCRIPT — el fallo mas probable del primer inte
     { contacto: { telefono: "999 888 777" } }, {}, {});
   check("«déjanos tu número» se contesta con el teléfono del CV", tel.texto === "Mi número es 999 888 777.", tel.texto);
   const [sinTel] = await resp.redactar([{ indice: 2, enunciado: "Déjanos tu número de celular" }], { contacto: {} }, {}, {});
-  check("y si el CV no lo tiene, se pregunta", sinTel.texto === "" && sinTel.necesita.length === 1);
+  check("sin teléfono en el CV y sin ser obligatorio, no se interrumpe",
+    sinTel.texto === "" && sinTel.necesita.length === 0);
+  const [telObligatorio] = await resp.redactar(
+    [{ indice: 2, enunciado: "Déjanos tu número de celular", obligatoria: true }], { contacto: {} }, {}, {});
+  check("si el portal lo exige, entonces sí se pregunta", telObligatorio.necesita.length === 1);
 
   // Elegir una opción no vuelve a navegar ni a pulsar «Postularme».
   const pj = await fspk.readFile(new URL("panel/panel.js", BASE), "utf8");
   const rr = pj.slice(pj.indexOf("async function reRedactar"), pj.indexOf("function respuestasDelPanel"));
   check("elegir una opción solo vuelve a leer esta pantalla",
     /accion: "rellenarPantalla"/.test(rr) && !/accion: "prepararUna"/.test(rr));
+}
+
+// ══════════════════════════════════════════════════════════════════════
+// PREGUNTAR ES EL ÚLTIMO RECURSO (Ali, 2026-09-24)
+// ══════════════════════════════════════════════════════════════════════
+// «Lo de pedir ayuda al usuario es lo último que queremos hacer.» Una
+// tanda de treinta con una pregunta cada una eran treinta interrupciones.
+{
+  titulo("SIN INTERRUMPIR — solo se pregunta lo que compromete de verdad");
+  const r = await import(`${BASE}lib/respuestas.js`);
+
+  const [adHonorem] = await r.redactar([{ indice: 0, enunciado: "Confirmo que las prácticas son AD HONOREM (sin remuneración)." }], {}, {}, {});
+  check("aceptar prácticas SIN PAGO sigue preguntándose", adHonorem.texto === ""
+    && adHonorem.necesita.some((n) => !n.respondido));
+  check("y eso frena el envío automático", r.consentimientoPendiente([adHonorem]) !== null);
+
+  const [terminos] = await r.redactar([{ indice: 0, enunciado: "Acepto los términos y condiciones y el tratamiento de mis datos." }], {}, {}, {});
+  check("unos términos normales se aceptan solos", /acepto las condiciones/.test(terminos.texto));
+  check("y no frenan el envío", r.consentimientoPendiente([terminos]) === null);
+  const [noAcepto] = await r.redactar([{ indice: 0, enunciado: "Acepto los términos y condiciones." }], {}, {}, { consent_0: "No" });
+  check("salvo que ella diga que no", noAcepto.texto === "");
+
+  // Una opción que no es de disponibilidad es un HECHO sobre la persona:
+  // un «Sí» elegido a ciegas sería inventar. Esa la decide el modelo.
+  const [hecho] = await r.redactar([{ indice: 100, tipo: "opcion", enunciado: "¿Tienes experiencia en SAP?",
+                                      opciones: ["Sí", "No"] }], {}, {}, {});
+  check("una opción que es un hecho no se elige a ciegas", hecho.texto === "", hecho.texto);
+
+  // Un dato que el modelo no sabe y el portal no exige: en blanco.
+  const fs = await import("node:fs/promises");
+  const src = await fs.readFile(new URL("lib/respuestas.js", BASE), "utf8");
+  check("lo que el modelo no sabe y no es obligatorio no se pregunta",
+    /r\.falta && !q\.obligatoria/.test(src));
+  check("el modelo recibe la vacante", /puesto: contexto\.titulo/.test(src));
+}
+
+// ══════════════════════════════════════════════════════════════════════
+// MÁS RÁPIDO
+// ══════════════════════════════════════════════════════════════════════
+{
+  titulo("VELOCIDAD — no hacer lo que no hace falta, y en paralelo");
+  const fs = await import("node:fs/promises");
+  const fo = await fs.readFile(new URL("background.js", BASE), "utf8");
+  const prep = fo.slice(fo.indexOf("async function prepararUna"), fo.indexOf("async function rellenarPantalla"));
+  check("adaptar el CV y generar el Word solo si hay dónde subirlo",
+    /conArchivo \? cvAdaptado\(/.test(prep) && !/ia\.adaptarAVacante/.test(prep));
+  check("redactar y adaptar van a la vez", /Promise\.all\(\[\s*redactarPantalla/.test(prep));
+  for (const portal of ["computrabajo", "linkedin", "indeed", "bumeran"]) {
+    const src = await fs.readFile(new URL(`contenido/${portal}.js`, BASE), "utf8");
+    check(`${portal} dice si el formulario pide archivo`, /conArchivo:/.test(src));
+  }
+  check("la pausa entre vacantes bajó", /PAUSA_ENTRE_VACANTES = 1500/.test(fo));
+}
+
+// ══════════════════════════════════════════════════════════════════════
+// CONECTAR UN PORTAL SE QUEDA CONECTADO
+// ══════════════════════════════════════════════════════════════════════
+// Ali: «ingreso pero sigue saliendo conectando». La sesión solo se veía
+// con una pestaña del portal abierta, y la vigilancia moría cuando Chrome
+// dormía la extensión.
+{
+  titulo("CONEXIÓN — se recuerda, y la vigilancia sobrevive");
+  const fs = await import("node:fs/promises");
+  const fo = await fs.readFile(new URL("background.js", BASE), "utf8");
+  const pj = await fs.readFile(new URL("panel/panel.js", BASE), "utf8");
+  check("la sesión vista se recuerda aunque se cierre la pestaña",
+    /sesionesRecordadas/.test(fo) && /e\.recordada = true/.test(fo));
+  check("y se olvida si el portal dice que ya no hay sesión",
+    /e\.sesion === false\) delete recordadas/.test(fo));
+  // El oyente tiene que estar a nivel superior: dentro de una función
+  // se pierde cuando Chrome duerme la extensión.
+  check("la vigilancia vive en el almacén y el oyente es de nivel superior",
+    /^chrome\.tabs\.onUpdated\.addListener/m.test(fo) && /almacen\.guardar\("vigilando"/.test(fo));
+  check("también mira al cambiar de dirección sin recargar", /info\.status === "complete" \|\| info\.url/.test(fo));
+  check("el panel revisa solo mientras conectas", /function vigilarConexiones\(\)/.test(pj)
+    && /if \(!conectando\.size/.test(pj));
 }
 
 console.log(`

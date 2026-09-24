@@ -425,7 +425,7 @@ REGLAS ESTRICTAS:
 1. Una entrada por pregunta, con el mismo número que se te dio.
 2. Responde en primera persona, en español natural, como lo escribiría la persona.
 3. Usa ÚNICAMENTE información del CV. Está terminantemente prohibido inventar datos, cifras, herramientas, experiencias o nombres que no aparezcan.
-4. Si el CV no tiene la información, pon "FALTA_DATO: <qué dato hace falta>" en el texto. Es preferible pedir el dato a inventarlo.
+4. Si la pregunta pide un DATO que no está en el CV (un documento, un número, una fecha, un sueldo, una dirección), pon "FALTA_DATO: <qué dato hace falta>". Pero si pide una MOTIVACIÓN u opinión («¿por qué te interesa?», «¿qué te motiva?», «¿por qué deberíamos elegirte?»), respóndela con sinceridad uniendo la vacante con lo que el CV SÍ dice: eso no es inventar, y dejarla sin responder le cuesta la postulación a la persona.
 5. Responde SOLO lo que cada pregunta pide. Si preguntan el distrito, no menciones el teléfono.
 6. Máximo 400 caracteres por respuesta. Sin viñetas ni comillas envolventes.
 7. No copies fragmentos del CV en crudo: redacta una frase."""
@@ -447,8 +447,17 @@ def redactar_lote(enunciados, perfil, extras=None):
         return None
 
     listado = "\n".join(f"{n}. {e}" for n, e in enumerate(enunciados, 1))
+    # La vacante va aparte y con su nombre: mezclada entre los datos del CV,
+    # el modelo no sabía que «puesto» era el puesto AL QUE POSTULA.
+    extras = dict(extras or {})
+    vacante = {k: extras.pop(k) for k in ("puesto", "empresa", "vacante") if extras.get(k)}
+    bloque_vacante = ""
+    if vacante:
+        bloque_vacante = "Vacante a la que postula:\n" + "\n".join(
+            f"{k}: {v}" for k, v in vacante.items()) + "\n\n"
     prompt = (
         f"CV de la persona:\n{_cv_en_texto(perfil, extras)}\n\n"
+        f"{bloque_vacante}"
         f"Preguntas:\n{listado}\n\n"
         "Devuelve el JSON con una respuesta por pregunta."
     )

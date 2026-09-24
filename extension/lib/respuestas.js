@@ -67,33 +67,50 @@ function lugarDe(enunciado) {
  *   `necesita` son los datos que la persona tiene que aportar; mientras
  *   haya alguno sin responder, `texto` va vacío.
  */
-export async function redactar(preguntas, perfil, guardados = {}, respuestasPersona = {}) {
+export async function redactar(preguntas, perfil, guardados = {}, respuestasPersona = {}, contexto = {}) {
   const salida = preguntas.map((p) => ({ ...p, clase: clasificar(p.enunciado), texto: "", necesita: [] }));
 
-  // 1. Consentimiento y compromiso: decide la persona, no el modelo.
+  // POLÍTICA (Ali, 2026-09-24): preguntar a la persona es el ÚLTIMO
+  // recurso. «A menos que sea extremadamente importante.» Antes cada
+  // disponibilidad, cada horario y cada «acepto las condiciones» esperaba
+  // a que ella contestara, y una tanda de treinta se convertía en treinta
+  // interrupciones: casi lo mismo que postular a mano.
+  //
+  // Ahora se contesta lo razonable por defecto —y queda a la vista y
+  // editable en el panel—, y solo se pregunta lo que de verdad la
+  // compromete. Hoy eso es UNA cosa: aceptar prácticas sin pago.
+  const SIN_PAGO = /ad honorem|sin remuneraci[oó]n|no remunerad|sin pago|no percibir/i;
+
+  // 1. Consentimiento y compromiso.
   for (const q of salida) {
     if (q.clase === "consentimiento") {
-      const r = respuestasPersona[`consent_${q.indice}`];
-      q.necesita.push({
-        clave: `consent_${q.indice}`,
-        etiqueta: "¿Confirmas que lo leíste y lo aceptas?",
-        tipo: "opciones",
-        opciones: ["Sí, confirmo y acepto", "No"],
-        aviso: avisoConsentimiento(q.enunciado),
-        respondido: Boolean(r),
-      });
-      if (r === "Sí, confirmo y acepto") {
-        q.texto = "Confirmo que he leído y comprendido las condiciones indicadas.";
+      const clave = `consent_${q.indice}`;
+      const r = respuestasPersona[clave];
+      if (SIN_PAGO.test(q.enunciado)) {
+        // La excepción: trabajar sin cobrar lo decide ella.
+        q.necesita.push({
+          clave, etiqueta: "¿Confirmas que lo leíste y lo aceptas?", tipo: "opciones",
+          opciones: ["Sí, confirmo y acepto", "No"],
+          aviso: avisoConsentimiento(q.enunciado), respondido: Boolean(r),
+        });
+        if (r === "Sí, confirmo y acepto") {
+          q.texto = "Confirmo que he leído y comprendido las condiciones indicadas.";
+        }
+      } else {
+        // Leer las condiciones, el tratamiento de datos: lo que acepta
+        // cualquiera que postula. Se acepta, salvo que ella diga que no.
+        q.texto = r === "No" ? "" : "Confirmo que he leído y acepto las condiciones indicadas.";
+        q.necesita.push({ clave, etiqueta: "¿Lo aceptas?", tipo: "opciones",
+                          opciones: ["Sí, confirmo y acepto", "No"], respondido: true, automatica: !r });
       }
     } else if (q.clase === "compromiso") {
-      const r = respuestasPersona[`disp_${q.indice}`];
+      const clave = `disp_${q.indice}`;
+      const r = respuestasPersona[clave] || "Sí, completa";      // por defecto, sí
       const lugar = lugarDe(q.enunciado);
       q.necesita.push({
-        clave: `disp_${q.indice}`,
-        etiqueta: `¿Tienes disponibilidad${lugar ? ` para ir a ${lugar}` : ""}?`,
-        tipo: "opciones",
-        opciones: ["Sí, completa", "Sí, con restricciones de horario", "No"],
-        respondido: Boolean(r),
+        clave, etiqueta: `¿Tienes disponibilidad${lugar ? ` para ir a ${lugar}` : ""}?`,
+        tipo: "opciones", opciones: ["Sí, completa", "Sí, con restricciones de horario", "No"],
+        respondido: true, automatica: !respuestasPersona[clave],
       });
       if (r === "Sí, completa") {
         q.texto = `Sí, cuento con disponibilidad${lugar ? ` para asistir a ${lugar}` : ""}.`;
@@ -110,13 +127,23 @@ export async function redactar(preguntas, perfil, guardados = {}, respuestasPers
   // «compromiso» y se le ofrecía «Sí / No» para una pregunta de «¿qué
   // turno?»; o, peor, iban al modelo, que no puede elegir un horario por
   // nadie.
+  //
+  // Ahora se ELIGEN solas cuando son de disponibilidad (turnos, sedes,
+  // modalidad): la más flexible, o la primera. Las demás —«¿tienes
+  // experiencia en X? Sí/No»— son hechos sobre la persona, y un «Sí»
+  // elegido a ciegas sería inventar: esas las elige el modelo con el CV.
+  const FLEXIBLE = /cualquier|indistint|ambos|ambas|todos|todas|flexible|full ?time|tiempo completo/i;
   for (const q of salida) {
     if (q.tipo !== "opcion" || !(q.opciones || []).length) continue;
     const clave = `opc_${q.indice}`;
     const r = respuestasPersona[clave];
+    const deDisponibilidad = q.clase === "compromiso" || /horario|turno|sede|modalidad|jornada/i.test(q.enunciado);
+    const auto = deDisponibilidad ? (q.opciones.find((o) => FLEXIBLE.test(o)) || q.opciones[0]) : "";
+    const elegida = r && q.opciones.includes(r) ? r : auto;
     q.necesita = [{ clave, etiqueta: q.enunciado, tipo: "opciones", opciones: q.opciones,
-                    respondido: Boolean(r) }];
-    q.texto = r && q.opciones.includes(r) ? r : "";
+                    respondido: Boolean(elegida), automatica: !r && Boolean(auto) }];
+    q.texto = elegida;
+    if (!elegida) q.porModelo = true;          // la elige el modelo, abajo
   }
 
   // 2. Datos ya guardados: se responden al instante, sin gastar el modelo.
@@ -126,6 +153,10 @@ export async function redactar(preguntas, perfil, guardados = {}, respuestasPers
     const { campo, valor } = paraCampo(q.enunciado, guardados);
     if (campo && valor) {
       q.texto = campo.plantilla(valor);
+    } else if (campo && !valor && !q.obligatoria) {
+      // No está guardado y el portal no lo exige: se deja en blanco antes
+      // que interrumpir. (Antes se preguntaba siempre.)
+      q.saltar = true;
     } else if (campo && !valor) {
       q.necesita.push({
         clave: campo.clave,
@@ -151,6 +182,7 @@ export async function redactar(preguntas, perfil, guardados = {}, respuestasPers
     const contacto = perfil?.contacto || {};
     if (TEL.test(q.enunciado) && !/documento|dni|identidad/i.test(q.enunciado)) {
       if (contacto.telefono) q.texto = `Mi número es ${contacto.telefono}.`;
+      else if (!q.obligatoria) q.saltar = true;
       else q.necesita.push({ clave: `tel_${q.indice}`, etiqueta: "Tu número de celular", tipo: "texto",
                              respondido: Boolean(respuestasPersona[`tel_${q.indice}`]) });
       if (!q.texto && respuestasPersona[`tel_${q.indice}`]) q.texto = `Mi número es ${respuestasPersona[`tel_${q.indice}`]}.`;
@@ -160,10 +192,25 @@ export async function redactar(preguntas, perfil, guardados = {}, respuestasPers
   }
 
   // 3. Lo que queda, al modelo — en UNA sola llamada.
-  const pendientes = salida.filter((q) => !q.texto && q.necesita.length === 0);
+  // Las de opciones que no son de disponibilidad también van: el modelo
+  // elige entre las opciones del portal con lo que dice el CV.
+  const pendientes = salida.filter((q) =>
+    !q.saltar && ((!q.texto && q.necesita.length === 0) || q.porModelo));
   if (pendientes.length) {
+    // La vacante viaja con las preguntas. Antes el modelo no sabía a qué
+    // puesto se postulaba, así que «¿por qué te interesa este puesto?»
+    // volvía como FALTA_DATO y se le preguntaba a la persona.
+    const extras = {
+      ...guardados,
+      ...(contexto.titulo ? { puesto: contexto.titulo } : {}),
+      ...(contexto.empresa ? { empresa: contexto.empresa } : {}),
+      ...(contexto.descripcion ? { vacante: String(contexto.descripcion).slice(0, 700) } : {}),
+    };
     const respuestas = await ia.redactarLote(
-      pendientes.map((q) => q.enunciado), perfil, guardados,
+      pendientes.map((q) => (q.porModelo
+        ? `${q.enunciado} (responde SOLO con una de estas opciones, tal cual: ${q.opciones.join(" | ")})`
+        : q.enunciado)),
+      perfil, extras,
     );
     if (respuestas?.agotada) {
       // Sin cuota: la persona escribe estas a mano. Se le dice por qué.
@@ -172,6 +219,17 @@ export async function redactar(preguntas, perfil, guardados = {}, respuestasPers
       pendientes.forEach((q, i) => {
         const r = respuestas[i];
         if (!r) return;
+        if (q.porModelo) {
+          // Se acepta solo si es una de las opciones del portal.
+          const elegida = q.opciones.find((o) => o.toLowerCase() === String(r.texto || "").trim().toLowerCase());
+          if (elegida) { q.texto = elegida; q.necesita[0].respondido = true; q.necesita[0].automatica = true; }
+          return;
+        }
+        if (r.falta && !q.obligatoria) {
+          // El modelo no lo sabe y el portal no lo exige: en blanco, sin
+          // interrumpir. Preguntar es el último recurso.
+          return;
+        }
         if (r.falta) {
           q.necesita.push({
             clave: `extra_${q.indice}`,
