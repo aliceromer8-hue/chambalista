@@ -152,14 +152,15 @@
     if (!haySesion()) {
       return { abierto: false, error: "Inicia sesión en Bumeran antes de postular." };
     }
-    boton.click();
-    // Bumeran es una SPA: no recarga, cambia el DOM. Se espera un poco y
-    // se comprueba dónde acabamos.
-    await new Promise((r) => setTimeout(r, 1200));
+    // NO se pulsa «Postularme». Medido en el sitio real (2026-09-24,
+    // Molitalia): es el submit del formulario del sueldo, y el sueldo
+    // YA VIENE relleno desde el CV de Bumeran. Pulsarlo aquí era postular
+    // durante la PREPARACIÓN, también con «Revisar antes» activado. El
+    // formulario ya está en la página: abrir es no hacer nada.
     if (!enPostulacion()) {
       return { abierto: false, error: "Bumeran pidió iniciar sesión. Entra y vuelve a intentarlo." };
     }
-    return { abierto: true, conArchivo: camposDeArchivo().length > 0 };
+    return { abierto: true, conArchivo: false };
   }
 
   /**
@@ -172,10 +173,13 @@
   function leerPreguntas() {
     const preguntas = [];
     const salario = document.querySelector(SEL_SALARIO);
-    if (salario && salario.offsetParent !== null) {
+    // Si ya tiene cifra (Bumeran la trae del CV de la persona), no se
+    // pregunta ni se toca: es la que ella puso en su perfil.
+    if (salario && salario.offsetParent !== null && !(salario.value || "").trim()) {
       preguntas.push({
         id: "salarioPretendido",
-        enunciado: "¿Cuál es tu sueldo bruto pretendido? Bumeran lo pide para esta vacante.",
+        // «pretensión»: así encaja con el dato guardado y no gasta modelo.
+        enunciado: "¿Cuál es tu pretensión salarial (sueldo bruto)? Bumeran lo pide para esta vacante.",
         tipo: "numero",
         obligatoria: Boolean(salario.required),
         pedirALaPersona: true,
@@ -208,18 +212,28 @@
    * enseña antes de enviar: un formulario enviado con huecos es una
    * postulación perdida sin que nadie se entere.
    */
+  function soloCifra(valor) {
+    // «2 500» también son miles.
+    const m = String(valor == null ? "" : valor).replace(/(\d) (?=\d{3}\b)/g, "$1").match(/\d[\d.,]*/);
+    if (!m) return "";
+    let s = m[0].replace(/[.,]$/, "");
+    // Punto o coma seguido de exactamente 3 cifras = miles; si no, decimales.
+    s = s.replace(/[.,](?=\d{3}(\D|$))/g, "");
+    return s.split(/[.,]/)[0];
+  }
+
   function escribirRespuestas(respuestas) {
     const dadas = respuestas || {};
     const pendientes = [];
     const escritas = [];
     const salario = document.querySelector(SEL_SALARIO);
-    if (salario && salario.offsetParent !== null) {
+    if (salario && salario.offsetParent !== null && !(salario.value || "").trim()) {
       // Solo números: lo dice el propio Bumeran bajo el campo.
       // Por id o por posición (el sueldo es siempre la primera pregunta).
       const valor = dadas.salarioPretendido ?? dadas[0];
-      const limpio = String(valor == null ? "" : valor).replace(/[^\d]/g, "");
+      const limpio = soloCifra(valor);
       if (limpio) { rellenar(salario, limpio); escritas.push(0); }
-      else pendientes.push("Sueldo pretendido");
+      else if (salario.required) pendientes.push("Sueldo pretendido");
     }
     // El checkbox de actualizar el sueldo del perfil se deja como esté.
     return { escritas, pendientes, errores: erroresValidacion() };
@@ -235,7 +249,10 @@
       return { enviada: false, error: "Bumeran tiene el botón bloqueado: le falta algún campo." };
     }
     boton.click();
-    await new Promise((r) => setTimeout(r, 2000));
+    for (let i = 0; i < 16; i++) {
+      await new Promise((r) => setTimeout(r, 500));
+      if (confirmada().enviada) return confirmada();
+    }
     const errores = erroresValidacion();
     if (errores.length) return { enviada: false, error: errores.join(" · ") };
     return confirmada();

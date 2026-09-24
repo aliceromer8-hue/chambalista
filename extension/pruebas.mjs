@@ -1720,6 +1720,30 @@ titulo("LA PESTAÑA SIN CONTENT SCRIPT — el fallo mas probable del primer inte
   check("sin caracteres de control invisibles", !/[\x00-\x08\x0b\x0c\x0e-\x1f]/.test(src));
 }
 
+// ══════════════════════════════════════════════════════════════════════
+// BUMERAN DE VERDAD (medido en el sitio real, 2026-09-24)
+// ══════════════════════════════════════════════════════════════════════
+// «Postularme» es el submit del formulario del sueldo, y el sueldo ya
+// viene relleno desde el CV de Bumeran. Abrir lo pulsaba: postulaba al
+// PREPARAR, también con «Revisar antes» activado.
+{
+  titulo("BUMERAN — preparar no postula; el sueldo de su CV se respeta");
+  const fs = await import("node:fs/promises");
+  const src = await fs.readFile(new URL("contenido/bumeran.js", BASE), "utf8");
+  const abrir = src.slice(src.indexOf("async function abrirFormulario"), src.indexOf("function leerPreguntas"));
+  check("abrir el formulario NO pulsa «Postularme»", !/\.click\(\)/.test(abrir));
+  check("el sueldo que ya trae Bumeran no se pregunta", /!\(salario\.value \|\| ""\)\.trim\(\)\) \{\s*preguntas\.push/.test(src));
+  check("ni se pisa al escribir", /salario\.offsetParent !== null && !\(salario\.value/.test(src.slice(src.indexOf("function escribirRespuestas"))));
+  check("el enunciado encaja con el dato guardado «pretensión»", /pretensi[oó]n salarial \(sueldo bruto\)/.test(src));
+
+  const i = src.indexOf("function soloCifra");
+  const soloCifra = eval("(" + src.slice(i, src.indexOf("return s.split", i)) + "return s.split(/[.,]/)[0]; })");
+  check("«S/ 1,500.00» se escribe 1500 (antes 150000)", soloCifra("Mi pretensión salarial es de S/ 1,500.00.") === "1500");
+  check("«2 500» y «1.500» son miles", soloCifra("2 500") === "2500" && soloCifra("S/ 1.500") === "1500");
+  check("«1200.50» se queda en 1200", soloCifra("1200.50") === "1200");
+  check("enviar espera la confirmación, no mira una sola vez", /i < 16; i\+\+/.test(src));
+}
+
 console.log(`
 ${fallos === 0 ? "TODO OK" : `${fallos} FALLO(S)`}`);
 
