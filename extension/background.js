@@ -223,7 +223,7 @@ async function prepararUna(vacante, perfil, guardados, respuestasPersona) {
     };
   }
 
-  const tabId = await pestanaDeTrabajo();
+  let tabId = await pestanaDeTrabajo();
   const reporte = { url: vacante.url, completados: [], pendientes: [], preguntas: [], cambiosCV: [] };
 
   // Bumeran e Indeed aportan vacantes pero no se postula desde aquí:
@@ -271,7 +271,27 @@ async function prepararUna(vacante, perfil, guardados, respuestasPersona) {
     }
   }
 
-  const abierto = await hablarCon(tabId, { accion: "abrirFormulario" });
+  let abierto;
+  try {
+    abierto = await hablarCon(tabId, { accion: "abrirFormulario" });
+  } catch (e) {
+    // Pulsar «Postular» a veces NAVEGA (Indeed → SmartApply): la página
+    // se va con el mensaje a medias y Chrome contesta «message port
+    // closed». No es un fallo: el formulario está en la página nueva.
+    if (!/port closed|message channel|back.forward cache/i.test(e.message || "")) throw e;
+    abierto = { abierto: false, enOtraPestana: true };
+  }
+  // El formulario puede haberse abierto en otra pestaña o en otra web.
+  // Antes se seguía en la original, que ya no tenía formulario: se leían
+  // cero preguntas y no se escribía nada.
+  if (abierto && !abierto.abierto && !abierto.error) {
+    const donde = await buscarFormularioAbierto(tabId);
+    if (donde) {
+      tabId = donde;
+      await almacen.guardar("tabTrabajo", tabId);
+      abierto = (await hablarCon(tabId, { accion: "abrirFormulario" }).catch(() => null)) || abierto;
+    }
+  }
   if (abierto?.requiereLogin) return { ...reporte, requiereLogin: true, nota: abierto.nota };
   if (abierto?.captcha) return { ...reporte, captcha: true, nota: abierto.nota };
   if (abierto?.error) return { ...reporte, error: abierto.error };
@@ -292,32 +312,62 @@ async function prepararUna(vacante, perfil, guardados, respuestasPersona) {
   reporte.completados = relleno?.completados || [];
   reporte.pendientes = relleno?.pendientes || [];
 
+  const pantalla = await rellenarPantalla(tabId, perfil, guardados, respuestasPersona);
+  reporte.preguntas = pantalla.preguntas;
+  reporte.escritas = pantalla.escritas;
+  reporte.listoParaEnviar = true;
+  return reporte;
+}
+
+/**
+ * Lee las preguntas de la pantalla que está a la vista, redacta las que
+ * se pueden contestar y las ESCRIBE en el formulario.
+ *
+ * Sirve para la primera pantalla y para las siguientes: LinkedIn e Indeed
+ * reparten el formulario en varias, y la persona pasa de una a otra con
+ * «Siguiente» en el propio portal. Por eso no se avanza solo: avanzar a
+ * ciegas enviaría pantallas que nadie ha mirado.
+ */
+async function rellenarPantalla(tabId, perfil, guardados, respuestasPersona) {
   const { preguntas } = await hablarCon(tabId, { accion: "preguntas" });
   // Cada pregunta con su posición. Computrabajo ya la traía; LinkedIn,
   // Indeed y Bumeran no, y el panel —que guarda las respuestas por
   // posición— las metía todas bajo la clave «undefined», pisándose.
   const leidas = (preguntas || []).map((p, i) => ({ ...p, indice: p.indice ?? i }));
-  reporte.preguntas = await respuestas.redactar(leidas, perfil, guardados, respuestasPersona || {});
+  const redactadas = await respuestas.redactar(leidas, perfil, guardados, respuestasPersona || {});
 
-  // Lo redactado se ESCRIBE ya en el formulario del portal.
-  //
-  // Antes solo se escribía al pulsar «Enviar» en el panel, así que quien
-  // miraba el formulario después de preparar —y en una prueba, lo prudente
-  // es NO enviar— lo encontraba vacío y concluía que no autocompletaba.
-  // Escribir no envía nada: la persona sigue revisando y dando el clic.
-  // Lo que falta (consentimientos, disponibilidad, datos que no están en
-  // el CV) se queda vacío hasta que ella lo conteste.
-  const redactadas = {};
-  for (const q of reporte.preguntas) if (q.texto) redactadas[q.indice] = q.texto;
-  reporte.escritas = 0;
-  if (Object.keys(redactadas).length) {
+  // Lo redactado se escribe YA. Lo que decide la persona (consentimiento,
+  // disponibilidad, datos que no están en el CV) se queda vacío hasta que
+  // lo conteste en el panel.
+  const listas = {};
+  for (const q of redactadas) if (q.texto) listas[q.indice] = q.texto;
+  let escritas = 0;
+  if (Object.keys(listas).length) {
     try {
-      const r = await hablarCon(tabId, { accion: "escribir", respuestas: redactadas });
-      reporte.escritas = Array.isArray(r?.escritas) ? r.escritas.length : Number(r?.escritas) || 0;
+      const r = await hablarCon(tabId, { accion: "escribir", respuestas: listas });
+      escritas = Array.isArray(r?.escritas) ? r.escritas.length : Number(r?.escritas) || 0;
     } catch { /* se escriben igual al enviar */ }
   }
-  reporte.listoParaEnviar = true;
-  return reporte;
+  return { preguntas: redactadas, escritas };
+}
+
+/**
+ * Dónde quedó el formulario después de pulsar «Postular».
+ *
+ * Indeed manda a SmartApply, en otra web: a veces en la misma pestaña,
+ * a veces en una nueva. Se mira primero la misma, luego las nuevas.
+ */
+async function buscarFormularioAbierto(tabIdOriginal) {
+  await esperar(1500);
+  const misma = await chrome.tabs.get(tabIdOriginal).catch(() => null);
+  if (misma && /smartapply\.indeed\.com/.test(misma.url || "")) {
+    await pestanaLista(tabIdOriginal, 12000);
+    return tabIdOriginal;
+  }
+  const nuevas = await chrome.tabs.query({ url: ["https://smartapply.indeed.com/*"] });
+  const ultima = nuevas.sort((a, b) => b.id - a.id)[0];
+  if (ultima && await pestanaLista(ultima.id, 12000)) return ultima.id;
+  return null;
 }
 
 async function escribirYEnviar(respuestasAprobadas) {
@@ -636,6 +686,37 @@ chrome.runtime.onMessage.addListener((msg, _e, responder) => {
           if (actual?.token && mismaPersona) return responder({ guardada: false, yaEstaba: true });
           await sesion.guardar(traida);
           return responder({ guardada: true, correo: traida.usuario?.correo });
+        }
+
+        // Enseñar el formulario. La pestaña de trabajo se crea en segundo
+        // plano para no quitarle el panel a la persona, pero entonces
+        // nunca veía el formulario rellenado —ni podía revisarlo— y
+        // concluía que no se había escrito nada. Si trae respuestas del
+        // panel, se escriben antes de enseñarlo.
+        case "mostrarFormulario": {
+          const id = await almacen.leer("tabTrabajo", null);
+          if (!id) return responder({ error: "No hay ningún formulario abierto." });
+          if (msg.respuestas && Object.keys(msg.respuestas).length) {
+            await hablarCon(id, { accion: "escribir", respuestas: msg.respuestas }).catch(() => null);
+          }
+          const t = await chrome.tabs.update(id, { active: true }).catch(() => null);
+          if (!t) return responder({ error: "La pestaña del formulario se cerró. Vuelve a postular." });
+          await chrome.windows.update(t.windowId, { focused: true }).catch(() => {});
+          return responder({ ok: true });
+        }
+        // Rellenar la pantalla que está a la vista, para formularios de
+        // varias pantallas: la persona pulsa «Siguiente» en el portal y
+        // esto rellena la nueva.
+        case "rellenarPantalla": {
+          const id = await almacen.leer("tabTrabajo", null);
+          if (!id) return responder({ error: "No hay ningún formulario abierto." });
+          const perfil = await almacen.perfil.obtener();
+          const guardados = await almacen.datosPersonales.obtener();
+          try {
+            return responder(await rellenarPantalla(id, perfil, guardados, msg.respuestasPersona));
+          } catch (e) {
+            return responder({ error: `No se pudo leer esa pantalla: ${e.message}` });
+          }
         }
 
         case "abrirAcceso": {

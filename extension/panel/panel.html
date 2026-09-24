@@ -126,14 +126,17 @@
       <p class="nota" id="resumen-busqueda"></p>
     </article>
 
-    <div class="barra-acciones oculto" id="acciones-lote">
+    <!-- Fija abajo mientras hay resultados: es LA acción de esta pantalla
+         y estaba entre el buscador y la lista, en rojo de peligro, sin que
+         pareciera una opción. -->
+    <div class="barra-acciones barra-lote oculto" id="acciones-lote">
       <span class="nota" id="cuenta-marcadas"></span>
-      <button class="boton secundario" id="btn-lote-revisar">Preparar las marcadas</button>
-      <button class="boton peligro" id="btn-lote-auto">Postular a todas…</button>
+      <button class="boton secundario" id="btn-lote-revisar">Revisarlas una a una</button>
+      <button class="boton primario" id="btn-lote-auto">Postular a todas</button>
     </div>
 
     <div class="riesgo oculto" id="bloque-riesgo">
-      <p><strong>⚠️ Esto se envía sin que lo revises.</strong> Marca cada punto solo si lo entiendes.</p>
+      <p><strong>En automático, se envían sin pasar por tu revisión.</strong> Marca cada punto para seguir.</p>
       <div id="casillas"></div>
       <div class="fila-botones">
         <button class="boton secundario" id="btn-cancelar-auto">Mejor no</button>

@@ -80,3 +80,83 @@ export function ordenar(vacantes, perfil) {
     .map((v) => ({ ...v, encaje: calcular(v, perfil) }))
     .sort((a, b) => (b.encaje.puntaje ?? -1) - (a.encaje.puntaje ?? -1));
 }
+
+
+// ---------------------------------------------------------------------
+// ¿Es del tema que se buscó?
+// ---------------------------------------------------------------------
+//
+// Los portales devuelven cualquier cosa que se parezca: buscar
+// «practicante de marketing» traía «Practicante de Diseño Gráfico»,
+// porque para el portal «practicante» ya es parecido. Y como el CV de
+// quien busca marketing suele mencionar diseño, encima subía en la lista.
+//
+// Ordenar por el CV no basta: primero hay que quedarse con lo que es del
+// tema. Se mira el TÍTULO, que es lo que dice qué puesto es; la
+// descripción menciona de todo.
+
+// Lo que dice el NIVEL, no el tema. «Practicante» no hace a dos vacantes
+// del mismo tema.
+const NIVEL = new Set([
+  "practicante", "practicantes", "practica", "practicas", "pasante", "pasantia",
+  "becario", "becaria", "asistente", "auxiliar", "junior", "trainee", "analista",
+  "senior", "jefe", "coordinador", "coordinadora", "profesional", "preprofesional",
+  "estudiante", "egresado", "egresada", "bachiller", "encargado", "encargada",
+]);
+
+// Temas y sus palabras. Buscar una palabra de un tema acepta cualquier
+// título con otra del mismo tema: quien busca marketing quiere ver
+// «Asistente de Redes Sociales» aunque no diga «marketing».
+const TEMAS = [
+  ["marketing", "mercadeo", "publicidad", "comunicacion", "comunicaciones", "digital",
+   "redes", "sociales", "community", "contenido", "contenidos", "marca", "marcas",
+   "branding", "trade", "growth", "leads", "ecommerce", "comercial", "brand", "medios",
+   "influencer", "audiovisual", "campanas", "performance"],
+  ["administracion", "administrativo", "administrativa", "gestion", "negocios",
+   "operaciones", "logistica", "compras", "almacen"],
+  ["contabilidad", "contable", "contador", "contadora", "finanzas", "financiero",
+   "financiera", "tesoreria", "auditoria", "tributacion", "tributaria", "costos"],
+  ["sistemas", "software", "desarrollo", "desarrollador", "programador", "programacion",
+   "informatica", "soporte", "datos", "data", "developer", "frontend", "backend", "tecnologia"],
+  ["recursos", "humanos", "rrhh", "seleccion", "reclutamiento", "talento", "personas",
+   "bienestar", "nominas", "planillas"],
+  ["derecho", "legal", "abogado", "abogada", "juridico", "juridica", "leyes", "cumplimiento"],
+  ["diseno", "disenador", "disenadora", "grafico", "grafica", "ilustracion", "creativo",
+   "creativa", "multimedia"],
+  ["ingenieria", "ingeniero", "industrial", "produccion", "calidad", "mantenimiento",
+   "procesos", "planta"],
+  ["psicologia", "psicologo", "psicologa"],
+  ["ventas", "vendedor", "vendedora", "asesor", "asesora", "atencion", "cliente", "clientes"],
+];
+
+// Las abreviaturas que la gente escribe y palabras() se come por cortas.
+function expandir(texto) {
+  return String(texto || "")
+    .replace(/\bmkt\b/gi, "marketing")
+    .replace(/\brr\.?\s?hh\b/gi, "rrhh")
+    .replace(/\bti\b/gi, "tecnologia");
+}
+
+const deTema = (texto) => palabras(expandir(texto)).filter((p) => !NIVEL.has(p));
+const raizDe = (p) => p.slice(0, 5);
+
+/**
+ * ¿La vacante es del tema de `busqueda`?
+ *
+ * Si la búsqueda no dice tema (solo «practicante»), o el título no tiene
+ * nada con qué juzgar, se da por buena: ante la duda se enseña.
+ */
+export function relacionada(vacante, busqueda) {
+  const pedidas = deTema(busqueda);
+  if (!pedidas.length) return true;
+  const delTitulo = deTema(vacante?.titulo);
+  if (!delTitulo.length) return true;
+
+  const aceptadas = new Set(pedidas);
+  for (const tema of TEMAS) {
+    const tocaElTema = pedidas.some((p) => tema.includes(p) || tema.some((t) => raizDe(t) === raizDe(p)));
+    if (tocaElTema) tema.forEach((t) => aceptadas.add(t));
+  }
+  const raices = new Set([...aceptadas].map(raizDe));
+  return delTitulo.some((p) => aceptadas.has(p) || raices.has(raizDe(p)));
+}

@@ -10,6 +10,7 @@ import * as ia from "../lib/ia.js";
 import * as coincidencia from "../lib/coincidencia.js";
 import * as sesion from "../lib/sesion.js";
 import { PACK_MAYOR, TOPE_POR_TANDA } from "../lib/verificados.js";
+import { SERVIDOR } from "../lib/servidor.js";
 
 const $ = (s) => document.querySelector(s);
 const enviar = (msg) => chrome.runtime.sendMessage(msg);
@@ -271,6 +272,46 @@ function nombreCuenta({ completo = false } = {}) {
 }
 
 /**
+ * La tarjeta de un portal en la portada: punto de estado, nombre, qué
+ * hace, y un botón. Sale de aquí para usarla en dos sitios: al conectar
+ * el primero (etapa 2) y para añadir más cuando ya hay uno (etapa 3).
+ */
+function filaPortal(p) {
+  return `
+        <div class="portal-tarjeta${p.sesion ? " conectado" : ""}">
+          <span class="marca-punto ${p.sesion ? "si" : conectando.has(p.id) ? "esperando" : "no"}"></span>
+          <span class="portal-texto">
+            <span class="portal-nombre">${escapar(p.nombre)}</span>
+            <span class="portal-chip ${queHace(p).tono}" title="${queHace(p).etiqueta}">${queHace(p).etiqueta}</span>
+          </span>
+          <!-- «Conectar» y no «Entrar»: «Entrar» ya es el botón de la
+               cuenta de Chamba Lista, y dos «Entrar» que hacen cosas
+               distintas en dos pantallas seguidas se confunden. -->
+          <button class="boton ${p.sesion ? "secundario" : "primario"}" data-portada-acceso="${p.id}">
+            ${p.sesion ? "Abrir" : conectando.has(p.id) ? "Esperando…" : "Conectar"}
+          </button>
+          ${conectando.has(p.id) && !p.sesion
+            ? `<span class="portal-aviso">Entra en la pestaña que se abrió. Esto se marca solo.</span>`
+            : ""}
+        </div>`;
+}
+
+/** Los botones «Conectar» de las tarjetas que haya dentro de `raiz`. */
+function conectarBotonesPortal(raiz) {
+  raiz.querySelectorAll("[data-portada-acceso]").forEach((b) => {
+    b.addEventListener("click", async () => {
+      const cual = b.dataset.portadaAcceso;
+      conectando.add(cual);
+      pintarInicio();                       // el punto pasa a ámbar ya
+      await enviar({ accion: "abrirAcceso", portal: cual });
+      avisar("Inicia sesión en la pestaña que se abrió. Esto se marca solo.");
+      // Sin temporizador a ciegas: el fondo vigila esa pestaña y avisa en
+      // cuanto la sesión aparece.
+    });
+  });
+}
+
+/**
  * La portada cambia según en qué punto está la persona. El panel entero
  * se comporta como una landing cuando es nueva —una sola cosa que hacer,
  * el resto atenuado— y se convierte en tablero cuando ya está lista.
@@ -427,48 +468,19 @@ function pintarPortada(resumen) {
       : ordenados.slice(0, 1);
     const resto = primeros.length === ordenados.length ? [] : ordenados.slice(1);
 
-    const fila = (p) => `
-        <div class="portal-tarjeta${p.sesion ? " conectado" : ""}">
-          <span class="marca-punto ${p.sesion ? "si" : conectando.has(p.id) ? "esperando" : "no"}"></span>
-          <span class="portal-texto">
-            <span class="portal-nombre">${escapar(p.nombre)}</span>
-            <span class="portal-chip ${queHace(p).tono}" title="${queHace(p).etiqueta}">${queHace(p).etiqueta}</span>
-          </span>
-          <!-- «Conectar» y no «Entrar»: «Entrar» ya es el botón de la
-               cuenta de Chamba Lista, y dos «Entrar» que hacen cosas
-               distintas en dos pantallas seguidas se confunden. -->
-          <button class="boton ${p.sesion ? "secundario" : "primario"}" data-portada-acceso="${p.id}">
-            ${p.sesion ? "Abrir" : conectando.has(p.id) ? "Esperando…" : "Conectar"}
-          </button>
-          ${conectando.has(p.id) && !p.sesion
-            ? `<span class="portal-aviso">Entra en la pestaña que se abrió. Esto se marca solo.</span>`
-            : ""}
-        </div>`;
+
 
     acciones.innerHTML = `<div class="portales-portada" style="width:100%">`
-      + primeros.map(fila).join("")
+      + primeros.map(filaPortal).join("")
       + (resto.length
         ? `<details class="mas-portales">
              <summary><span class="mas-signo" aria-hidden="true">+</span> Añadir otro portal
                <small>${resto.map((p) => escapar(p.nombre)).join(" · ")}</small></summary>
-             <div class="portales-portada">${resto.map(fila).join("")}</div>
+             <div class="portales-portada">${resto.map(filaPortal).join("")}</div>
            </details>`
         : "")
       + `</div>`;
-    acciones.querySelectorAll("[data-portada-acceso]").forEach((b) => {
-      b.addEventListener("click", async () => {
-        const cual = b.dataset.portadaAcceso;
-        conectando.add(cual);
-        pintarInicio();                       // el punto pasa a ámbar ya
-        await enviar({ accion: "abrirAcceso", portal: cual });
-        avisar("Inicia sesión en la pestaña que se abrió. Esto se marca solo.");
-        // Sin temporizador a ciegas: el fondo vigila esa pestaña y avisa
-        // en cuanto la sesión aparece. Mirar a los 12 segundos hacía que
-        // quien tarda más —y con verificación por correo se tarda más—
-        // volviera al panel y viera «sin conectar» después de haber
-        // entrado, sin saber si estaba roto el producto o él.
-      });
-    });
+    conectarBotonesPortal(acciones);
     return;
   }
 
@@ -482,9 +494,20 @@ function pintarPortada(resumen) {
   $("#portada-bajada").textContent = cuantas
     ? `${resumen.entrevistas} en entrevista · ${conectados.length} ${conectados.length === 1 ? "portal conectado" : "portales conectados"}`
     : `${conectados.length} ${conectados.length === 1 ? "portal conectado" : "portales conectados"}. Escribe el puesto que buscas y empezamos.`;
+  // Los portales que faltan, a mano. Antes, conectado el primero, la
+  // opción de añadir los demás desaparecía de Inicio y solo quedaba en
+  // Mi perfil, donde nadie la buscaba.
+  const sinConectar = sesionesCache.filter((p) => !p.sesion);
   acciones.innerHTML = `<button class="boton primario" id="p-buscar">Buscar y postular</button>`
-    + `<span class="nota">Ponle el puesto y déjala trabajando</span>`;
+    + (sinConectar.length
+      ? `<details class="mas-portales">
+           <summary><span class="mas-signo" aria-hidden="true">+</span> Conectar más portales
+             <small>${sinConectar.map((p) => escapar(p.nombre)).join(" · ")}</small></summary>
+           <div class="portales-portada">${sinConectar.map(filaPortal).join("")}</div>
+         </details>`
+      : "");
   $("#p-buscar").addEventListener("click", () => irA("vacantes"));
+  conectarBotonesPortal(acciones);
   $("#sello").innerHTML = `${resumen.porEtapa.enviada || 0}<small>enviadas</small>`;
 }
 
@@ -585,6 +608,7 @@ function conectarTarjetas(raiz) {
 function actualizarCuenta() {
   const n = $("#lista-vacantes").querySelectorAll(".chk-v:checked").length;
   $("#cuenta-marcadas").textContent = `${n} marcada(s) de ${estado.vacantes.length}`;
+  $("#btn-lote-auto").textContent = n ? `Postular a las ${n}` : "Postular a todas";
   $("#acciones-lote").classList.toggle("oculto", !estado.vacantes.length);
 }
 
@@ -626,10 +650,17 @@ $("#btn-buscar").addEventListener("click", async () => {
     const r = await enviar({ accion: "buscar", ...prefs, portales: elegidos });
     if (r?.error) throw new Error(r.error);
 
-    // Se ordenan por encaje con el CV: lo más relevante arriba.
-    estado.vacantes = estado.perfil
+    // Primero, solo las del tema que buscó; después, ordenadas por
+    // encaje con el CV. Antes solo se ordenaba, y «Practicante de Diseño
+    // Gráfico» salía buscando marketing (y encima arriba).
+    const todas = estado.perfil
       ? coincidencia.ordenar(r.vacantes || [], estado.perfil)
       : (r.vacantes || []);
+    const delTema = todas.filter((v) => coincidencia.relacionada(v, puesto));
+    estado.fueraDeTema = todas.filter((v) => !coincidencia.relacionada(v, puesto));
+    // Si el filtro se lo come todo, se enseña todo: mejor ruido que nada.
+    if (!delTema.length) estado.fueraDeTema = [];
+    estado.vacantes = delTema.length ? delTema : todas;
 
     if (!estado.vacantes.length) {
       $("#lista-vacantes").innerHTML = `<div class="vacio-guiado" style="grid-column:1/-1">
@@ -660,6 +691,23 @@ $("#btn-buscar").addEventListener("click", async () => {
         : estado.perfil ? " Ordenadas por encaje con tu CV."
         : " Carga tu CV para ordenarlas por encaje.") +
       (fallos ? ` — ${fallos}` : "");
+
+    // Se dice cuántas se quitaron por no ser del tema, y se pueden ver:
+    // el filtro puede equivocarse y la persona decide.
+    if (estado.fueraDeTema?.length) {
+      const ver = document.createElement("button");
+      ver.className = "enlace";
+      ver.textContent = `Ver también ${estado.fueraDeTema.length} de otros temas`;
+      ver.addEventListener("click", () => {
+        estado.vacantes = [...estado.vacantes, ...estado.fueraDeTema];
+        estado.fueraDeTema = [];
+        $("#lista-vacantes").innerHTML = estado.vacantes.map(tarjetaVacante).join("");
+        conectarTarjetas($("#lista-vacantes"));
+        actualizarCuenta();
+        ver.remove();
+      });
+      $("#resumen-busqueda").append(" ", ver);
+    }
   } catch (e) {
     $("#resumen-busqueda").textContent = `No se pudo buscar: ${e.message}`;
   } finally {
@@ -723,7 +771,7 @@ function pintarModal() {
   if (total) {
     const faltan = r.preguntas.filter((q) => !q.texto).length;
     html += `<div class="aviso"><strong>${r.escritas || 0} de ${total} preguntas ya están escritas en el formulario.</strong>`
-          + (faltan ? `<br><span class="nota">${faltan} las contestas tú aquí abajo.</span>` : "")
+          + (faltan ? `<br><span class="nota">${faltan === 1 ? "Una la contestas" : `${faltan} las contestas`} tú aquí abajo.</span>` : "")
           + `</div>`;
   }
   if (r.completados?.length) {
@@ -733,12 +781,42 @@ function pintarModal() {
     html += `<div class="aviso alerta">El portal pide datos que no tenemos: <strong>${r.pendientes.map(escapar).join(", ")}</strong>. ` +
             `Guárdalos en <em>Mi perfil</em> o escríbelos en la página.</div>`;
   }
+  // Donde se ve el formulario. En LinkedIn el envío lo das tú allí, así
+  // que ese es EL botón; en el resto sirve para revisar antes de enviar.
+  const soloRevisado = Boolean(LISTA_PORTALES.find((p) => p.id === (v.portalId || ""))?.soloRevisado);
+  html += `<div class="fila-botones ver-formulario">
+      <button class="boton ${soloRevisado ? "primario" : "secundario"}" id="btn-ver-form">
+        ${soloRevisado ? `Ir a ${escapar(v.portal || "LinkedIn")} a enviar` : "Ver el formulario"}</button>
+      <button class="enlace" id="btn-rellenar-pantalla">¿Pasaste a otra pantalla del formulario? Rellenarla</button>
+    </div>`;
+
   html += `<div id="preguntas"></div>
-    <label class="confirmar"><input type="checkbox" id="chk-revision">
+    <label class="confirmar${soloRevisado ? " oculto" : ""}"><input type="checkbox" id="chk-revision">
       <span>Revisé el formulario en la página del portal y confirmo el envío</span></label>
-    <button class="boton primario" id="btn-enviar" disabled>Enviar postulación</button>
+    <button class="boton primario${soloRevisado ? " oculto" : ""}" id="btn-enviar" disabled>Enviar postulación</button>
     <p class="nota" id="estado-envio"></p>`;
   c.innerHTML = html;
+
+  $("#btn-ver-form").addEventListener("click", async () => {
+    // Lo que ya contestó en el panel viaja al formulario antes de verlo.
+    const r2 = await enviar({ accion: "mostrarFormulario", respuestas: respuestasDelPanel() });
+    if (r2?.error) avisar(r2.error);
+  });
+  $("#btn-rellenar-pantalla").addEventListener("click", async () => {
+    const b = $("#btn-rellenar-pantalla");
+    b.disabled = true;
+    b.textContent = "Rellenando esta pantalla…";
+    const r2 = await enviar({ accion: "rellenarPantalla", respuestasPersona: {} });
+    if (r2?.error) {
+      avisar(r2.error);
+      b.disabled = false;
+      b.textContent = "¿Pasaste a otra pantalla del formulario? Rellenarla";
+      return;
+    }
+    estado.reporte = { ...estado.reporte, preguntas: r2.preguntas, escritas: r2.escritas };
+    pintarModal();
+    avisar(`${r2.escritas} de ${(r2.preguntas || []).length} preguntas escritas en esta pantalla.`, "bien");
+  });
 
   pintarPreguntas(r.preguntas || []);
 
@@ -859,14 +937,20 @@ async function reRedactar() {
   });
 }
 
-async function enviarUna() {
-  const boton = $("#btn-enviar");
-  boton.disabled = true;
-  boton.textContent = "Enviando…";
+/** Lo que la persona dejó escrito en el panel, por posición. */
+function respuestasDelPanel() {
   const respuestas = {};
   document.querySelectorAll("#preguntas textarea").forEach((ta) => {
     if (ta.value.trim()) respuestas[ta.dataset.indice] = ta.value.trim();
   });
+  return respuestas;
+}
+
+async function enviarUna() {
+  const boton = $("#btn-enviar");
+  boton.disabled = true;
+  boton.textContent = "Enviando…";
+  const respuestas = respuestasDelPanel();
   const r = await enviar({ accion: "enviarUna", vacante: estado.vacanteAbierta, respuestas });
   const est = $("#estado-envio");
   if (r?.enviada) {
@@ -1603,6 +1687,7 @@ function pintarPortales() {
 function pintarVersion() {
   const donde = document.querySelector("#version-extension");
   if (!donde) return;
+  avisarSiHayVersionNueva();
   try {
     donde.textContent = `Chamba Lista ${chrome.runtime.getManifest().version}`;
   } catch {
@@ -1646,3 +1731,34 @@ document.addEventListener("visibilitychange", () => {
     pintarInicio();
   });
 });
+
+
+/**
+ * Si la versión cargada es más vieja que la publicada, se dice arriba.
+ *
+ * La extensión se carga descomprimida desde una carpeta: bajar la nueva
+ * y que Chrome la ejecute son dos pasos distintos, y el segundo se olvida.
+ * Ali probó un arreglo que su Chrome no había cargado y vio el fallo de
+ * antes. Sin este aviso, eso le va a pasar a cualquiera.
+ */
+async function avisarSiHayVersionNueva() {
+  try {
+    const actual = chrome.runtime.getManifest().version;
+    const r = await fetch(`${SERVIDOR}/api/estado`);
+    const publicada = (await r.json()).version_extension;
+    if (!publicada || !esMasNueva(publicada, actual)) return;
+    const aviso = document.createElement("div");
+    aviso.className = "aviso-version";
+    aviso.innerHTML = `<b>Hay una versión nueva (${escapar(publicada)}).</b> `
+      + `Tienes la ${escapar(actual)}. Descárgala en la web y recárgala en chrome://extensions.`;
+    document.querySelector("main")?.prepend(aviso);
+  } catch { /* sin red no se avisa: no es motivo para molestar */ }
+}
+
+function esMasNueva(a, b) {
+  const pa = String(a).split(".").map(Number), pb = String(b).split(".").map(Number);
+  for (let i = 0; i < Math.max(pa.length, pb.length); i++) {
+    if ((pa[i] || 0) !== (pb[i] || 0)) return (pa[i] || 0) > (pb[i] || 0);
+  }
+  return false;
+}

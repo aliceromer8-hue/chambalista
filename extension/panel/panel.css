@@ -1119,3 +1119,22 @@ main { max-width: 1120px; }
   font: inherit; font-size: 13px; background: var(--papel); color: var(--tinta); min-width: 0;
 }
 .form-nombre input:focus { outline: none; box-shadow: var(--dura-chica); }
+
+
+/* «Postular a todas», fija abajo mientras hay resultados. */
+.barra-lote {
+  position: sticky; bottom: 14px; z-index: 6;
+  display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+  background: var(--papel); border: 2px solid var(--linea); border-radius: 99px;
+  box-shadow: var(--dura); padding: 8px 10px 8px 18px; margin: 12px 0;
+}
+.barra-lote .nota { margin: 0 auto 0 0; }
+
+/* Ver el formulario / rellenar la siguiente pantalla. */
+.ver-formulario { margin: 10px 0 14px; }
+
+/* Versión atrasada. */
+.aviso-version {
+  background: var(--sol-suave); border: 2px solid var(--sol); color: var(--tinta);
+  border-radius: var(--r-chico); padding: 10px 14px; margin-bottom: 16px; font-size: 13px;
+}

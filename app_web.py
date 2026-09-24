@@ -165,6 +165,14 @@ def recuperar_pagina():
     return render_template("recuperar.html")
 
 
+def _version_extension():
+    try:
+        import json as _json
+        return _json.loads((BASE / "extension" / "manifest.json").read_text(encoding="utf-8"))["version"]
+    except Exception:                                           # noqa: BLE001
+        return None
+
+
 @app.get("/api/estado")
 def estado():
     # Si la clave de Gemini tiene facturación activada.
@@ -182,6 +190,11 @@ def estado():
         "ia_del_usuario": True,
         "ia_facturada": os.environ.get("GEMINI_FACTURACION", "").lower() in ("1", "true", "si", "sí"),
         "ia_activa": bool(os.environ.get("GEMINI_API_KEY")),
+        # La versión publicada de la extensión. El panel la compara con
+        # la que tiene cargada y avisa si va atrasado: sin eso, Ali probó
+        # arreglos que su Chrome no había cargado y parecía que no
+        # funcionaban.
+        "version_extension": _version_extension(),
         "limite": LIMITE_PETICIONES,
         "ventana_horas": round(VENTANA_SEGUNDOS / 3600, 1),
         "max_mb": 6,

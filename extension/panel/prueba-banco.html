@@ -90,6 +90,27 @@
           { id: "indeed", nombre: "Indeed", postulable: true, sesion: null, abierto: false },
         ] };
         if (a === "estadoLote") return { fase: "inactivo", items: [] };
+        // Una búsqueda de «practicante de marketing» como la que hizo Ali,
+        // con una de diseño gráfico colada — la que salió en su prueba.
+        if (a === "buscar") return { termino: msg.puesto, errores: [], vacantes: [
+          { id: "1", portal: "Indeed", portalId: "indeed", postulable: true, titulo: "Practicante de Marketing / Gestión y análisis de leads", empresa: "TALENTEA", ubicacion: "Los Olivos, Lima", url: "https://pe.indeed.com/x1" },
+          { id: "2", portal: "Computrabajo", portalId: "computrabajo", postulable: true, titulo: "Practicante de Diseño Gráfico", empresa: "Estudio X", ubicacion: "Lima", url: "https://pe.computrabajo.com/x2" },
+          { id: "3", portal: "Computrabajo", portalId: "computrabajo", postulable: true, titulo: "Asistente de Redes Sociales", empresa: "Agencia Y", ubicacion: "Miraflores", url: "https://pe.computrabajo.com/x3" },
+          { id: "4", portal: "LinkedIn", portalId: "linkedin", postulable: true, titulo: "Practicante MKT Digital", empresa: "Marca Z", ubicacion: "San Isidro", url: "https://www.linkedin.com/jobs/view/4/" },
+        ] };
+        if (a === "prepararUna") return {
+          url: msg.vacante?.url, completados: ["correo", "teléfono"], pendientes: [], cambiosCV: [],
+          cv: { adjuntado: true, archivo: "CV ALICE ROMERO.docx" }, escritas: 2, listoParaEnviar: true,
+          preguntas: [
+            { indice: 0, enunciado: "¿Por qué te interesa el puesto?", texto: "Llevo las redes del centro federado y me interesa medir leads.", necesita: [] },
+            { indice: 1, enunciado: "¿Qué herramientas manejas?", texto: "Canva, Meta Business Suite y Excel.", necesita: [] },
+            { indice: 2, enunciado: "¿Tienes disponibilidad para ir a Los Olivos?", texto: "", necesita: [{ clave: "disp_2", etiqueta: "¿Tienes disponibilidad para ir a Los Olivos?", tipo: "opciones", opciones: ["Sí, completa", "No"], respondido: false }] },
+          ],
+        };
+        if (a === "mostrarFormulario") { window.__mostrado = msg; return { ok: true }; }
+        if (a === "rellenarPantalla") return { escritas: 1, preguntas: [
+          { indice: 0, enunciado: "¿Cuántos años de experiencia tienes?", texto: "Tengo experiencia de un año en redes.", necesita: [] },
+        ] };
         console.log("[banco] sendMessage sin respuesta:", a, msg);
         return {};
       },
@@ -132,6 +153,7 @@
       return new Response(JSON.stringify({ perfil: { ...CV, analizado_con: "ia" } }), { status: 200 });
     }
     if (u.includes("/api/cuenta/salir")) return new Response("{}", { status: 200 });
+    if (u.includes("/api/estado")) return new Response(JSON.stringify({ version_extension: params.get("publicada") || "0.0.0" }), { status: 200 });
     if (u.includes("/api/cuenta/nombre")) {
       const nuevo = JSON.parse(opts?.body || "{}").nombre;
       return new Response(JSON.stringify({ usuario: { correo: "alice@ejemplo.pe", nombre: nuevo } }), { status: 200 });
@@ -162,7 +184,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Chamba Lista — Panel</title>
-<link rel="stylesheet" href="panel.css?v=1790201842">
+<link rel="stylesheet" href="panel.css?v=1790230009">
 </head>
 <body>
 
@@ -284,14 +306,17 @@
       <p class="nota" id="resumen-busqueda"></p>
     </article>
 
-    <div class="barra-acciones oculto" id="acciones-lote">
+    <!-- Fija abajo mientras hay resultados: es LA acción de esta pantalla
+         y estaba entre el buscador y la lista, en rojo de peligro, sin que
+         pareciera una opción. -->
+    <div class="barra-acciones barra-lote oculto" id="acciones-lote">
       <span class="nota" id="cuenta-marcadas"></span>
-      <button class="boton secundario" id="btn-lote-revisar">Preparar las marcadas</button>
-      <button class="boton peligro" id="btn-lote-auto">Postular a todas…</button>
+      <button class="boton secundario" id="btn-lote-revisar">Revisarlas una a una</button>
+      <button class="boton primario" id="btn-lote-auto">Postular a todas</button>
     </div>
 
     <div class="riesgo oculto" id="bloque-riesgo">
-      <p><strong>⚠️ Esto se envía sin que lo revises.</strong> Marca cada punto solo si lo entiendes.</p>
+      <p><strong>En automático, se envían sin pasar por tu revisión.</strong> Marca cada punto para seguir.</p>
       <div id="casillas"></div>
       <div class="fila-botones">
         <button class="boton secundario" id="btn-cancelar-auto">Mejor no</button>
@@ -402,6 +427,6 @@
   </div>
 </div>
 
-<script type="module" src="panel.js?v=1790201842"></script>
+<script type="module" src="panel.js?v=1790230009"></script>
 </body>
 </html>

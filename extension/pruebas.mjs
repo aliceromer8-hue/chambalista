@@ -1349,6 +1349,100 @@ titulo("LA PESTAÑA SIN CONTENT SCRIPT — el fallo mas probable del primer inte
   check("las ofertas de LinkedIn llegan al modo «rellena»", !/postulable:\s*false/.test(lk));
 }
 
+// ══════════════════════════════════════════════════════════════════════
+// SOLO LO DEL TEMA QUE BUSCASTE
+// ══════════════════════════════════════════════════════════════════════
+// Buscando «practicante de marketing» salió «Practicante de Diseño
+// Gráfico». Se ordenaba por el CV, pero nunca se filtraba por la búsqueda.
+{
+  titulo("TEMA — la lista es de lo que buscaste");
+  const { relacionada } = await import(`${BASE}lib/coincidencia.js`);
+  const casos = [
+    ["Practicante de Diseño Gráfico", "practicante de marketing", false],
+    ["Practicante de Marketing / Gestión y análisis de leads", "practicante de marketing", true],
+    ["Asistente de Redes Sociales", "practicante de marketing", true],
+    ["Practicante MKT Digital", "practicante de marketing", true],
+    ["Practicante de Contabilidad", "practicante de marketing", false],
+    ["Practicante de Enfermería", "enfermera", true],
+    ["Cualquier puesto", "practicante", true],          // sin tema: no se filtra
+    ["", "marketing", true],                              // sin título: no se juzga
+  ];
+  for (const [titulo, busca, esperado] of casos) {
+    check(`«${titulo || "(sin título)"}» para «${busca}» → ${esperado ? "sí" : "no"}`,
+      relacionada({ titulo }, busca) === esperado);
+  }
+  const fspt = await import("node:fs/promises");
+  const pj = await fspt.readFile(new URL("panel/panel.js", BASE), "utf8");
+  check("la búsqueda filtra por tema", /coincidencia\.relacionada\(v, puesto\)/.test(pj));
+  check("y deja ver lo quitado", /Ver también \$\{estado\.fueraDeTema\.length\}/.test(pj));
+}
+
+// ══════════════════════════════════════════════════════════════════════
+// VER EL FORMULARIO QUE SE RELLENÓ
+// ══════════════════════════════════════════════════════════════════════
+// La pestaña de trabajo se crea en segundo plano. Ali nunca veía el
+// formulario rellenado —ni podía revisarlo, aunque la casilla le pedía
+// «revisé el formulario en la página del portal»— y concluía que no se
+// escribía nada.
+{
+  titulo("FORMULARIO — se puede ver, y se sigue por varias pantallas");
+  const fspf = await import("node:fs/promises");
+  const fo = await fspf.readFile(new URL("background.js", BASE), "utf8");
+  const pj = await fspf.readFile(new URL("panel/panel.js", BASE), "utf8");
+  check("el fondo sabe enseñar la pestaña del formulario", /case "mostrarFormulario"/.test(fo));
+  check("y antes escribe lo contestado en el panel",
+    /case "mostrarFormulario"[\s\S]{0,400}accion: "escribir"/.test(fo));
+  check("el panel tiene el botón para verlo", /id="btn-ver-form"/.test(pj));
+  check("en LinkedIn ese es el botón principal y no hay «Enviar»",
+    /soloRevisado \? "primario" : "secundario"/.test(pj) && /id="btn-enviar"/.test(pj)
+    && /soloRevisado \? " oculto" : ""/.test(pj));
+  check("se puede rellenar la pantalla siguiente", /case "rellenarPantalla"/.test(fo)
+    && /id="btn-rellenar-pantalla"/.test(pj));
+  check("preparar y «rellenar pantalla» usan la misma función",
+    (fo.match(/await rellenarPantalla\(/g) || []).length >= 2);
+  // Indeed abre SmartApply en otra web: hay que seguirla.
+  check("si el formulario se abre en otra pestaña o web, se sigue",
+    /async function buscarFormularioAbierto/.test(fo) && /smartapply/.test(fo));
+  check("pulsar «Postular» que navega no se trata como error",
+    /port closed\|message channel/.test(fo));
+}
+
+// ══════════════════════════════════════════════════════════════════════
+// «POSTULAR A TODAS», A LA VISTA · Y CONECTAR MÁS PORTALES
+// ══════════════════════════════════════════════════════════════════════
+{
+  titulo("ACCIONES — a la vista cuando sirven");
+  const fspa = await import("node:fs/promises");
+  const ph = await fspa.readFile(new URL("panel/panel.html", BASE), "utf8");
+  const pj = await fspa.readFile(new URL("panel/panel.js", BASE), "utf8");
+  const pc = await fspa.readFile(new URL("panel/panel.css", BASE), "utf8");
+  check("«Postular a todas» es el botón principal, no uno de peligro",
+    /class="boton primario" id="btn-lote-auto"/.test(ph));
+  check("y la barra se queda fija abajo", /\.barra-lote\s*\{[^}]*position:\s*sticky/.test(pc));
+  check("dice a cuántas va a postular", /Postular a las \$\{n\}/.test(pj));
+  check("con un portal conectado, se ofrecen los demás en Inicio",
+    /Conectar más portales/.test(pj) && /sinConectar\.map\(filaPortal\)/.test(pj));
+  check("la tarjeta de portal es UNA función, usada en los dos sitios",
+    (pj.match(/map\(filaPortal\)/g) || []).length >= 3);
+}
+
+// ══════════════════════════════════════════════════════════════════════
+// VERSIÓN ATRASADA
+// ══════════════════════════════════════════════════════════════════════
+// Ali probó un arreglo que su Chrome no había cargado: el evento de su
+// prueba llegó con el formato viejo. Sin aviso, eso le pasa a cualquiera.
+{
+  titulo("VERSIÓN — si va atrasada, se dice");
+  const fspv = await import("node:fs/promises");
+  const pj = await fspv.readFile(new URL("panel/panel.js", BASE), "utf8");
+  check("el panel compara su versión con la publicada",
+    /version_extension/.test(pj) && /function esMasNueva/.test(pj));
+  const esMasNueva = new Function(`${pj.match(/function esMasNueva[\s\S]*?\n\}/)[0]}; return esMasNueva;`)();
+  check("0.3.4 es más nueva que 0.3.3", esMasNueva("0.3.4", "0.3.3") === true);
+  check("0.3.10 es más nueva que 0.3.9 (no orden de texto)", esMasNueva("0.3.10", "0.3.9") === true);
+  check("la misma no es más nueva", esMasNueva("0.3.3", "0.3.3") === false);
+}
+
 console.log(`
 ${fallos === 0 ? "TODO OK" : `${fallos} FALLO(S)`}`);
 
