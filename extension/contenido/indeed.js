@@ -11,6 +11,12 @@
 // ni buscar, así que el portal aportaba dieciséis filas en blanco.
 
 (() => {
+  // Las herramientas compartidas viven en window.ChambaComun (comun.js).
+  // Faltaba esta línea: el código de postular las llamaba sueltas, como
+  // si fueran globales, y no lo son. Leer una pregunta, escribir una
+  // respuesta o adjuntar el CV reventaba con «no está definido»: en
+  // este portal nunca se llegó a rellenar nada.
+  const { rellenar, enunciadoDe, erroresValidacion, adjuntarCV, camposDeArchivo } = window.ChambaComun;
   const SEL = {
     oferta: "div.job_seen_beacon",
     // El orden importa: lo primero que encaje gana. `a[data-jk] span[title]`
@@ -166,17 +172,21 @@
   function escribirRespuestas(respuestas) {
     const dadas = respuestas || {};
     const pendientes = [];
-    for (const pregunta of leerPreguntas()) {
-      const valor = dadas[pregunta.id];
+    const escritas = [];
+    // Por id del campo O por posición. El panel manda por posición
+    // (`indice`), igual en los cuatro portales; antes aquí solo se miraba
+    // el id, así que ninguna respuesta del panel llegaba nunca a escribirse.
+    for (const [i, pregunta] of leerPreguntas().entries()) {
+      const valor = dadas[pregunta.id] ?? dadas[i];
       if (valor == null || valor === "") {
         if (pregunta.obligatoria) pendientes.push(pregunta.enunciado);
         continue;
       }
       const campo = document.getElementById(pregunta.id)
         || document.querySelector(`[name="${CSS.escape(pregunta.id)}"]`);
-      if (campo) rellenar(campo, valor);
+      if (campo) { rellenar(campo, valor); escritas.push(i); }
     }
-    return { escritas: Object.keys(dadas).length, pendientes, errores: erroresValidacion() };
+    return { escritas, pendientes, errores: erroresValidacion() };
   }
 
   /**
@@ -243,7 +253,9 @@
       else if (msg.accion === "sesion") responder({ sesion: haySesion() });
       else if (msg.accion === "ofertas") responder({ ofertas: leerOfertas(), sesion: haySesion() });
       else if (msg.accion === "detalle") responder(leerDetalle());
-      else if (msg.accion === "abrir") abrirFormulario().then(responder);
+      // «abrirFormulario» es lo que manda el fondo. Solo se entendía
+      // «abrir», así que la postulación moría en el primer paso.
+      else if (msg.accion === "abrir" || msg.accion === "abrirFormulario") abrirFormulario().then(responder);
       else if (msg.accion === "preguntas") responder({ preguntas: leerPreguntas() });
       else if (msg.accion === "rellenar" || msg.accion === "escribir")
         responder(escribirRespuestas(msg.respuestas));

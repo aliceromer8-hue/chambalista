@@ -1,13 +1,20 @@
-// Content script de LinkedIn: solo lectura del listado de empleos.
+// Content script de LinkedIn: lee el listado y RELLENA la Solicitud
+// Sencilla, pero nunca envía.
 //
 // LinkedIn es el más restrictivo de los cuatro y el que más vigila la
-// automatización, así que aquí NO se postula ni se rellena nada: se lee
-// la lista y la persona abre la oferta para aplicar por su cuenta.
+// automatización. Por eso aquí se rellena y el envío lo da la persona en
+// su pantalla — ver el bloque «Rellenar — pero NO enviar» más abajo.
 //
 // Sus clases llevan hashes que cambian, así que se prefieren atributos
 // estables (`data-job-id`, `data-occludable-job-id`) y estructura.
 
 (() => {
+  // Las herramientas compartidas viven en window.ChambaComun (comun.js).
+  // Faltaba esta línea: el código de postular las llamaba sueltas, como
+  // si fueran globales, y no lo son. Leer una pregunta, escribir una
+  // respuesta o adjuntar el CV reventaba con «no está definido»: en
+  // este portal nunca se llegó a rellenar nada.
+  const { rellenar, enunciadoDe, erroresValidacion, adjuntarCV } = window.ChambaComun;
   const texto = (raiz, sel) => {
     const e = raiz.querySelector(sel);
     return e ? e.innerText.replace(/\s+/g, " ").trim() : "";
@@ -51,7 +58,12 @@
         id: `linkedin-${id || href}`,
         portal: "LinkedIn",
         portalId: "linkedin",
-        postulable: false,
+        // Antes `false`: resto de cuando LinkedIn era solo lectura. Con
+        // eso el fondo ni intentaba rellenar —abría la oferta en otra
+        // pestaña— y el modo «rellena, envías tú» nunca se llegaba a usar.
+        // El envío sigue cerrado dos veces: enviar() se niega aquí y el
+        // lote lo bloquea por `soloRevisado` en portales.js.
+        postulable: true,
         titulo,
         empresa: texto(c, "[class*='primary-description'], [class*='subtitle'], .job-card-container__company-name"),
         ubicacion: texto(c, "[class*='metadata'] li, [class*='caption']"),
@@ -160,18 +172,22 @@
   function escribirRespuestas(respuestas) {
     const dadas = respuestas || {};
     const pendientes = [];
-    for (const pregunta of leerPreguntas()) {
-      const valor = dadas[pregunta.id];
+    const escritas = [];
+    // Por id del campo O por posición. El panel manda por posición
+    // (`indice`), igual en los cuatro portales; antes aquí solo se miraba
+    // el id, así que ninguna respuesta del panel llegaba nunca a escribirse.
+    for (const [i, pregunta] of leerPreguntas().entries()) {
+      const valor = dadas[pregunta.id] ?? dadas[i];
       if (valor == null || valor === "") {
         if (pregunta.obligatoria) pendientes.push(pregunta.enunciado);
         continue;
       }
       const campo = document.getElementById(pregunta.id)
         || document.querySelector(`[name="${CSS.escape(pregunta.id)}"]`);
-      if (campo) rellenar(campo, valor);
+      if (campo) { rellenar(campo, valor); escritas.push(i); }
     }
     return {
-      escritas: Object.keys(dadas).length,
+      escritas,
       pendientes,
       errores: erroresValidacion(),
       revisionObligatoria: true,
@@ -201,10 +217,17 @@
       else if (msg.accion === "sesion") responder({ sesion: haySesion() });
       else if (msg.accion === "ofertas") responder({ ofertas: leerOfertas(), sesion: haySesion() });
       else if (msg.accion === "detalle") responder(leerDetalle());
-      else if (msg.accion === "abrir") abrirFormulario().then(responder);
+      // «abrirFormulario» es lo que manda el fondo. Solo se entendía
+      // «abrir», así que la postulación moría en el primer paso.
+      else if (msg.accion === "abrir" || msg.accion === "abrirFormulario") abrirFormulario().then(responder);
       else if (msg.accion === "preguntas") responder({ preguntas: leerPreguntas() });
       else if (msg.accion === "rellenar" || msg.accion === "escribir")
         responder(escribirRespuestas(msg.respuestas));
+      // Faltaba: el fondo manda «adjuntar» en cada postulación y LinkedIn
+      // contestaba «no sé hacer esa acción». Si el paso de CV de Solicitud
+      // Sencilla tiene campo de archivo, se adjunta el adaptado; si no,
+      // adjuntarCV lo dice y se postula con el CV del perfil.
+      else if (msg.accion === "adjuntar") responder(adjuntarCV(msg.nombre, msg.base64));
       else if (msg.accion === "enviar") enviar().then(responder);
       else responder({ error: "LinkedIn no sabe hacer esa accion: " + msg.accion });
     } catch (e) {

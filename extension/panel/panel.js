@@ -716,6 +716,16 @@ function pintarModal() {
     html += `<div class="aviso alerta"><strong>Vas a postular con el CV que ya tienes en el portal.</strong><br>`
           + `${escapar(r.cv.nota || "No se pudo adjuntar el CV adaptado.")}</div>`;
   }
+  // Cuántas quedaron escritas en el formulario del portal, y cuántas
+  // esperan a que las contestes tú. Es lo primero que se comprueba
+  // mirando el portal, así que se dice sin tener que ir a mirarlo.
+  const total = (r.preguntas || []).length;
+  if (total) {
+    const faltan = r.preguntas.filter((q) => !q.texto).length;
+    html += `<div class="aviso"><strong>${r.escritas || 0} de ${total} preguntas ya están escritas en el formulario.</strong>`
+          + (faltan ? `<br><span class="nota">${faltan} las contestas tú aquí abajo.</span>` : "")
+          + `</div>`;
+  }
   if (r.completados?.length) {
     html += `<p class="nota">Se completaron solos ${r.completados.length} campo(s) del formulario.</p>`;
   }

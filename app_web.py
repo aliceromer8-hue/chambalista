@@ -458,7 +458,7 @@ MEDIBLES_EXTENSION = {
 # propósito: sin ella, un `detalle` con el puesto exacto y la hora
 # identifica a una persona aunque no lleve ni nombre ni id, y la política
 # promete conteos que no identifican a nadie.
-CAMPOS_MEDIBLES = {"portal", "ok", "motivo", "cuantas", "con", "segundos"}
+CAMPOS_MEDIBLES = {"portal", "ok", "motivo", "cuantas", "con", "segundos", "respondidas"}
 
 
 @app.post("/api/medir")

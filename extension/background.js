@@ -293,7 +293,29 @@ async function prepararUna(vacante, perfil, guardados, respuestasPersona) {
   reporte.pendientes = relleno?.pendientes || [];
 
   const { preguntas } = await hablarCon(tabId, { accion: "preguntas" });
-  reporte.preguntas = await respuestas.redactar(preguntas || [], perfil, guardados, respuestasPersona || {});
+  // Cada pregunta con su posición. Computrabajo ya la traía; LinkedIn,
+  // Indeed y Bumeran no, y el panel —que guarda las respuestas por
+  // posición— las metía todas bajo la clave «undefined», pisándose.
+  const leidas = (preguntas || []).map((p, i) => ({ ...p, indice: p.indice ?? i }));
+  reporte.preguntas = await respuestas.redactar(leidas, perfil, guardados, respuestasPersona || {});
+
+  // Lo redactado se ESCRIBE ya en el formulario del portal.
+  //
+  // Antes solo se escribía al pulsar «Enviar» en el panel, así que quien
+  // miraba el formulario después de preparar —y en una prueba, lo prudente
+  // es NO enviar— lo encontraba vacío y concluía que no autocompletaba.
+  // Escribir no envía nada: la persona sigue revisando y dando el clic.
+  // Lo que falta (consentimientos, disponibilidad, datos que no están en
+  // el CV) se queda vacío hasta que ella lo conteste.
+  const redactadas = {};
+  for (const q of reporte.preguntas) if (q.texto) redactadas[q.indice] = q.texto;
+  reporte.escritas = 0;
+  if (Object.keys(redactadas).length) {
+    try {
+      const r = await hablarCon(tabId, { accion: "escribir", respuestas: redactadas });
+      reporte.escritas = Array.isArray(r?.escritas) ? r.escritas.length : Number(r?.escritas) || 0;
+    } catch { /* se escriben igual al enviar */ }
+  }
   reporte.listoParaEnviar = true;
   return reporte;
 }
@@ -530,13 +552,26 @@ chrome.runtime.onMessage.addListener((msg, _e, responder) => {
         case "prepararUna": {
           const perfil = await almacen.perfil.obtener();
           const guardados = await almacen.datosPersonales.obtener();
+          const t0 = Date.now();
           const listo = await prepararUna(msg.vacante, perfil, guardados, msg.respuestasPersona);
+          // Antes solo se anotaba `ok` = «se adjuntó el CV». En LinkedIn el
+          // CV sale siempre del perfil, así que un intento que fallaba
+          // en el primer paso y uno que iba bien se veían iguales, y sin
+          // motivo no había forma de saber qué pasó. Ahora dice si salió,
+          // por qué no, cuántas preguntas había y cuántas se escribieron.
+          const fallo = listo?.requiereCuenta ? "sin_cuenta"
+            : listo?.requiereLogin ? "sin_sesion_portal"
+            : listo?.captcha ? "captcha"
+            : listo?.soloLectura ? "solo_lectura"
+            : listo?.error ? String(listo.error).slice(0, 60) : "";
           medir("postulacion_preparada", {
             portal: msg.vacante?.portalId || msg.vacante?.portal,
-            // Si el CV adaptado se adjuntó o no. Es la función que nos
-            // distingue: si falla a menudo, hay que saberlo por número y
-            // no porque alguien se queje.
-            ok: Boolean(listo?.cv?.adjuntado),
+            ok: !fallo,
+            motivo: fallo || undefined,
+            con: listo?.cv?.adjuntado ? "cv_adaptado" : "cv_del_portal",
+            cuantas: (listo?.preguntas || []).length,
+            respondidas: listo?.escritas || 0,
+            segundos: Math.round((Date.now() - t0) / 1000),
           });
           return responder(listo);
         }

@@ -1245,8 +1245,12 @@ check("un tipo válido sí entra",
 # Lo que se guarda no puede convertirse en una huella. Con el puesto
 # exacto, la hora y el distrito se identifica a una persona aunque no
 # haya ni nombre ni id — y la política promete conteos que no identifican.
+# «respondidas» entra porque es un conteo pequeño, como «cuantas»: cuántas
+# preguntas se escribieron. Sin él no se distingue «leyó 5 y escribió 0»
+# de «leyó 5 y escribió 5», que es justo lo que falló en LinkedIn.
 check("el detalle solo admite campos de pocos valores",
-      set(app_web.CAMPOS_MEDIBLES) <= {"portal", "ok", "motivo", "cuantas", "con", "segundos"},
+      set(app_web.CAMPOS_MEDIBLES) <= {"portal", "ok", "motivo", "cuantas", "con",
+                                       "segundos", "respondidas"},
       str(app_web.CAMPOS_MEDIBLES))
 check("nada de puesto, empresa ni texto del CV",
       not ({"puesto", "titulo", "empresa", "cv", "correo", "url"}

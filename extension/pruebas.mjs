@@ -1258,6 +1258,97 @@ titulo("LA PESTAÑA SIN CONTENT SCRIPT — el fallo mas probable del primer inte
     /guardar\(\{ \.\.\.\(await obtener\(\)\), usuario: j\.usuario \}\)/.test(ses));
 }
 
+// ══════════════════════════════════════════════════════════════════════
+// EL CONTRATO FONDO ↔ PORTALES
+// ══════════════════════════════════════════════════════════════════════
+// El fondo mandaba «abrirFormulario» y LinkedIn, Indeed y Bumeran solo
+// entendían «abrir». Respondían «no sé hacer esa acción» y la postulación
+// moría en el primer paso: en tres de los cuatro portales NUNCA se llegó a
+// leer una pregunta. Ali lo vio como «no autocompleta».
+//
+// Nadie comparaba lo que manda el fondo con lo que entiende cada portal.
+// Esto lo compara.
+{
+  titulo("CONTRATO — cada acción del fondo la entiende cada portal");
+  const fspc = await import("node:fs/promises");
+  const fondoC = await fspc.readFile(new URL("background.js", BASE), "utf8");
+
+  // Lo que el fondo le pide a una pestaña de portal (también las
+  // llamadas partidas en varias líneas).
+  const manda = [...new Set(
+    [...fondoC.matchAll(/hablarCon\(\s*tabId,\s*\{\s*accion:\s*"([a-zA-Z]+)"/g)].map((m) => m[1]),
+  )];
+  check("se leen las acciones que manda el fondo", manda.length >= 5, manda.join(", "));
+
+  for (const portal of ["computrabajo", "linkedin", "indeed", "bumeran"]) {
+    const src = await fspc.readFile(new URL(`contenido/${portal}.js`, BASE), "utf8");
+    const entiende = new Set(
+      [...src.matchAll(/(?:case\s+|accion\s*===\s*)"([a-zA-Z]+)"/g)].map((m) => m[1]),
+    );
+    const faltan = manda.filter((a) => !entiende.has(a));
+    check(`${portal} entiende todo lo que le pide el fondo`, faltan.length === 0,
+      faltan.length ? `no entiende: ${faltan.join(", ")}` : "");
+  }
+
+  // Las respuestas viajan por POSICIÓN. Cada pregunta tiene que llevarla,
+  // y cada portal tiene que aceptar la posición al escribir.
+  check("el fondo le pone posición a cada pregunta",
+    /indice:\s*p\.indice\s*\?\?\s*i/.test(fondoC));
+  for (const portal of ["linkedin", "indeed"]) {
+    const src = await fspc.readFile(new URL(`contenido/${portal}.js`, BASE), "utf8");
+    check(`${portal} escribe por id o por posición`, /dadas\[pregunta\.id\]\s*\?\?\s*dadas\[i\]/.test(src));
+    // Contar lo escrito DE VERDAD, no las respuestas recibidas.
+    check(`${portal} cuenta lo que escribió, no lo que recibió`,
+      !/escritas:\s*Object\.keys\(dadas\)\.length/.test(src));
+  }
+  const bum = await fspc.readFile(new URL("contenido/bumeran.js", BASE), "utf8");
+  check("bumeran escribe por id o por posición", /dadas\.salarioPretendido\s*\?\?\s*dadas\[0\]/.test(bum));
+
+  // Y lo redactado se escribe al preparar, no solo al enviar.
+  const prep = fondoC.slice(fondoC.indexOf("async function prepararUna"),
+                            fondoC.indexOf("async function escribirYEnviar"));
+  check("al preparar ya se escribe lo redactado en el formulario",
+    /accion:\s*"escribir"/.test(prep));
+  check("y la medición dice por qué falló", /motivo:\s*fallo/.test(fondoC));
+}
+
+// ══════════════════════════════════════════════════════════════════════
+// LAS HERRAMIENTAS COMPARTIDAS, CONECTADAS
+// ══════════════════════════════════════════════════════════════════════
+// comun.js expone rellenar, enunciadoDe, adjuntarCV... en
+// window.ChambaComun. LinkedIn, Indeed y Bumeran las llamaban sueltas,
+// como si fueran globales. No lo son: leer una pregunta, escribir una
+// respuesta o adjuntar el CV reventaba con «no está definido». En esos
+// tres portales NUNCA se rellenó nada, y ninguna prueba lo veía porque
+// nadie ejecutaba ese código.
+{
+  titulo("COMÚN — ningún portal usa una herramienta sin tomarla");
+  const fspm = await import("node:fs/promises");
+  const comun = await fspm.readFile(new URL("contenido/comun.js", BASE), "utf8");
+  const exportadas = ((comun.match(/return \{([^}]*)\};\s*\}\)\(\);\s*$/m) || [])[1] || "")
+    .split(",").map((s) => s.trim()).filter(Boolean);
+  check("se leen las herramientas que exporta comun.js", exportadas.length >= 5, exportadas.join(", "));
+
+  for (const portal of ["computrabajo", "linkedin", "indeed", "bumeran"]) {
+    const src = await fspm.readFile(new URL(`contenido/${portal}.js`, BASE), "utf8");
+    const tomadas = new Set(((src.match(/const \{([^}]*)\}\s*=\s*window\.ChambaComun/) || [])[1] || "")
+      .split(",").map((s) => s.trim()).filter(Boolean));
+    const sueltas = exportadas.filter((f) => {
+      // Uso suelto: `f(` sin `.` delante (C.f( es la otra forma válida).
+      const usa = new RegExp(`(^|[^.\\w])${f}\\(`, "m").test(src);
+      const local = new RegExp(`(function\\s+${f}\\b|const\\s+${f}\\s*=)`).test(src);
+      return usa && !local && !tomadas.has(f);
+    });
+    check(`${portal} toma de ChambaComun todo lo que usa`, sueltas.length === 0,
+      sueltas.length ? `sin conectar: ${sueltas.join(", ")}` : "");
+  }
+
+  // Y ningún portal que sabe postular se marca como «no postulable» al
+  // leer sus ofertas: LinkedIn lo hacía, y el fondo ni lo intentaba.
+  const lk = await fspm.readFile(new URL("contenido/linkedin.js", BASE), "utf8");
+  check("las ofertas de LinkedIn llegan al modo «rellena»", !/postulable:\s*false/.test(lk));
+}
+
 console.log(`
 ${fallos === 0 ? "TODO OK" : `${fallos} FALLO(S)`}`);
 

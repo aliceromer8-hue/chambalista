@@ -11,6 +11,12 @@
 // Verificado contra el sitio real: 20 de 20 ofertas extraídas completas.
 
 (() => {
+  // Las herramientas compartidas viven en window.ChambaComun (comun.js).
+  // Faltaba esta línea: el código de postular las llamaba sueltas, como
+  // si fueran globales, y no lo son. Leer una pregunta, escribir una
+  // respuesta o adjuntar el CV reventaba con «no está definido»: en
+  // este portal nunca se llegó a rellenar nada.
+  const { rellenar, enunciadoDe, erroresValidacion, adjuntarCV, camposDeArchivo } = window.ChambaComun;
   const MODALIDAD = /^(presencial|remoto|h[ií]brido|home office)$/i;
   const SOLO_NUMERO = /^[\d.,]+$/;
 
@@ -204,16 +210,18 @@
   function escribirRespuestas(respuestas) {
     const dadas = respuestas || {};
     const pendientes = [];
+    const escritas = [];
     const salario = document.querySelector(SEL_SALARIO);
     if (salario && salario.offsetParent !== null) {
       // Solo números: lo dice el propio Bumeran bajo el campo.
-      const limpio = String(dadas.salarioPretendido == null ? "" : dadas.salarioPretendido)
-        .replace(/[^\d]/g, "");
-      if (limpio) rellenar(salario, limpio);
+      // Por id o por posición (el sueldo es siempre la primera pregunta).
+      const valor = dadas.salarioPretendido ?? dadas[0];
+      const limpio = String(valor == null ? "" : valor).replace(/[^\d]/g, "");
+      if (limpio) { rellenar(salario, limpio); escritas.push(0); }
       else pendientes.push("Sueldo pretendido");
     }
     // El checkbox de actualizar el sueldo del perfil se deja como esté.
-    return { escritas: Object.keys(dadas).length, pendientes, errores: erroresValidacion() };
+    return { escritas, pendientes, errores: erroresValidacion() };
   }
 
   async function enviar() {
@@ -257,7 +265,9 @@
       else if (msg.accion === "sesion") responder({ sesion: haySesion() });
       else if (msg.accion === "ofertas") responder({ ofertas: leerOfertas(), sesion: haySesion() });
       else if (msg.accion === "detalle") responder(leerDetalle());
-      else if (msg.accion === "abrir") abrirFormulario().then(responder);
+      // «abrirFormulario» es lo que manda el fondo. Solo se entendía
+      // «abrir», así que la postulación moría en el primer paso.
+      else if (msg.accion === "abrir" || msg.accion === "abrirFormulario") abrirFormulario().then(responder);
       else if (msg.accion === "preguntas") responder({ preguntas: leerPreguntas() });
       else if (msg.accion === "rellenar") responder(escribirRespuestas(msg.respuestas));
       else if (msg.accion === "escribir") responder(escribirRespuestas(msg.respuestas));

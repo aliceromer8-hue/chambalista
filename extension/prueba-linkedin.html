@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<!-- PRUEBA DEL CONTRATO FONDO ↔ LINKEDIN — no viaja en el zip («prueba-…»).
+
+     Carga los content scripts DE VERDAD (comun.js + linkedin.js) sobre una
+     página que imita una Solicitud Sencilla, y les manda la misma
+     secuencia de mensajes que manda background.js al preparar:
+
+         ping → abrirFormulario → preguntas → escribir {0: …, 1: …}
+
+     Antes de arreglarlo, «abrirFormulario» contestaba «LinkedIn no sabe
+     hacer esa accion» y todo moría ahí. No sustituye a probar en LinkedIn
+     real —su DOM cambia—, pero sí demuestra que las piezas encajan.
+
+     Abrir: python -m http.server 8777 --directory extension
+            → /prueba-linkedin.html -->
+<html lang="es">
+<head><meta charset="utf-8"><title>Prueba LinkedIn</title></head>
+<body>
+  <nav id="global-nav">LinkedIn (con sesión)</nav>
+  <main>
+    <h1>Practicante de Marketing</h1>
+    <button class="jobs-apply-button" id="btn-sencilla">Solicitud sencilla</button>
+  </main>
+  <pre id="resultado">corriendo…</pre>
+
+<script>
+  // chrome.runtime simulado: se guarda el oyente que registra linkedin.js
+  // para poder hablarle como lo haría el fondo.
+  let oyente = null;
+  window.chrome = { runtime: { onMessage: { addListener: (f) => { oyente = f; } }, sendMessage: () => {} } };
+  window.hablar = (msg) => new Promise((ok) => {
+    const siguio = oyente(msg, {}, ok);
+    if (siguio !== true) setTimeout(() => ok({ __sinRespuesta: true }), 50);
+  });
+
+  // Al pulsar «Solicitud sencilla» aparece el modal con dos preguntas.
+  document.getElementById("btn-sencilla").addEventListener("click", () => {
+    const m = document.createElement("div");
+    m.className = "jobs-easy-apply-modal";
+    m.innerHTML = `
+      <label for="q-interes">¿Por qué te interesa este puesto?</label>
+      <textarea id="q-interes" required></textarea>
+      <label for="q-anos">¿Cuántos años de experiencia tienes con Canva?</label>
+      <input id="q-anos" type="text">`;
+    document.body.appendChild(m);
+  });
+</script>
+<script src="contenido/comun.js"></script>
+<script src="contenido/linkedin.js"></script>
+<script>
+  (async () => {
+    const r = {};
+    r.ping = await hablar({ accion: "ping" });
+    r.abrir = await hablar({ accion: "abrirFormulario" });
+    r.preguntas = await hablar({ accion: "preguntas" });
+    // Igual que el fondo: posición en cada pregunta, respuestas por posición.
+    const leidas = (r.preguntas.preguntas || []).map((p, i) => ({ ...p, indice: p.indice ?? i }));
+    r.escribir = await hablar({ accion: "escribir", respuestas: { 0: "Me interesa porque llevo las redes del centro federado.", 1: "Uno" } });
+    r.adjuntar = await hablar({ accion: "adjuntar", nombre: "CV.docx", base64: "" });
+    r.valores = {
+      interes: document.getElementById("q-interes")?.value,
+      anos: document.getElementById("q-anos")?.value,
+    };
+    r.indices = leidas.map((q) => q.indice);
+    window.__resultado = r;
+    document.getElementById("resultado").textContent = JSON.stringify(r, null, 2);
+  })();
+</script>
+</body>
+</html>
