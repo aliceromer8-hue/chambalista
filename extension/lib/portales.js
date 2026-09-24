@@ -99,16 +99,12 @@ export const PORTALES = {
   linkedin: {
     id: "linkedin",
     nombre: "LinkedIn",
-    // Rellena, pero NO envía. LinkedIn prohíbe la automatización en su
-    // §8.2 y desde finales de 2025 restringe cuentas por ello; lo que
-    // detectan son extensiones que tocan el DOM. Lo que se arriesga es
-    // la cuenta de la persona, no la nuestra, y su perfil de LinkedIn es
-    // su vida laboral entera.
-    //
-    // Su política sí admite extensiones que ayudan al propio usuario
-    // mientras no envíen sin revisión. Eso es lo que se hace.
+    // Rellena y ENVÍA. LinkedIn prohíbe la automatización en su §8.2 y
+    // restringe cuentas por ello; lo que se arriesga es la cuenta de la
+    // persona. Hasta 2026-09-24 LinkedIn iba marcado como «solo revisado» y el envío
+    // lo daba ella. Ali decidió que envíe sola, asumiendo el riesgo; el
+    // lote lo avisa antes de empezar.
     postulable: true,
-    soloRevisado: true,
 
     // El más restrictivo de los cuatro: aquí solo se busca. Postular se
     // hace a mano en la oferta.

@@ -16,7 +16,8 @@
 export const POSTULACION_VERIFICADA = ["computrabajo"];
 
 // Escrito y con selectores medidos, pendiente de una postulación real.
-export const POSTULACION_SIN_PROBAR = ["bumeran", "indeed"];
+// LinkedIn pasa aquí: ya envía, y el envío no se ha probado en LinkedIn real.
+export const POSTULACION_SIN_PROBAR = ["bumeran", "indeed", "linkedin"];
 
 // LinkedIn aparte: aquí no falta probarlo, es que NO va a enviar nunca.
 //
@@ -28,7 +29,9 @@ export const POSTULACION_SIN_PROBAR = ["bumeran", "indeed"];
 // Su política sí admite extensiones que ayudan al propio usuario
 // mientras no envíen sin revisión, así que se rellena y se para. Esto
 // no es una fase: es la decisión.
-export const SOLO_RELLENA = ["linkedin"];
+// Vacío desde 2026-09-24: LinkedIn envía (decisión de Ali). Se queda
+// la lista por si algún portal vuelve a necesitarla.
+export const SOLO_RELLENA = [];
 
 
 // Los packs que se venden. El titular de la portada sale de aquí.

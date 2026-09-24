@@ -273,6 +273,8 @@
       else if (msg.accion === "rellenar") responder(escribirRespuestas(msg.respuestas));
       else if (msg.accion === "escribir") responder(escribirRespuestas(msg.respuestas));
       else if (msg.accion === "adjuntar") responder(adjuntarCV(msg.nombre, msg.base64));
+      // Bumeran postula en la misma pantalla: no hay «siguiente».
+      else if (msg.accion === "siguiente") responder({ avanzado: false, ultimoPaso: true });
       else if (msg.accion === "enviar") enviar().then(responder);
       else responder({ error: "Bumeran no sabe hacer esa accion: " + msg.accion });
     } catch (e) {

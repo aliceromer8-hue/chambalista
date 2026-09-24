@@ -298,6 +298,14 @@ async function prepararUna(vacante, perfil, guardados, respuestasPersona) {
       // abrirFormulario pulsa «Postularme». Volver a llamarlo ahí sería
       // postular durante la preparación, sin que nadie revisara nada.
       abierto = { abierto: true, trasNavegar: true };
+      // ¿El portal postuló solo al entrar? Pasa en ofertas sin preguntas.
+      // Si es así se dice tal cual: no hay formulario que rellenar, y
+      // fingir que lo hay dejaría a la persona esperando algo que ya pasó.
+      const ping = await hablarCon(tabId, { accion: "ping" }).catch(() => null);
+      if (ping?.enviada) {
+        return { ...reporte, enviadaDirecto: true,
+                 nota: `${vacante.portal || "El portal"} envió la postulación al entrar: esta oferta no tenía preguntas.` };
+      }
     }
   }
   if (abierto?.requiereLogin) return { ...reporte, requiereLogin: true, nota: abierto.nota };
@@ -374,6 +382,17 @@ async function buscarFormularioAbierto(tabIdOriginal, urlAntes = "") {
   // página que se estaba cargando: error, y ni siquiera quedaba anotado.
   const sinAncla = (u) => String(u || "").split("#")[0];
   if (misma && sinAncla(misma.url) !== sinAncla(urlAntes)) {
+    // Computrabajo encadena redirecciones (/match/ → /candidate/kq). Se
+    // espera a que la dirección deje de cambiar y la página termine: si
+    // no, se leen preguntas en la página intermedia y se pierden.
+    let anterior = "", estable = 0;
+    for (let i = 0; i < 30 && estable < 2; i++) {
+      await esperar(500);
+      const t = await chrome.tabs.get(tabIdOriginal).catch(() => null);
+      if (!t) return null;
+      estable = (t.url === anterior && t.status === "complete") ? estable + 1 : 0;
+      anterior = t.url;
+    }
     await pestanaLista(tabIdOriginal, 15000);
     return tabIdOriginal;
   }
@@ -388,6 +407,20 @@ async function escribirYEnviar(respuestasAprobadas) {
   if (respuestasAprobadas && Object.keys(respuestasAprobadas).length) {
     await hablarCon(tabId, { accion: "escribir", respuestas: respuestasAprobadas });
     await esperar(400);
+  }
+  // Formularios de varias pantallas (LinkedIn, Indeed): cada pantalla
+  // nueva se rellena ANTES de avanzar. Si alguna pide algo que no se sabe
+  // contestar, el portal no deja avanzar y se para ahí con su mensaje:
+  // nunca se envía un formulario a medias.
+  const perfil = await almacen.perfil.obtener();
+  const guardados = await almacen.datosPersonales.obtener();
+  for (let paso = 0; paso < 8; paso++) {
+    const s = await hablarCon(tabId, { accion: "siguiente" }).catch(() => null);
+    if (s?.errores?.length) {
+      return { enviada: false, error: `El portal pide completar: ${s.errores.slice(0, 3).join(" · ")}` };
+    }
+    if (!s?.avanzado) break;
+    await rellenarPantalla(tabId, perfil, guardados, {});
   }
   return hablarCon(tabId, { accion: "enviar" });
 }
@@ -466,23 +499,15 @@ async function correrLote({ vacantes, modo, aprobacion, respuestasPersona }) {
       }
     }
 
-    // El candado de LinkedIn.
-    //
-    // Su §8.2 prohíbe la automatización y desde finales de 2025
-    // restringen cuentas por ello. Lo que se arriesga es el perfil de la
-    // persona —su vida laboral entera—, no el nuestro. Así que en modo
-    // automático LinkedIn se prepara y se PARA: queda relleno en su
-    // pantalla y el envío lo da ella.
-    //
-    // Va aquí, en el orquestador, además de en el content script: dos
-    // cierres en sitios distintos, porque a este si alguien lo quita
-    // tiene que quitarlo a propósito y no de pasada.
-    const soloRevisado = Boolean(PORTALES[item.portalId]?.soloRevisado)
-      || /linkedin/i.test(item.portal || "");
+    // Hasta 2026-09-24 aquí había un candado: en automático LinkedIn se
+    // preparaba y se paraba. Ali decidió que envíe (ver linkedin.js). El
+    // único portal que puede seguir parándose es uno marcado
+    // `soloRevisado` en portales.js; hoy no hay ninguno.
+    const soloRevisado = Boolean(PORTALES[item.portalId]?.soloRevisado);
 
     if (modo === "automatico" && soloRevisado && item.estado === "preparada") {
       item.estado = "omitida";
-      item.motivo = "LinkedIn no permite enviar automáticamente: queda lista para que la envíes tú.";
+      item.motivo = `${item.portal} no envía en automático: queda lista para que la envíes tú.`;
     } else if (modo === "automatico") {
       if (item.estado === "preparada") {
         const aprobadas = {};

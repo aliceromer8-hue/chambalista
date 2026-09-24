@@ -757,6 +757,14 @@ function pintarModal() {
     c.innerHTML = cab + `<div class="aviso alerta">${escapar(r.nota || r.error)}</div>`;
     return;
   }
+  // El portal postuló solo al entrar (oferta sin preguntas). Se dice
+  // tal cual: ya está enviada, no hay nada más que hacer.
+  if (r.enviadaDirecto) {
+    c.innerHTML = cab + `<div class="aviso"><strong>Postulación enviada.</strong><br>`
+      + `<span class="nota">${escapar(r.nota)}</span></div>`;
+    pintarInicio();
+    return;
+  }
 
   let html = cab;
 
@@ -942,10 +950,13 @@ async function reRedactar() {
     const orig = (estado.reporte.preguntas.find((q) => String(q.indice) === ta.dataset.indice) || {}).texto || "";
     if (ta.value.trim() && ta.value.trim() !== orig.trim()) editados[ta.dataset.indice] = ta.value.trim();
   });
-  estado.reporte = await enviar({
-    accion: "prepararUna", vacante: estado.vacanteAbierta,
-    respuestasPersona: estado.respuestasPersona,
-  });
+  // Solo se vuelve a leer y redactar ESTA pantalla. Antes se preparaba
+  // la postulación entera otra vez: volvía a la ficha y volvía a pulsar
+  // «Postularme» por cada opción elegida — lento, y en Computrabajo, un
+  // viaje de ida y vuelta a la página de preguntas cada vez.
+  const r = await enviar({ accion: "rellenarPantalla", respuestasPersona: estado.respuestasPersona });
+  if (r?.error) { avisar(r.error); return; }
+  estado.reporte = { ...estado.reporte, preguntas: r.preguntas, escritas: r.escritas };
   pintarPreguntas(estado.reporte.preguntas || []);
   document.querySelectorAll("#preguntas textarea").forEach((ta) => {
     if (editados[ta.dataset.indice]) ta.value = editados[ta.dataset.indice];
@@ -1006,6 +1017,10 @@ $("#btn-lote-auto").addEventListener("click", async () => {
     const cfg = LISTA_PORTALES.find((p) => p.id === (v.portalId || "")) || {};
     return cfg.soloRevisado;
   });
+  // LinkedIn envía en automático por decisión de Ali, con el riesgo de
+  // cuenta asumido. Se dice ANTES, junto a las casillas: es información
+  // para decidir, no un susto.
+  const deLinkedin = marcadas.filter((v) => (v.portalId || "") === "linkedin").length;
   const avisoPrevio = $("#aviso-lote") || (() => {
     const p = document.createElement("p");
     p.id = "aviso-lote";
@@ -1023,6 +1038,11 @@ $("#btn-lote-auto").addEventListener("click", async () => {
       + `${seSaltan.length === 1 ? "la mandes" : "las mandes"} tú. `
       + (iran === 0 ? "No se enviará ninguna automáticamente."
                     : iran === 1 ? "Se enviará una." : `Se enviarán ${iran}.`);
+    avisoPrevio.classList.remove("oculto");
+  } else if (deLinkedin) {
+    avisoPrevio.textContent =
+      `${deLinkedin === 1 ? "Una es" : `${deLinkedin} son`} de LinkedIn. LinkedIn puede limitar `
+      + "las cuentas que postulan en automático.";
     avisoPrevio.classList.remove("oculto");
   } else {
     avisoPrevio.textContent = "";

@@ -291,37 +291,42 @@ function comprobarSuelto(mod, fuente) {
 }
 
 
-titulo("LINKEDIN — rellena, pero no envia nunca");
+titulo("LINKEDIN — envía, sabiendo el riesgo, y sin atajos");
 
 {
-  // No es una fase pendiente, es la decision. Su §8.2 prohibe la
-  // automatizacion y lo que se arriesga es la cuenta de la persona.
-  // Por eso hay DOS cierres en sitios distintos: si alguien quita uno,
-  // el otro sigue, y para quitar los dos hay que hacerlo a proposito.
+  // Decisión de Ali, 2026-09-24: «Que envíe sola». Antes LinkedIn solo
+  // rellenaba porque su §8.2 prohíbe la automatización y lo que se
+  // arriesga es la cuenta de la persona. El riesgo sigue: estas pruebas
+  // cuidan que se envíe BIEN y que se avise antes.
   const fsp = await import("node:fs/promises");
   const li = await fsp.readFile(new URL("contenido/linkedin.js", BASE), "utf8");
   const fondo = await fsp.readFile(new URL("background.js", BASE), "utf8");
   const port = await fsp.readFile(new URL("lib/portales.js", BASE), "utf8");
-
-  check("el content script de LinkedIn no pulsa enviar",
-    /async function enviar\(\)[\s\S]{0,400}?enviada: false/.test(li));
-  check("y no busca ningun boton de envio",
-    !/botonEnviar|submit application|enviar solicitud/i.test(li));
-  check("LinkedIn va marcado soloRevisado", /soloRevisado: true/.test(port));
-  check("y el lote automatico lo respeta", /soloRevisado && item\.estado/.test(fondo));
-  // El bloque del candado: desde donde se calcula soloRevisado hasta el
-  // else. Se busca el ULTIMO «soloRevisado», que es el codigo; el
-  // primero esta en el comentario que lo explica.
-  const candado = fondo.slice(fondo.lastIndexOf("const soloRevisado"),
-                              fondo.lastIndexOf("const soloRevisado") + 700);
-  check("con red de seguridad por nombre, por si falta la marca",
-    /linkedin/i.test(candado));
-  check("queda anotado como omitida, no como enviada",
-    /item\.estado = "omitida"/.test(candado));
-
   const ver = await fsp.readFile(new URL("lib/verificados.js", BASE), "utf8");
-  check("y esta en SOLO_RELLENA, no en pendiente de probar",
-    /SOLO_RELLENA/.test(ver) && /linkedin/.test(ver.split("SOLO_RELLENA")[1].split("]")[0]));
+  const pj = await fsp.readFile(new URL("panel/panel.js", BASE), "utf8");
+
+  const siguiente = li.slice(li.indexOf("async function siguientePaso"), li.indexOf("async function enviar"));
+  // Lo peligroso de un formulario por pantallas es pulsar «Enviar» creyendo
+  // que se pulsaba «Siguiente». Se mira el botón final ANTES de avanzar.
+  check("avanzar de pantalla nunca pulsa el botón final",
+    siguiente.indexOf("botonCon(FINAL)") > -1
+    && siguiente.indexOf("botonCon(FINAL)") < siguiente.indexOf("botonCon(AVANZAR)"));
+  check("el envío se confirma por el mensaje de LinkedIn, no por suposición",
+    /function confirmada\(\)/.test(li) && /se envi\[oó\] tu solicitud/.test(li));
+  check("si LinkedIn pide algo al avanzar, se para ahí",
+    /errores\.length \? \{ avanzado: false, errores \}/.test(li));
+  check("LinkedIn ya no va marcado soloRevisado", !/soloRevisado: true/.test(port));
+  check("y no queda un candado por nombre en el lote",
+    !/\|\| \/linkedin\/i\.test\(item\.portal/.test(fondo));
+  check("está en «sin probar»: el envío no se ha probado en LinkedIn real",
+    /linkedin/.test(ver.split("POSTULACION_SIN_PROBAR")[1].split("]")[0]));
+  // Es SU cuenta la que se arriesga: se dice antes de lanzar el lote.
+  check("el lote avisa del riesgo de LinkedIn antes de empezar",
+    /LinkedIn puede limitar/.test(pj) && /deLinkedin/.test(pj));
+  // Las pantallas nuevas se rellenan antes de avanzar, no a ciegas.
+  const env = fondo.slice(fondo.indexOf("async function escribirYEnviar"));
+  check("en varias pantallas, cada una se rellena antes de avanzar",
+    /accion: "siguiente"/.test(env) && /await rellenarPantalla\(tabId/.test(env));
 }
 
 
@@ -586,13 +591,15 @@ titulo("EL RECORRIDO — que subir el CV no sea un callejon");
   // Cada portal dice lo que hace, no todos lo mismo.
   const dicen = ["computrabajo", "bumeran", "indeed", "linkedin"]
     .map((id) => `${id}:${queHace({ id, postulable: true }).etiqueta}`);
-  check("los cuatro portales no dicen todos lo mismo",
-    new Set(dicen.map((d) => d.split(":")[1])).size >= 3, dicen.join(" · "));
+  // Lo comprobado y lo que está en pruebas no pueden decir lo mismo.
+  check("lo comprobado y lo que está en pruebas no dicen lo mismo",
+    new Set(dicen.map((d) => d.split(":")[1])).size >= 2, dicen.join(" · "));
   check("computrabajo es el unico que dice «postula» a secas",
     queHace({ id: "computrabajo", postulable: true }).etiqueta === "postula");
   const sinTildes = (t) => t.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase();
-  check("linkedin avisa de que el envio lo da la persona",
-    /envias tu/.test(sinTildes(queHace({ id: "linkedin", postulable: true }).etiqueta)),
+  // LinkedIn envía desde 2026-09-24 y no se ha probado en LinkedIn real.
+  check("linkedin dice que está en pruebas",
+    /pruebas/.test(sinTildes(queHace({ id: "linkedin", postulable: true }).etiqueta)),
     queHace({ id: "linkedin", postulable: true }).etiqueta);
   check("y los sin comprobar lo dicen",
     /pruebas/.test(queHace({ id: "bumeran", postulable: true }).etiqueta));
@@ -1488,6 +1495,51 @@ titulo("LA PESTAÑA SIN CONTENT SCRIPT — el fallo mas probable del primer inte
   // y parecía que todo se reiniciaba.
   check("el desplegable de portales sigue abierto mientras uno se conecta",
     (pj.match(/conectando\.has\(p\.id\)\) \? " open" : ""/g) || []).length >= 2);
+}
+
+// ══════════════════════════════════════════════════════════════════════
+// COMPUTRABAJO — «PREGUNTAS DE SELECCIÓN» (sitio real, 2026-09-24)
+// ══════════════════════════════════════════════════════════════════════
+// «Postularme» lleva a candidato.pe.computrabajo.com/candidate/kq: textos
+// KillerQuestions[n].OpenQuestion, opciones .ClosedQuestion y «Enviar mi
+// CV». Un clic programado sobre «Postularme» no hacía nada.
+{
+  titulo("COMPUTRABAJO — la página de preguntas nueva");
+  const fspk = await import("node:fs/promises");
+  const ct = await fspk.readFile(new URL("contenido/computrabajo.js", BASE), "utf8");
+  const resp = await import(`${BASE}lib/respuestas.js`);
+
+  check("va a postular por la dirección del botón, no con un clic",
+    /boton\.dataset\.hrefOfferApply/.test(ct) && /location\.assign\(destino\)/.test(ct));
+  check("lee también las preguntas de opciones", /function leerOpciones\(\)/.test(ct)
+    && /concat\(leerOpciones\(\)\)/.test(ct));
+  check("quita «(máximo N caracteres)» del enunciado", /m\[aá\]ximo \\d\+ caracteres/.test(ct));
+  check("sabe marcar una opción", /input\[type=radio\]\[name=/.test(ct));
+  check("el ping dice si el portal ya postuló solo", /enviada: Boolean\(confirmada\(\)\)/.test(ct));
+
+  // Las de opciones las elige la persona, con las opciones DEL PORTAL.
+  const horario = { indice: 100, tipo: "opcion", enunciado: "En que horario te encuentras con mayor disponibilidad",
+                    opciones: ["8:00AM - 1:00PM", "1:00PM - 6:00PM", "2:00PM - 7:00PM"] };
+  const [sinElegir] = await resp.redactar([horario], {}, {}, {});
+  check("un horario no lo contesta nadie más que la persona", sinElegir.texto === "");
+  check("y se le ofrecen los turnos del portal, no «Sí / No»",
+    JSON.stringify(sinElegir.necesita[0]?.opciones) === JSON.stringify(horario.opciones),
+    JSON.stringify(sinElegir.necesita[0]?.opciones));
+  const [elegido] = await resp.redactar([horario], {}, {}, { opc_100: "1:00PM - 6:00PM" });
+  check("al elegir, queda esa opción", elegido.texto === "1:00PM - 6:00PM");
+
+  // El teléfono sale del CV, no del modelo.
+  const [tel] = await resp.redactar([{ indice: 2, enunciado: "Déjanos tu numero actualizado para ponernos en contacto." }],
+    { contacto: { telefono: "999 888 777" } }, {}, {});
+  check("«déjanos tu número» se contesta con el teléfono del CV", tel.texto === "Mi número es 999 888 777.", tel.texto);
+  const [sinTel] = await resp.redactar([{ indice: 2, enunciado: "Déjanos tu número de celular" }], { contacto: {} }, {}, {});
+  check("y si el CV no lo tiene, se pregunta", sinTel.texto === "" && sinTel.necesita.length === 1);
+
+  // Elegir una opción no vuelve a navegar ni a pulsar «Postularme».
+  const pj = await fspk.readFile(new URL("panel/panel.js", BASE), "utf8");
+  const rr = pj.slice(pj.indexOf("async function reRedactar"), pj.indexOf("function respuestasDelPanel"));
+  check("elegir una opción solo vuelve a leer esta pantalla",
+    /accion: "rellenarPantalla"/.test(rr) && !/accion: "prepararUna"/.test(rr));
 }
 
 console.log(`

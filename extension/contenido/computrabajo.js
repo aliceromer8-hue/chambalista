@@ -92,6 +92,22 @@
           : "No se encontró el botón «Postularme». Puede que la oferta haya expirado.",
       };
     }
+    // «Postularme» es un <a class="b_primary"> SIN href: lo mueve el
+    // JavaScript del portal. Un clic programado no hacía nada (probado
+    // desde Claude en Chrome: solo reaccionó a un clic real). Pero el
+    // botón lleva su destino en data-href-offer-apply, que manda a
+    // candidato.pe.computrabajo.com/match/ → /candidate/kq, la página
+    // de «Preguntas de selección». Ir ahí directamente es lo mismo que
+    // pulsar, sin depender de cómo trate el portal los clics.
+    //
+    // Ir ahí NO envía: la postulación se manda con «Enviar mi CV», al
+    // final de esa página. Si la oferta no tuviera preguntas y el portal
+    // postulara al llegar, el fondo lo detecta y lo dice (ver `ping`).
+    const destino = boton.dataset.hrefOfferApply;
+    if (destino) {
+      location.assign(destino);
+      return { abierto: false, navegando: true };
+    }
     boton.click();
     await C.esperar(1500);
     if (C.hayCaptcha()) {
@@ -135,7 +151,45 @@
       // 2026-09-24) que no es una pregunta de la empresa: la IA le habría
       // escrito una respuesta a un campo que nadie pidió. El `indice` se
       // queda el de la lista completa, que es el que usa escribirRespuestas.
-      .filter((q) => q.enunciado && q.visible);
+      .filter((q) => q.enunciado && q.visible)
+      // «(máximo 500 caracteres)» es del campo, no de la pregunta: sin
+      // quitarlo, la IA lo lee como parte de lo que le preguntan.
+      .map((q) => ({ ...q, enunciado: q.enunciado.replace(/\(m[aá]ximo \d+ caracteres\)/i, "").trim() }))
+      .concat(leerOpciones());
+  }
+
+  /**
+   * Las preguntas de opciones (botones de radio) de «Preguntas de
+   * selección». En TALENTEA: «¿En qué horario tienes más
+   * disponibilidad?» con tres turnos. Antes solo se leían los cuadros de
+   * texto, así que estas se quedaban sin contestar y el envío fallaba.
+   *
+   * Van con `indice` 100+ para no chocar con los textareas, que usan su
+   * posición. Y NUNCA las contesta el modelo: son compromisos (horarios,
+   * sedes) y las elige la persona.
+   */
+  function leerOpciones() {
+    const grupos = new Map();
+    for (const r of document.querySelectorAll("input[type=radio]")) {
+      if (!(r.offsetWidth || r.offsetHeight) || !r.name) continue;
+      if (!grupos.has(r.name)) grupos.set(r.name, []);
+      grupos.get(r.name).push(r);
+    }
+    return [...grupos.entries()].map(([nombre, radios], g) => {
+      const caja = radios[0].closest(".field_radio_box") || radios[0].closest("fieldset")
+        || radios[0].parentElement?.parentElement;
+      const opciones = radios.map((r) =>
+        (r.closest("label")?.innerText || document.querySelector(`label[for="${CSS.escape(r.id)}"]`)?.innerText || "").trim());
+      const todo = (caja?.innerText || "").replace(/\s+/g, " ").trim();
+      // El enunciado es el texto de la caja sin las opciones.
+      let enunciado = todo;
+      for (const o of opciones) enunciado = enunciado.replace(o, "");
+      return {
+        indice: 100 + g, nombre, tipo: "opcion", opciones,
+        enunciado: enunciado.replace(/\s+/g, " ").trim() || "Elige una opción",
+        visible: true,
+      };
+    }).filter((q) => q.opciones.every(Boolean));
   }
 
   /** Rellena los campos simples (nombre, correo, teléfono, datos guardados). */
@@ -186,7 +240,22 @@
   function escribirRespuestas(respuestas) {
     const campos = [...document.querySelectorAll("form textarea, textarea")];
     const escritas = [];
+    const opciones = leerOpciones();
     for (const [indice, texto] of Object.entries(respuestas || {})) {
+      // Las de opciones (indice 100+): se marca la que coincide con lo
+      // que eligió la persona. Si no coincide ninguna, no se marca nada.
+      if (Number(indice) >= 100) {
+        const q = opciones.find((o) => o.indice === Number(indice));
+        const i = q ? q.opciones.findIndex((o) => o === String(texto).trim()) : -1;
+        const radio = i >= 0 ? [...document.querySelectorAll(`input[type=radio][name="${CSS.escape(q.nombre)}"]`)][i] : null;
+        if (radio) {
+          radio.click();
+          radio.checked = true;
+          radio.dispatchEvent(new Event("change", { bubbles: true }));
+          escritas.push(Number(indice));
+        }
+        continue;
+      }
       const campo = campos[Number(indice)];
       if (!campo || !String(texto).trim()) continue;
       C.rellenar(campo, String(texto).trim());
@@ -274,7 +343,14 @@
     (async () => {
       try {
         switch (msg.accion) {
-          case "ping":          return responder({ ok: true, url: location.href, sesion: haySesion() });
+          // `enviada`: si al llegar aquí el portal ya dice «postulado».
+          // Pasa si la oferta no tenía preguntas y el portal postuló solo
+          // al entrar: el fondo tiene que saberlo y decirlo, no esperar un
+          // formulario que no va a aparecer.
+          case "ping":          return responder({ ok: true, url: location.href, sesion: haySesion(),
+                                                   enviada: Boolean(confirmada()) });
+          // Una sola pantalla de preguntas: no hay «siguiente».
+          case "siguiente":     return responder({ avanzado: false, ultimoPaso: true });
           case "sesion":        return responder({ sesion: haySesion() });
           case "ofertas":       return responder({ ofertas: leerOfertas(), sesion: haySesion() });
           case "detalle":       return responder(leerDetalle());

@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<!-- PRUEBA DE «PREGUNTAS DE SELECCIÓN» DE COMPUTRABAJO — no viaja en el zip.
+
+     Copia la estructura medida en el sitio real el 2026-09-24 (TALENTEA,
+     candidato.pe.computrabajo.com/candidate/kq): tres textareas
+     KillerQuestions[n].OpenQuestion con el enunciado en un <p> previo y
+     «(máximo 500 caracteres)» detrás, una pregunta de opciones
+     KillerQuestions[3].ClosedQuestion dentro de .field_radio_box, y el
+     botón final «Enviar mi CV». Más un textarea OCULTO, como el
+     «Comment» de la ficha, que no debe leerse.
+
+     Corre computrabajo.js DE VERDAD y le manda: ping → preguntas →
+     escribir. Nunca «enviar».  Abrir: /prueba-computrabajo.html -->
+<html lang="es">
+<head><meta charset="utf-8"><title>Prueba Computrabajo</title></head>
+<body>
+  <form>
+    <article class="tags_form">
+      <div class="field_textarea"><p>¿Que carrera estudias? ¿En que ciclo te encuentras?</p>
+        <textarea name="KillerQuestions[0].OpenQuestion" id="KillerQuestions_0__OpenQuestion" maxlength="500"></textarea>
+        <span>(máximo 500 caracteres)</span></div>
+      <div class="field_textarea"><p>¿Cuentas con disponibilidad de gestionar en los olivos?</p>
+        <textarea name="KillerQuestions[1].OpenQuestion" id="KillerQuestions_1__OpenQuestion" maxlength="500"></textarea>
+        <span>(máximo 500 caracteres)</span></div>
+      <div class="field_textarea"><p>Déjanos tu numero actualizado para ponernos en contacto.</p>
+        <textarea name="KillerQuestions[2].OpenQuestion" id="KillerQuestions_2__OpenQuestion" maxlength="500"></textarea>
+        <span>(máximo 500 caracteres)</span></div>
+      <div class="field_radio_box rounded"><p>En que horario te encuentras con mayor disponibilidad para gestionar</p>
+        <div class="group">
+          <label class="radio w_100"><input type="radio" name="KillerQuestions[3].ClosedQuestion" value="0"> 8:00AM - 1:00PM</label>
+          <label class="radio w_100"><input type="radio" name="KillerQuestions[3].ClosedQuestion" value="1"> 1:00PM - 6:00PM</label>
+          <label class="radio w_100"><input type="radio" name="KillerQuestions[3].ClosedQuestion" value="2"> 2:00PM - 7:00PM</label>
+        </div></div>
+    </article>
+    <input type="submit" value="Enviar mi CV" class="b_primary new rounded" id="enviar-final">
+  </form>
+  <form style="display:none"><label>Comentario <textarea name="Comment"></textarea></label></form>
+  <footer>pie</footer>
+  <pre id="resultado">corriendo…</pre>
+
+<script>
+  let oyente = null;
+  window.chrome = { runtime: { onMessage: { addListener: (f) => { oyente = f; } }, sendMessage: () => {} } };
+  window.hablar = (msg) => new Promise((ok) => {
+    const siguio = oyente(msg, {}, ok);
+    if (siguio !== true) setTimeout(() => ok({ __sinRespuesta: true }), 50);
+  });
+  // Si algo intentara enviar, se nota: el formulario no se va a ningún lado.
+  document.querySelector("form").addEventListener("submit", (e) => { e.preventDefault(); window.__intentoEnviar = true; });
+</script>
+<script src="contenido/comun.js"></script>
+<script src="contenido/computrabajo.js"></script>
+<script>
+  (async () => {
+    const r = {};
+    r.ping = await hablar({ accion: "ping" });
+    r.siguiente = await hablar({ accion: "siguiente" });
+    r.preguntas = (await hablar({ accion: "preguntas" })).preguntas;
+    r.escribir = await hablar({ accion: "escribir", respuestas: {
+      0: "Estudio Marketing en la USIL, estoy en décimo ciclo.",
+      1: "Sí, cuento con disponibilidad.",
+      2: "Mi número es 999 888 777.",
+      100: "1:00PM - 6:00PM",
+    } });
+    r.valores = [...document.querySelectorAll("form:first-of-type textarea")].map((t) => t.value);
+    r.radio = document.querySelector("input[type=radio]:checked")?.parentElement.innerText.trim() || null;
+    r.comentario_oculto = document.querySelector("textarea[name=Comment]").value;
+    r.intento_enviar = Boolean(window.__intentoEnviar);
+    window.__resultado = r;
+    document.getElementById("resultado").textContent = JSON.stringify(r, null, 2);
+  })();
+</script>
+</body>
+</html>

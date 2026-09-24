@@ -1,9 +1,9 @@
-// Content script de LinkedIn: lee el listado y RELLENA la Solicitud
-// Sencilla, pero nunca envía.
+// Content script de LinkedIn: lee el listado, rellena la Solicitud
+// Sencilla y la envía.
 //
 // LinkedIn es el más restrictivo de los cuatro y el que más vigila la
-// automatización. Por eso aquí se rellena y el envío lo da la persona en
-// su pantalla — ver el bloque «Rellenar — pero NO enviar» más abajo.
+// automatización. Enviar aquí arriesga la cuenta de la persona; Ali lo
+// decidió sabiéndolo — ver el bloque «ENVIAR» más abajo.
 //
 // Sus clases llevan hashes que cambian, así que se prefieren atributos
 // estables (`data-job-id`, `data-occludable-job-id`) y estructura.
@@ -195,20 +195,55 @@
     };
   }
 
-  /**
-   * Aquí no se envía, y es a propósito.
-   *
-   * Ver el bloque de arriba: pulsar «enviar» por la persona es lo que
-   * convierte esto en la automatización que LinkedIn detecta y castiga
-   * con la cuenta de ELLA. Queda rellenado y en pantalla.
-   */
+  // ENVIAR — decisión de Ali, 2026-09-24.
+  //
+  // Hasta aquí LinkedIn solo rellenaba y el envío lo daba la persona: su
+  // §8.2 prohíbe la automatización y restringe cuentas por ello. Ali lo
+  // sabe y decidió asumirlo: «Que envíe sola». El riesgo sigue siendo el
+  // mismo —lo que se juega es SU cuenta— y por eso el lote lo dice antes
+  // de empezar.
+  //
+  // La Solicitud Sencilla tiene varias pantallas. El fondo va pantalla a
+  // pantalla con `siguientePaso` (rellenando cada una) y llama a
+  // `enviar` solo cuando ya está el botón final.
+
+  const botonCon = (re) => [...document.querySelectorAll(
+    ".jobs-easy-apply-modal button, [data-test-modal] button")]
+    .find((b) => !b.disabled && re.test((b.innerText || b.getAttribute("aria-label") || "").trim())) || null;
+
+  const FINAL = /^(enviar solicitud|submit application)$/i;
+  const AVANZAR = /^(siguiente|revisar|continuar|next|review|continue)$/i;
+
+  /** Avanza UNA pantalla. Nunca pulsa el botón final. */
+  async function siguientePaso() {
+    if (!enFormulario()) return { avanzado: false, error: "El formulario de LinkedIn no está abierto." };
+    if (botonCon(FINAL)) return { avanzado: false, ultimoPaso: true };
+    const b = botonCon(AVANZAR);
+    if (!b) return { avanzado: false, ultimoPaso: true };
+    b.click();
+    await new Promise((r) => setTimeout(r, 1500));
+    const errores = erroresValidacion();
+    return errores.length ? { avanzado: false, errores } : { avanzado: true };
+  }
+
   async function enviar() {
-    return {
-      enviada: false,
-      revisionObligatoria: true,
-      error: "En LinkedIn el envío lo das tú. El formulario ya está lleno en tu pantalla: "
-           + "revísalo y pulsa enviar. Es la única forma de que no te restrinjan la cuenta.",
-    };
+    if (!enFormulario()) return { enviada: false, error: "El formulario de LinkedIn no está abierto." };
+    const b = botonCon(FINAL);
+    if (!b) return { enviada: false, error: "Todavía no estamos en el paso de enviar." };
+    b.click();
+    await new Promise((r) => setTimeout(r, 2500));
+    const errores = erroresValidacion();
+    if (errores.length) return { enviada: false, error: errores.join(" · ") };
+    return confirmada();
+  }
+
+  /** Por PRESENCIA de la confirmación, nunca por ausencia del botón. */
+  function confirmada() {
+    const texto = (document.body.innerText || "").toLowerCase();
+    if (/se envi[oó] tu solicitud|solicitud enviada|your application was sent|application submitted/.test(texto)) {
+      return { enviada: true, mensaje: "LinkedIn confirmó la solicitud." };
+    }
+    return { enviada: false, error: "LinkedIn no confirmó el envío. Revísala tú antes de darla por enviada." };
   }
 
   chrome.runtime.onMessage.addListener((msg, _e, responder) => {
@@ -228,6 +263,7 @@
       // Sencilla tiene campo de archivo, se adjunta el adaptado; si no,
       // adjuntarCV lo dice y se postula con el CV del perfil.
       else if (msg.accion === "adjuntar") responder(adjuntarCV(msg.nombre, msg.base64));
+      else if (msg.accion === "siguiente") siguientePaso().then(responder);
       else if (msg.accion === "enviar") enviar().then(responder);
       else responder({ error: "LinkedIn no sabe hacer esa accion: " + msg.accion });
     } catch (e) {

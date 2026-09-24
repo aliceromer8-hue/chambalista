@@ -105,8 +105,23 @@ export async function redactar(preguntas, perfil, guardados = {}, respuestasPers
     }
   }
 
+  // 1b. Preguntas de opciones del portal (horarios, sedes, turnos): las
+  // elige la persona entre las opciones DEL PORTAL. Antes pasaban por
+  // «compromiso» y se le ofrecía «Sí / No» para una pregunta de «¿qué
+  // turno?»; o, peor, iban al modelo, que no puede elegir un horario por
+  // nadie.
+  for (const q of salida) {
+    if (q.tipo !== "opcion" || !(q.opciones || []).length) continue;
+    const clave = `opc_${q.indice}`;
+    const r = respuestasPersona[clave];
+    q.necesita = [{ clave, etiqueta: q.enunciado, tipo: "opciones", opciones: q.opciones,
+                    respondido: Boolean(r) }];
+    q.texto = r && q.opciones.includes(r) ? r : "";
+  }
+
   // 2. Datos ya guardados: se responden al instante, sin gastar el modelo.
   for (const q of salida) {
+    if (q.tipo === "opcion") continue;
     if (q.texto || q.clase === "consentimiento" || q.clase === "compromiso") continue;
     const { campo, valor } = paraCampo(q.enunciado, guardados);
     if (campo && valor) {
@@ -121,6 +136,26 @@ export async function redactar(preguntas, perfil, guardados = {}, respuestasPers
       if (respuestasPersona[campo.clave]) {
         q.texto = campo.plantilla(respuestasPersona[campo.clave]);
       }
+    }
+  }
+
+  // 2b. Teléfono y correo: salen del CV, no del modelo.
+  //
+  // «Déjanos tu número actualizado para ponernos en contacto» (TALENTEA,
+  // Computrabajo) iba al modelo. El número está en el CV y no hay nada
+  // que redactar: se escribe tal cual. Si el CV no lo tiene, se pregunta.
+  const TEL = /(n[uú]mero|celular|tel[eé]fono|whatsapp)/i;
+  const CORREO = /(correo|e-?mail)/i;
+  for (const q of salida) {
+    if (q.texto || q.necesita.length || q.tipo === "opcion") continue;
+    const contacto = perfil?.contacto || {};
+    if (TEL.test(q.enunciado) && !/documento|dni|identidad/i.test(q.enunciado)) {
+      if (contacto.telefono) q.texto = `Mi número es ${contacto.telefono}.`;
+      else q.necesita.push({ clave: `tel_${q.indice}`, etiqueta: "Tu número de celular", tipo: "texto",
+                             respondido: Boolean(respuestasPersona[`tel_${q.indice}`]) });
+      if (!q.texto && respuestasPersona[`tel_${q.indice}`]) q.texto = `Mi número es ${respuestasPersona[`tel_${q.indice}`]}.`;
+    } else if (CORREO.test(q.enunciado) && contacto.email) {
+      q.texto = `Mi correo es ${contacto.email}.`;
     }
   }
 
