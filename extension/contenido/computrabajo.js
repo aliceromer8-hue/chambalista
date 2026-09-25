@@ -311,7 +311,7 @@
       if (!etiqueta.trim()) continue;
 
       // Datos personales: solo si la persona los guardó a propósito.
-      const encaje = patrones.find((p) => new RegExp(p.patron, "i").test(etiqueta));
+      const encaje = patrones.find((p) => new RegExp(p.patron, p.flags || "i").test(etiqueta));
       if (encaje) {
         const valor = guardados[encaje.clave];
         if (valor) {

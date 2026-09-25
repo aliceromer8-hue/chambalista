@@ -292,3 +292,23 @@ export function nombreBonito(texto) {
   const d = distritoEn(texto);
   return d ? TITULO(d) : (texto || "").trim();
 }
+
+// ── Otra ciudad (Ali, 2026-09-25: «acabas de postular a uno en Trujillo») ──
+// Si buscas desde un distrito de Lima, una vacante que dice Trujillo o
+// Arequipa no es para ti: se aparta de la lista y de la tanda. «Lima» o un
+// distrito de Lima nunca cuentan como otra ciudad; sin dato, tampoco.
+const OTRAS_CIUDADES = [
+  "arequipa", "trujillo", "la libertad", "piura", "sullana", "talara", "chiclayo", "lambayeque",
+  "cusco", "cuzco", "ica", "chincha", "pisco", "junin", "huancayo", "ancash", "chimbote", "huaraz",
+  "cajamarca", "puno", "juliaca", "tacna", "loreto", "iquitos", "ucayali", "pucallpa", "tarapoto",
+  "moyobamba", "ayacucho", "huanuco", "moquegua", "ilo", "tumbes", "amazonas", "chachapoyas",
+  "apurimac", "abancay", "huancavelica", "madre de dios", "puerto maldonado", "pasco",
+  "huacho", "huaral", "canete", "barranca", "chancay",
+];
+
+export function otraCiudad(ubicacion) {
+  const t = ` ${normal(ubicacion)} `;
+  if (!t.trim() || distritoEn(ubicacion) || / lima | callao /.test(t)) return null;
+  const hallada = OTRAS_CIUDADES.find((c) => t.includes(` ${c} `));
+  return hallada ? TITULO(hallada) : null;
+}

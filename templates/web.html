@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Chamba Lista — cien postulaciones, un clic cada una</title>
+<title>Chamba Lista — un clic, cincuenta postulaciones</title>
 <meta name="description" content="Encuentra vacantes de prácticas y primer empleo en Computrabajo, Bumeran, LinkedIn e Indeed. Chamba Lista llena cada postulación con tu CV y tus datos y la envía por ti; si prefieres, te avisa antes.">
 <link rel="stylesheet" href="/static/css/web.css">
 </head>
@@ -47,7 +47,7 @@
        si los dos números dejan de coincidir. -->
   <section class="intro entra">
     <p class="antetitulo">Prácticas y primer empleo en Perú</p>
-    <h1>Un clic.<br>Cien postulaciones.</h1>
+    <h1>Un clic.<br>Cincuenta postulaciones.</h1>
     <p class="bajada">Busca vacantes en Computrabajo, Bumeran, LinkedIn e Indeed. En Computrabajo e Indeed llena la postulación con tu CV y tus datos, y la envía. Si prefieres, te avisa antes de enviar.</p>
   </section>
 
@@ -123,6 +123,7 @@
           <li>Historial y seguimiento</li>
         </ul>
         <p class="plan-pie">El saldo no caduca y no se renueva solo.</p>
+        <button class="boton primario btn-pack" type="button" data-pack="100" data-soles="29">Elegir este pack</button>
       </div>
 
       <div class="plan-web">
@@ -134,6 +135,7 @@
           <li><b>30 postulaciones</b></li>
           <li>Tu CV adaptado a cada vacante</li>
         </ul>
+        <button class="boton secundario btn-pack" type="button" data-pack="30" data-soles="15">Elegir este pack</button>
       </div>
     </div>
     <p class="comparacion">Una postulación a mano son quince o veinte minutos entre
@@ -283,6 +285,19 @@
 <footer class="ancho">
   <p>Chamba Lista — hecho para buscar trabajo en Perú · <a href="/privacidad">Privacidad y condiciones</a></p>
 </footer>
+
+<!-- Pagar un pack: Yape o Plin, que es como se paga aquí. -->
+<dialog id="dlg-pago" aria-labelledby="pago-titulo">
+  <h2 id="pago-titulo">Pack de <span id="pago-cuantas">100</span> postulaciones</h2>
+  <p class="pago-precio">S/ <span id="pago-soles">29</span></p>
+  <ol class="pago-pasos">
+    <li id="pago-paso-1">Yapea o plinea <b>S/ <span class="pago-soles2">29</span></b> <span id="pago-destino"></span>.</li>
+    <li>En el mensaje del pago escribe el <b>correo de tu cuenta</b> de Chamba Lista.</li>
+    <li>Envía la captura a <a id="pago-correo" href="mailto:chambalistaperu@gmail.com">chambalistaperu@gmail.com</a>. Activamos tu pack en menos de 24 horas.</li>
+  </ol>
+  <p class="nota">El saldo no caduca y no se renueva solo: pagas una vez.</p>
+  <div class="acciones-cuenta"><button class="boton secundario" type="button" id="pago-cerrar">Cerrar</button></div>
+</dialog>
 
 <script src="/static/js/web.js"></script>
 </body>

@@ -195,7 +195,9 @@ REGLAS ESTRICTAS:
 4. Si el CV no tiene la información, pon "FALTA_DATO: <qué dato hace falta>". Es preferible pedir el dato a inventarlo.
 5. Responde SOLO lo que cada pregunta pide. Si preguntan el distrito, no menciones el teléfono.
 6. Máximo 400 caracteres por respuesta. Sin viñetas ni comillas envolventes.
-7. No copies fragmentos del CV en crudo: redacta una frase.`;
+7. No copies fragmentos del CV en crudo: redacta una frase.
+8. Tono profesional y humano, como una persona segura que escribe bien: un solo párrafo corrido, con frases completas y conectadas. Sin guiones, viñetas, listas, numeraciones ni saltos de línea.
+9. Nunca uses datos personales (DNI, fecha de nacimiento, dirección, teléfono) salvo que la pregunta los pida literalmente. Una pregunta sobre estudios, experiencia o motivos se responde desde el CV.`;
 
 /** Redacta varias respuestas en una sola llamada.
  *

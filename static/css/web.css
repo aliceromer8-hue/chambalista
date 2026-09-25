@@ -588,3 +588,16 @@ dialog#dlg-cuenta input:focus, .campo input:focus { outline: none; box-shadow: v
   background: var(--coral-suave); border-color: var(--coral); color: var(--tinta);
 }
 .boton.peligro:hover { background: var(--coral); }
+
+
+/* ══════════ pagar un pack ══════════ */
+.btn-pack { margin-top: 14px; width: 100%; justify-content: center; }
+dialog#dlg-pago {
+  border: 2px solid var(--linea); border-radius: var(--r);
+  box-shadow: var(--dura); background: var(--papel); color: var(--tinta);
+  padding: 26px 28px; max-width: 440px; width: calc(100% - 32px);
+}
+dialog#dlg-pago::backdrop { background: rgba(19, 19, 22, .55); }
+dialog#dlg-pago h2 { font-size: 1.35rem; margin: 0 0 4px; }
+.pago-precio { font-size: 2.2rem; font-weight: 900; letter-spacing: -.03em; margin: 0 0 10px; }
+.pago-pasos { padding-left: 20px; display: grid; gap: 10px; font-size: 14px; line-height: 1.5; }

@@ -798,33 +798,21 @@ titulo("ESTADO VACIO — una sola cosa que hacer, sin escribir");
 }
 
 
-titulo("UN PORTAL, NO CUATRO — el tercer punto de fuga");
+titulo("PORTALES — todos por igual, en su propio paso");
 
 {
-  // Se pedian cuatro sesiones seguidas antes de ver una sola vacante.
-  // Cuatro peajes delante de alguien que todavia no ha visto funcionar
-  // nada, y ademas innecesarios: con un portal conectado ya se busca y
-  // se postula.
+  // Hasta 2026-09-25 se pedía UNO primero (el verificado) y los demás
+  // plegados. Ali: «pon todos por igual, no le des prioridad a
+  // Computrabajo; lo que sí, una alerta de el más usado». Y los portales
+  // son el paso 4, después de tus datos.
   const fsp = await import("node:fs/promises");
   const pjs = await fsp.readFile(new URL("panel/panel.js", BASE), "utf8");
-  const css = await fsp.readFile(new URL("panel/panel.css", BASE), "utf8");
-
-  check("solo se pide uno al principio", /ordenados\.slice\(0, 1\)/.test(pjs));
-  check("los demas quedan plegados", /mas-portales/.test(pjs) && /<details/.test(pjs));
-  // Lo que importa es que el <summary> NOMBRE los portales plegados, no la
-  // frase exacta que los presenta.
-  const resumenPlegado = (pjs.match(/<summary>[\s\S]*?<\/summary>/) || [""])[0];
-  check("y se nombran, para que se sepa que estan ahi",
-    /resto\.map\(\(p\) => escapar\(p\.nombre\)\)/.test(resumenPlegado), resumenPlegado.slice(0, 80));
-  check("hay estilo para el desplegable", /\.mas-portales/.test(css));
-
-  // El primero es el que tiene la postulacion COMPROBADA, no el primero
-  // de la lista. Si mañana se verifica Bumeran, el orden se ajusta solo.
-  check("el primero se elige por estar verificado",
-    /queHace\(p\)\.tono === "bien"/.test(pjs),
-    "no por el orden en que esten declarados");
-  check("en cuanto hay uno conectado se ven todos",
-    /ordenados\.filter\(\(p\) => p\.sesion\)\.length/.test(pjs));
+  check("el paso 4 enseña los cuatro a la vez", /sesionesCache\.map\(filaPortal\)/.test(pjs)
+    && !/ordenados\.slice\(0, 1\)/.test(pjs));
+  check("sin «en pruebas» ni etiquetas: solo el nombre", !/queHace\(p\)\.etiqueta/.test(pjs));
+  check("Computrabajo lleva «el más usado», sin ir primero", /El más usado en Perú/.test(pjs));
+  check("no se pasa al paso 5 sin al menos uno conectado", /id="p-portales-listo"\$\{conectados\.length \? "" : " disabled"\}/.test(pjs));
+  check("cada paso tiene «Volver»", /data-volver="1"/.test(pjs) && /data-volver="2"/.test(pjs));
 }
 
 
@@ -1004,41 +992,21 @@ titulo("LA PESTAÑA SIN CONTENT SCRIPT — el fallo mas probable del primer inte
   const phtml = await fsp3.readFile(new URL("panel/panel.html", BASE), "utf8");
 
   check("el tope vive en verificados.js, con los packs",
-    /export const TOPE_POR_TANDA\s*=\s*(?:\d+|PACK_MAYOR)/.test(ver));
+    /export const TOPE_POR_TANDA\s*=\s*(?:\d+|TOPE_DIARIO|PACK_MAYOR)/.test(ver));
   check("background.js lo importa en vez de declararlo",
     fondo2.includes('import { TOPE_POR_TANDA }') &&
     !/^const TOPE_POR_TANDA/m.test(fondo2));
-
-  const pack = Number((ver.match(/PACK_MAYOR\s*=\s*(\d+)/) || [])[1]);
-  // El tope puede estar escrito como numero o como `PACK_MAYOR`. Lo
-  // segundo es lo deseable: asi no hay dos numeros que desincronizar.
+  // Desde 2026-09-25 el titular dice lo que hace UN clic: una tanda, que
+  // es lo seguro en un día. Los packs son lo que se compra.
+  const diario = Number((ver.match(/TOPE_DIARIO\s*=\s*(\d+)/) || [])[1]);
   const topeCrudo = (ver.match(/TOPE_POR_TANDA\s*=\s*([A-Z_\d]+)/) || [])[1];
-  const tope = topeCrudo === "PACK_MAYOR" ? pack : Number(topeCrudo);
-  check("los dos numeros se leen", Number.isFinite(tope) && Number.isFinite(pack),
-    `tope ${tope}, pack ${pack}`);
-
-  check("el titular se escribe desde los numeros, no a mano",
-    pjs.includes("titularPortada()") &&
-    !/portada-titulo"\)\.innerHTML = "Cien/.test(pjs));
-
-  // Lo que de verdad importa no es que la cadena «Un clic» este en el
-  // archivo —esta, dentro de una rama— sino que esa rama este CERRADA
-  // por la comparacion. Buscar la cadena a secas da un falso positivo.
-  const cuerpo = (pjs.match(/function titularPortada\(\)\s*\{([\s\S]*?)^\}/m) || [])[1] || "";
-  check("titularPortada compara el tope con el pack",
-    /TOPE_POR_TANDA\s*>=\s*PACK_MAYOR/.test(cuerpo), cuerpo ? "" : "no se encontro la funcion");
-
-  // Y lo que devuelve cuando la comparacion NO se cumple —el caso de hoy—
-  // no puede prometer un clic.
-  const salidaPorDefecto = cuerpo.split("}").pop();
-  check("sin cubrir el pack, el titular no promete un clic",
-    Boolean(cuerpo) && !/un clic/i.test(salidaPorDefecto),
-    salidaPorDefecto.trim().slice(0, 60));
-
-  // Y el primer fotograma (el HTML estatico) dice lo mismo que el JS.
+  const tope = topeCrudo === "TOPE_DIARIO" ? diario : Number(topeCrudo);
+  check("el tope de una tanda se lee", Number.isFinite(tope) && tope > 0, `tope ${tope}`);
+  check("el titular se escribe desde el tope, no a mano",
+    pjs.includes("titularPortada()") && /enLetra\(TOPE_POR_TANDA\)/.test(pjs));
+  const palabra = { 50: "Cincuenta", 100: "Cien", 30: "Treinta" }[tope];
   const enHtml = (phtml.match(/id="portada-titulo">([^<]*(?:<br>)?[^<]*)</) || [])[1] || "";
-  check("el HTML estatico no contradice al JS",
-    tope >= pack ? enHtml.includes("Un clic") : !enHtml.includes("Un clic"),
+  check("el HTML estático dice el mismo número que el código", Boolean(palabra) && enHtml.includes(palabra),
     enHtml.replace(/<br>/g, " "));
 }
 
@@ -1445,7 +1413,7 @@ titulo("LA PESTAÑA SIN CONTENT SCRIPT — el fallo mas probable del primer inte
   check("con un portal conectado, se ofrecen los demás en Inicio",
     /Conectar más portales/.test(pj) && /sinConectar\.map\(filaPortal\)/.test(pj));
   check("la tarjeta de portal es UNA función, usada en los dos sitios",
-    (pj.match(/map\(filaPortal\)/g) || []).length >= 3);
+    (pj.match(/map\(filaPortal\)/g) || []).length >= 2);
 }
 
 // ══════════════════════════════════════════════════════════════════════
@@ -1509,7 +1477,7 @@ titulo("LA PESTAÑA SIN CONTENT SCRIPT — el fallo mas probable del primer inte
   // Al conectar un portal el panel se repinta; el desplegable se cerraba
   // y parecía que todo se reiniciaba.
   check("el desplegable de portales sigue abierto mientras uno se conecta",
-    (pj.match(/conectando\.has\(p\.id\)\) \? " open" : ""/g) || []).length >= 2);
+    (pj.match(/conectando\.has\(p\.id\)\) \? " open" : ""/g) || []).length >= 1);
 }
 
 // ══════════════════════════════════════════════════════════════════════
@@ -1606,8 +1574,10 @@ titulo("LA PESTAÑA SIN CONTENT SCRIPT — el fallo mas probable del primer inte
   const fs = await import("node:fs/promises");
   const fo = await fs.readFile(new URL("background.js", BASE), "utf8");
   const prep = fo.slice(fo.indexOf("async function prepararUna"), fo.indexOf("async function rellenarPantalla"));
-  check("adaptar el CV y generar el Word solo si hay dónde subirlo",
-    /conArchivo \? cvAdaptado\(/.test(prep) && !/ia\.adaptarAVacante/.test(prep));
+  // Desde 2026-09-25 el CV se adapta ANTES de postular si la persona eligió
+  // «adaptado» (y ese CV responde las preguntas). Si no lo eligió, no se gasta IA.
+  check("el CV se adapta solo si se eligió «adaptado»",
+    /if \(modoCV === "adaptado"\) \{[\s\S]{0,200}cvAdaptado\(/.test(prep) && !/ia\.adaptarAVacante/.test(prep));
   check("redactar y adaptar van a la vez", /Promise\.all\(\[\s*redactarPantalla/.test(prep));
   for (const portal of ["computrabajo", "linkedin", "indeed", "bumeran"]) {
     const src = await fs.readFile(new URL(`contenido/${portal}.js`, BASE), "utf8");
@@ -1989,6 +1959,113 @@ titulo("LA PESTAÑA SIN CONTENT SCRIPT — el fallo mas probable del primer inte
   check("la misma oferta se reemplaza, no se apila", /claveOferta\(r\.url\) !== k/.test(al));
   check("tu «Mis postulaciones» de Computrabajo entra al historial", /async function importarPostuladas/.test(fo)
     && /candidate\/match\/postulada\/|postulada\/\$\{encodeURIComponent\(k\)\}/.test(fo));
+}
+
+// ══════════════════════════════════════════════════════════════════════
+// RONDA 2026-09-25 (d) — cuentas a salvo, CV antes, respuestas humanas
+// ══════════════════════════════════════════════════════════════════════
+{
+  titulo("QUE NO BANEEN TU CUENTA — topes por día y sin ráfagas");
+  const v = await import(`${BASE}lib/verificados.js`);
+  check("50 al día en total", v.TOPE_DIARIO === 50 && v.TOPE_POR_TANDA === 50);
+  check("cada portal con su tope, por debajo de lo que frena el portal",
+    v.LIMITES_PORTAL.linkedin.dia < 50 && v.LIMITES_PORTAL.indeed.dia <= 15
+    && ["computrabajo", "bumeran", "linkedin", "indeed"].every((p) => v.LIMITES_PORTAL[p]?.dia > 0));
+  check("LinkedIn e Indeed esperan más entre postulaciones",
+    v.LIMITES_PORTAL.linkedin.espera[0] >= 30 && v.LIMITES_PORTAL.indeed.espera[0] >= 20);
+  const fs = await import("node:fs/promises");
+  const fo = await fs.readFile(new URL("background.js", BASE), "utf8");
+  check("la tanda alterna portales", /const cola = alternarPortales\(vacantes\)/.test(fo));
+  check("se para antes de abrir si se llegó al tope", /if \(hoy\.total >= TOPE_DIARIO\)/.test(fo));
+  check("una sola y «revisar y enviar» también respetan los topes",
+    (fo.match(/await topeAlcanzado\(/g) || []).length >= 2);
+  check("entre dos del mismo portal se espera al azar", /libreDesde\[pid\] = Date\.now\(\) \+ \(min \+ Math\.random\(\)/.test(fo));
+  check("cada postulación mide cuánto tardó", /item\.segundos = Math\.round\(\(Date\.now\(\) - t0\) \/ 1000\)/.test(fo));
+  const al = await fs.readFile(new URL("lib/almacen.js", BASE), "utf8");
+  check("las importadas del portal no cuentan para el tope de hoy", /!r\.importada/.test(al));
+}
+
+{
+  titulo("CV ANTES DE POSTULAR — y las respuestas salen de ESE CV");
+  const fs = await import("node:fs/promises");
+  const fo = await fs.readFile(new URL("background.js", BASE), "utf8");
+  const prep = fo.slice(fo.indexOf("async function prepararUna"), fo.indexOf("async function rellenarPantalla"));
+  check("con «adaptado», se adapta ANTES de abrir la postulación",
+    prep.indexOf("cvAdaptado(perfil, vacante, confirmadas)") < prep.indexOf('accion: "abrirFormulario"'));
+  check("las preguntas se responden con el CV adaptado", /redactarPantalla\(leido\?\.preguntas \|\| \[\], perfilUsado/.test(prep));
+  check("y las pantallas siguientes también", /almacen\.leer\("perfilTrabajo", null\)\) \|\| perfil/.test(fo));
+  check("se guarda el CV enviado para poder bajar EL MISMO", /cvResumen: item\.cvResumen/.test(fo));
+  const pj = await fs.readFile(new URL("panel/panel.js", BASE), "utf8");
+  check("«CV adaptado» en Postulaciones rehace el que se envió, sin otra IA",
+    /let resumen = Array\.isArray\(reg\.cvResumen\)/.test(pj));
+  check("la elección de CV vale para todos los portales y es obligatoria",
+    /if \(!vacantes\.length \|\| await cvElegido\(\)\) return true;/.test(pj) && /prefs\.cvModo \|\| prefs\.cvPortal/.test(pj));
+}
+
+{
+  titulo("RESPUESTAS — del CV, en prosa, y el DNI solo si lo piden");
+  const d = await import(`${BASE}lib/datos.js`);
+  const g = { dni: "12345678", distrito: "La Molina", pretension: "1200", horario: "Tiempo completo" };
+  const campo = (q) => d.paraCampo(q, g).campo?.clave || null;
+  check("una pregunta de estudios NO se responde con el DNI",
+    campo("Indica tu grado de instrucción según tu documento de estudios") === null
+    && campo("¿Dónde estudiaste? Indica institución") === null);
+  check("«atención», «remuneración», «institución» ya no parecen «C.I.»",
+    campo("¿Tienes experiencia en atención al cliente?") === null && campo("¿Cuál es tu remuneración actual?") === null);
+  check("pero el DNI sí cuando lo piden", campo("Número de DNI") === "dni" && campo("Documento de identidad (DNI o CE)") === "dni");
+  const r = await import(`${BASE}lib/respuestas.js`);
+  check("sin guiones ni viñetas: en prosa", r.enProsa("Manejo:\n- Canva\n- Excel") === "Manejo: Canva, Excel."
+    && r.enProsa("1) Estudio marketing\n2) Estoy en décimo ciclo") === "Estudio marketing, estoy en décimo ciclo.");
+  const ia = await (await import("node:fs/promises")).readFile(new URL("lib/ia.js", BASE), "utf8");
+  check("el modelo tiene las reglas de tono y de datos personales",
+    /un solo párrafo corrido/.test(ia) && /Nunca uses datos personales/.test(ia));
+}
+
+{
+  titulo("RECORRIDO — paso 3 completo, paso 4 portales, siempre con «Volver»");
+  const fs = await import("node:fs/promises");
+  const pj = await fs.readFile(new URL("panel/panel.js", BASE), "utf8");
+  const ph = await fs.readFile(new URL("panel/panel.html", BASE), "utf8");
+  const pc = await fs.readFile(new URL("panel/panel.css", BASE), "utf8");
+  check("el paso 3 pide dónde buscas, con qué CV y tus datos", /async function pintarPaso3/.test(pj)
+    && /¿Dónde buscas trabajo\?/.test(pj) && /¿Con qué CV postulas en los portales\?/.test(pj));
+  check("del CV sale la pregunta «¿buscas cerca de ahí?»", /Tu CV dice que vives en/.test(pj));
+  check("guardar el paso 3 lleva al 4", /avisar\("Listo\. Ahora tus portales\."/.test(pj));
+  check("el recorrido va a lo ancho de la caja", /<\/div>\s*<!-- Dónde estás, a lo ancho[\s\S]{0,200}id="recorrido"/.test(ph)
+    && /\.portada > \.recorrido \{\s*grid-column: 1 \/ -1/.test(pc));
+  const fo = await fs.readFile(new URL("background.js", BASE), "utf8");
+  check("conectado un portal, su pestaña se cierra", /await chrome\.tabs\.remove\(tabId\)/.test(fo));
+  check("solo se busca en los portales conectados", /Conecta al menos un portal para buscar/.test(pj)
+    && /function pintarChecksPortales/.test(pj));
+}
+
+{
+  titulo("VACANTES — otra ciudad fuera, encaje por colores, portales con color");
+  const d = await import(`${BASE}lib/distritos.js`);
+  check("Trujillo es otra ciudad; Los Olivos no", d.otraCiudad("Trujillo, La Libertad") === "Trujillo"
+    && d.otraCiudad("Los Olivos, Lima") === null && d.otraCiudad("Lima") === null);
+  const fs = await import("node:fs/promises");
+  const pj = await fs.readFile(new URL("panel/panel.js", BASE), "utf8");
+  const pc = await fs.readFile(new URL("panel/panel.css", BASE), "utf8");
+  check("las de otra ciudad se apartan de la lista y de la tanda", /distritos\.otraCiudad\(v\.ubicacion\)/.test(pj));
+  check("cinco rangos de encaje, sin rojo abajo", /e-top/.test(pj) && /e-min/.test(pj)
+    && /\.encaje-v\.e-min \{ background: #ECEAE3/.test(pc));
+  check("cada portal con su color", ["computrabajo", "bumeran", "indeed", "linkedin"].every((p) => pc.includes(`.fila-v.portal-${p} {`)));
+  check("un adelanto difuminado de «más portales, más vacantes»", /teaser-portales/.test(pj) && /filter: blur/.test(pc));
+  check("las cintas se paran con la pestaña oculta", /\.en-pausa \.cinta-mov/.test(pc));
+}
+
+{
+  titulo("SIN CARACTERES DE CONTROL — en ningún archivo de la extensión");
+  const fs = await import("node:fs/promises");
+  const archivos = ["background.js", "panel/panel.js", ...["almacen", "datos", "respuestas", "distritos", "sincro", "verificados", "ia", "cv", "portales"].map((f) => `lib/${f}.js`),
+                    ...["computrabajo", "indeed", "linkedin", "bumeran", "comun"].map((f) => `contenido/${f}.js`)];
+  const malos = [];
+  for (const f of archivos) {
+    const src = await fs.readFile(new URL(f, BASE), "utf8");
+    if (/[\x00-\x08\x0b\x0c\x0e-\x1f]/.test(src)) malos.push(f);
+  }
+  check("ninguno lleva un carácter invisible colado", malos.length === 0, malos.join(", "));
 }
 
 console.log(`

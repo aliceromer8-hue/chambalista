@@ -155,6 +155,20 @@ export const tracker = {
     await guardar(CLAVES.tracker, lista.slice(0, 500));
     return lista;
   },
+  /** Cuántas se enviaron HOY con Chamba Lista, en total y por portal. */
+  async enviadasHoy() {
+    const lista = await leer(CLAVES.tracker, []);
+    const hoy = new Date().toDateString();
+    const hechas = lista.filter((r) => r.estado === "enviada" && !r.importada
+      && new Date(r.fecha).toDateString() === hoy);
+    const porPortal = {};
+    for (const r of hechas) {
+      const k = String(r.portalId || r.portal || "").toLowerCase();
+      porPortal[k] = (porPortal[k] || 0) + 1;
+    }
+    return { total: hechas.length, porPortal };
+  },
+
   async yaPostulado(url) {
     const lista = await leer(CLAVES.tracker, []);
     const k = claveOferta(url);

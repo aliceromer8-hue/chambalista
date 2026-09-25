@@ -676,3 +676,25 @@ No se puede deshacer y no guardamos copia. ¿Seguimos?`);
 pintarPrivacidadIA();
 animarRuta();
 restaurarTrabajo();
+
+
+// ---------- pagar un pack ----------
+// Yape o Plin: una transferencia entre personas, que es como se paga
+// aquí. El número lo da el servidor (variable de entorno PAGO_YAPE); si
+// aún no está, se pide escribir al correo y ahí se mandan los datos.
+document.querySelectorAll(".btn-pack").forEach((b) => b.addEventListener("click", async () => {
+  const dlg = document.querySelector("#dlg-pago");
+  document.querySelector("#pago-cuantas").textContent = b.dataset.pack;
+  document.querySelector("#pago-soles").textContent = b.dataset.soles;
+  document.querySelectorAll(".pago-soles2").forEach((s) => { s.textContent = b.dataset.soles; });
+  let pago = {};
+  try { pago = (await (await fetch("/api/estado")).json()).pago || {}; } catch { /* sin red: se pide escribir */ }
+  const destino = document.querySelector("#pago-destino");
+  destino.textContent = pago.yape
+    ? `al ${pago.yape}${pago.titular ? ` (${pago.titular})` : ""}`
+    : "— escríbenos al correo de abajo y te mandamos el número";
+  const asunto = encodeURIComponent(`Pack de ${b.dataset.pack} postulaciones`);
+  document.querySelector("#pago-correo").href = `mailto:${pago.correo || "chambalistaperu@gmail.com"}?subject=${asunto}`;
+  dlg.showModal();
+}));
+document.querySelector("#pago-cerrar")?.addEventListener("click", () => document.querySelector("#dlg-pago").close());

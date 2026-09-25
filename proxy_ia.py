@@ -25,6 +25,7 @@ import json
 import os
 import threading
 import time
+import re
 from collections import defaultdict
 
 import redactor_ia
@@ -43,12 +44,41 @@ def _limpiar(marcas, ahora):
     return [m for m in marcas if m > limite]
 
 
+_UUID = re.compile(r"^u:[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$")
+
+
+def _usadas_en_base(dispositivo):
+    """Cuántas usó esta CUENTA en la ventana, según la base. None si no se sabe.
+
+    En Vercel cada instancia tiene su propia memoria y se reinicia sola:
+    una cuota solo en memoria casi no frena. Con la tabla uso_ia
+    (supabase/005-uso-ia.sql) cuenta de verdad. Si la tabla aún no
+    existe, None y se usa la memoria como antes.
+    """
+    if not _UUID.match(dispositivo or ""):
+        return None
+    try:
+        import nube
+        if not nube.activa():
+            return None
+        desde = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime(time.time() - VENTANA_HORAS * 3600))
+        filas = nube._pedir("GET", f"uso_ia?select=creado&usuario=eq.{dispositivo[2:]}&creado=gte.{desde}"
+                                   f"&order=creado.asc&limit={LIBRES_POR_VENTANA + 5}")
+        return None if filas is None else filas
+    except Exception:                                             # noqa: BLE001
+        return None
+
+
 def consultar_cuota(dispositivo):
     """Cuánto le queda a este dispositivo, sin consumir nada."""
     ahora = time.time()
     with _candado:
         marcas = _limpiar(_uso.get(dispositivo, []), ahora)
         _uso[dispositivo] = marcas
+    en_base = _usadas_en_base(dispositivo)
+    if en_base is not None:
+        marcas = [time.mktime(time.strptime(f["creado"][:19], "%Y-%m-%dT%H:%M:%S")) - time.timezone
+                  for f in en_base if f.get("creado")] or marcas[:0]
     usadas = len(marcas)
     restantes = max(0, LIBRES_POR_VENTANA - usadas)
     proxima = (min(marcas) + VENTANA_HORAS * 3600) if marcas and not restantes else None
@@ -63,6 +93,13 @@ def consultar_cuota(dispositivo):
 
 def _consumir(dispositivo):
     """Registra una operación. Devuelve False si ya no le queda."""
+    en_base = _usadas_en_base(dispositivo)
+    if en_base is not None:
+        if len(en_base) >= LIBRES_POR_VENTANA:
+            return False
+        import nube
+        nube._pedir("POST", "uso_ia", [{"usuario": dispositivo[2:]}], {"Prefer": "return=minimal"})
+        return True
     ahora = time.time()
     with _candado:
         marcas = _limpiar(_uso.get(dispositivo, []), ahora)

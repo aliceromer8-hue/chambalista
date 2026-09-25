@@ -13,6 +13,7 @@ import * as huecos from "./lib/huecos.js";
 import * as sesion from "./lib/sesion.js";
 import { medir } from "./lib/medir.js";
 import { TOPE_POR_TANDA } from "./lib/verificados.js";
+import { TOPE_DIARIO, LIMITES_PORTAL } from "./lib/verificados.js";
 import * as distritos from "./lib/distritos.js";
 import { sincronizar } from "./lib/sincro.js";
 
@@ -413,25 +414,59 @@ async function prepararUna(vacante, perfil, guardados, respuestasPersona) {
   reporte.competenciasCV = confirmadas;
   reporte.descripcion = (vacante.descripcion || "").slice(0, 1200);
 
-  // CV adaptado a ESTA vacante en tu cuenta de Computrabajo, si lo
-  // elegiste. Va antes de abrir la postulación: Computrabajo adjunta el
-  // CV principal en el momento de postular.
-  const prefsCV = (await almacen.preferencias.obtener()).cvPortal || {};
-  if ((vacante.portalId || "") === "computrabajo" && prefsCV.computrabajo === "adaptado") {
+  // EL CV, ANTES DE ABRIR NADA (Ali, 2026-09-25: «en Postulaciones sale
+  // lo de adaptado pero recién lo adapta ahí; la idea es que se adapte al
+  // momento, antes de postular a cada una, se suba, y se respondan las
+  // preguntas en base a ese CV adaptado»).
+  //
+  //   adaptado  la IA reenfoca tu CV a esta vacante; ESE perfil es el que
+  //             responde las preguntas, y el Word se sube donde se puede
+  //   harvard   el de Chamba Lista tal cual
+  //   portal    el que ya tienes en cada portal
+  const modoCV = await modoCVElegido();
+  let perfilUsado = perfil;
+  let pedidoCV = null;
+  if (modoCV === "adaptado") {
+    if (lote?.actual) lote.actual.paso = "Adaptando tu CV a esta vacante";
+    const listo = await cvAdaptado(perfil, vacante, confirmadas).catch(() => null);
+    if (listo?.base) perfilUsado = listo.base;
+    reporte.cvResumen = listo?.resumen || null;
+    reporte.cambiosCV = listo?.cambios || [];
+    if (listo?.pedido && !listo.pedido.error) pedidoCV = listo.pedido;
+  } else if (modoCV === "harvard") {
+    pedidoCV = await cv.docxAdaptado(perfil, null, {}).catch(() => null);
+    if (pedidoCV?.error) pedidoCV = null;
+  }
+  reporte.modoCV = modoCV;
+  // Computrabajo adjunta el CV PRINCIPAL de tu cuenta al postular: con
+  // «adaptado», el de esta vacante se sube y se deja de principal antes;
+  // con «harvard», se sube la primera vez que se postula ahí.
+  if ((vacante.portalId || "") === "computrabajo" && modoCV === "harvard" && pedidoCV
+      && !(await almacen.preferencias.obtener()).cvHarvardEnComputrabajo) {
+    if (lote?.actual) lote.actual.paso = "Subiendo tu CV de Chamba Lista a Computrabajo";
     try {
-      const listo = await cvAdaptado(perfil, vacante, confirmadas);
-      if (listo?.pedido && !listo.pedido.error) {
-        const puesto = await ponerCVEnComputrabajo(tabId, listo.pedido, { reemplazarNuestro: true });
-        reporte.cv = { adjuntado: true, enCuenta: true, archivo: puesto.nombre };
-        reporte.cambiosCV = listo.cambios || [];
-      } else {
-        reporte.cv = { adjuntado: false, nota: "No se pudo generar el CV adaptado: va el principal de tu cuenta." };
-      }
+      const puesto = await ponerCVEnComputrabajo(tabId, pedidoCV);
+      const pr = await almacen.preferencias.obtener();
+      await almacen.preferencias.guardar({ ...pr, cvHarvardEnComputrabajo: true });
+      reporte.cv = { adjuntado: true, enCuenta: true, archivo: puesto.nombre };
+    } catch (e) {
+      reporte.cv = { adjuntado: false, nota: `No se pudo poner tu CV en Computrabajo (${e.message}). Va el principal de tu cuenta.` };
+    }
+    await irY(tabId, vacante.url, "ping").catch(() => null);
+  }
+  if ((vacante.portalId || "") === "computrabajo" && modoCV === "adaptado" && pedidoCV) {
+    if (lote?.actual) lote.actual.paso = "Subiendo tu CV adaptado a Computrabajo";
+    try {
+      const puesto = await ponerCVEnComputrabajo(tabId, pedidoCV, { reemplazarNuestro: true });
+      reporte.cv = { adjuntado: true, enCuenta: true, archivo: puesto.nombre };
     } catch (e) {
       reporte.cv = { adjuntado: false, nota: `No se pudo poner el CV adaptado en Computrabajo (${e.message}). Va el principal de tu cuenta.` };
     }
     await irY(tabId, vacante.url, "ping").catch(() => null);
   }
+  // Las pantallas siguientes (LinkedIn, Indeed) responden con el mismo CV.
+  await almacen.guardar("perfilTrabajo", perfilUsado);
+  if (lote?.actual) lote.actual.paso = "Abriendo la postulación";
 
   // Dónde estaba la pestaña ANTES de pulsar «Postularme»: si después
   // está en otra página, el formulario está en esa página.
@@ -506,27 +541,33 @@ async function prepararUna(vacante, perfil, guardados, respuestasPersona) {
     return { ...reporte, error: `No se pudo leer el formulario (${e.message}).` };
   }
   const conArchivo = Boolean(leido?.conArchivo);
+  if (lote?.actual) lote.actual.paso = "Respondiendo sus preguntas con tu CV";
+  // Si el formulario pide archivo y elegiste «el de cada portal», va el
+  // de Chamba Lista: un campo de archivo vacío no deja enviar.
   const [redaccion, cvListo] = await Promise.all([
-    redactarPantalla(leido?.preguntas || [], perfil, guardados, respuestasPersona, vacante),
-    conArchivo ? cvAdaptado(perfil, vacante, confirmadas) : Promise.resolve(null),
+    redactarPantalla(leido?.preguntas || [], perfilUsado, guardados, respuestasPersona, vacante),
+    conArchivo && !pedidoCV ? cv.docxAdaptado(perfil, null, {}).then((pedido) => ({ pedido })).catch(() => null)
+      : Promise.resolve(pedidoCV ? { pedido: pedidoCV, cambios: reporte.cambiosCV } : null),
   ]);
 
   // El Word antes que las respuestas: si el portal autocompleta algo al
   // recibirlo, lo que se escriba después es lo que manda.
   if (reporte.cv?.enCuenta) {
     // ya está: se subió a tu cuenta de Computrabajo antes de abrir
-  } else if (cvListo?.pedido && !cvListo.pedido.error) {
-    reporte.cambiosCV = cvListo.cambios || [];
+  } else if (conArchivo && cvListo?.pedido && !cvListo.pedido.error) {
     reporte.cv = await adjuntarPedido(tabId, cvListo.pedido);
   } else if (conArchivo) {
     reporte.cv = { adjuntado: false,
                    nota: "No se pudo generar el CV adaptado. Se postula con el que ya tienes en el portal." };
   } else {
-    reporte.cv = { adjuntado: false, nota: "Este formulario usa el CV que ya tienes guardado en el portal." };
+    reporte.cv = { adjuntado: false,
+                   nota: modoCV === "adaptado"
+                     ? "Este portal adjunta el CV de tu perfil; las respuestas salen de tu CV adaptado a esta vacante."
+                     : "Este formulario usa el CV que ya tienes guardado en el portal." };
   }
 
   const patrones = datos.CAMPOS.map((c) => ({
-    clave: c.clave, etiqueta: c.etiqueta, patron: c.patron.source,
+    clave: c.clave, etiqueta: c.etiqueta, patron: c.patron.source, flags: c.patron.flags,
   }));
   const relleno = await hablarCon(tabId, {
     accion: "rellenar", perfil, guardados, patrones,
@@ -582,6 +623,11 @@ async function escribirRedactadas(tabId, redactadas) {
 }
 
 /** El CV reenfocado a la vacante y su .docx. Solo si hay dónde subirlo. */
+async function modoCVElegido() {
+  const prefs = await almacen.preferencias.obtener();
+  return prefs.cvModo || prefs.cvPortal?.computrabajo || "portal";
+}
+
 async function cvAdaptado(perfil, vacante, confirmadas) {
   let resumen = null, cambios = [], base = perfil;
   try {
@@ -594,7 +640,7 @@ async function cvAdaptado(perfil, vacante, confirmadas) {
   } catch { /* el CV base sirve igual */ }
   const pedido = await cv.docxAdaptado(base, vacante, { resumen, competenciasExtra: confirmadas })
     .catch((e) => ({ error: e.message }));
-  return { pedido, cambios };
+  return { pedido, cambios, resumen, base };
 }
 
 /**
@@ -657,7 +703,8 @@ async function escribirYEnviar(respuestasAprobadas) {
       return { enviada: false, error: `El portal pide completar: ${s.errores.slice(0, 3).join(" · ")}` };
     }
     if (!s?.avanzado) break;
-    await rellenarPantalla(tabId, perfil, guardados, {}, await almacen.leer("vacanteTrabajo", {}));
+    await rellenarPantalla(tabId, (await almacen.leer("perfilTrabajo", null)) || perfil, guardados, {},
+                           await almacen.leer("vacanteTrabajo", {}));
   }
   try {
     return await hablarCon(tabId, { accion: "enviar" });
@@ -689,6 +736,38 @@ export const CONSENTIMIENTO = [
 
 const consentimientoCompleto = (a) => CONSENTIMIENTO.every((c) => a?.[c.clave] === true);
 
+/**
+ * Computrabajo, Indeed, LinkedIn, Bumeran, Computrabajo… en vez de diez
+ * seguidas del mismo portal: las esperas de uno se solapan con el trabajo
+ * en los otros, y ningún portal ve una ráfaga.
+ */
+/** Si enviar esta vacante pasaría un tope del día, por qué. Si no, null. */
+async function topeAlcanzado(vacante) {
+  const hoy = await almacen.tracker.enviadasHoy();
+  if (hoy.total >= TOPE_DIARIO) return `Llegaste a ${TOPE_DIARIO} hoy, el máximo seguro. Mañana seguimos.`;
+  const pid = String(vacante?.portalId || vacante?.portal || "").toLowerCase();
+  const dia = LIMITES_PORTAL[pid]?.dia;
+  if (dia && (hoy.porPortal[pid] || 0) >= dia) {
+    return `Hoy ya van ${dia} en ${vacante.portal || pid}: es lo seguro para tu cuenta. Mañana seguimos.`;
+  }
+  return null;
+}
+
+function alternarPortales(vacantes) {
+  const grupos = new Map();
+  for (const v of vacantes) {
+    const k = v.portalId || v.portal || "";
+    if (!grupos.has(k)) grupos.set(k, []);
+    grupos.get(k).push(v);
+  }
+  const listas = [...grupos.values()];
+  const salida = [];
+  for (let i = 0; salida.length < vacantes.length; i++) {
+    for (const l of listas) if (l[i]) salida.push(l[i]);
+  }
+  return salida;
+}
+
 async function correrLote({ vacantes, modo, aprobacion, respuestasPersona }) {
   if (modo === "automatico" && !consentimientoCompleto(aprobacion)) {
     lote = { ...lote, fase: "terminado", mensaje: "Falta marcar las casillas de riesgo. No se envió nada." };
@@ -697,7 +776,10 @@ async function correrLote({ vacantes, modo, aprobacion, respuestasPersona }) {
 
   const perfil = await almacen.perfil.obtener();
   const guardados = await almacen.datosPersonales.obtener();
-  const cola = vacantes.slice(0, TOPE_POR_TANDA);
+  const cola = alternarPortales(vacantes).slice(0, TOPE_POR_TANDA);
+  const inicio = Date.now();
+  // Cuándo se puede volver a postular en cada portal sin parecer ráfaga.
+  const libreDesde = {};
 
   lote = {
     fase: "preparando", modo, total: cola.length, hechas: 0, cancelado: false,
@@ -710,13 +792,44 @@ async function correrLote({ vacantes, modo, aprobacion, respuestasPersona }) {
     while (lote.pausado && !lote.cancelado) await esperar(400);
     if (lote.cancelado) break;
     const item = lote.items[i];
+    const pid = String(item.portalId || item.portal || "").toLowerCase();
     // Lo que el panel enseña «en vivo»: cuál va y qué se le está haciendo.
     lote.actual = { titulo: item.titulo, empresa: item.empresa, portal: item.portal,
                     paso: "Abriendo la oferta y leyendo sus preguntas" };
+
+    // Topes del día: el total y el del portal. Se para ANTES de abrir.
+    if (modo === "automatico") {
+      const hoy = await almacen.tracker.enviadasHoy();
+      const tope = LIMITES_PORTAL[pid]?.dia;
+      if (hoy.total >= TOPE_DIARIO) {
+        for (const resto of lote.items.slice(i)) {
+          resto.estado = "tope";
+          resto.motivo = `Llegaste a ${TOPE_DIARIO} hoy, el máximo seguro. Mañana seguimos.`;
+        }
+        lote.hechas = cola.length;
+        break;
+      }
+      if (tope && (hoy.porPortal[pid] || 0) >= tope) {
+        item.estado = "tope";
+        item.motivo = `Hoy ya van ${tope} en ${item.portal}: es lo seguro para tu cuenta. Mañana seguimos.`;
+        lote.hechas = i + 1;
+        continue;
+      }
+      // Sin ráfagas: si este portal recibió una hace poco, se espera.
+      const falta = (libreDesde[pid] || 0) - Date.now();
+      if (falta > 0) {
+        lote.actual.paso = `Esperando ${Math.ceil(falta / 1000)} s para no ir en ráfaga en ${item.portal}`;
+        while (Date.now() < libreDesde[pid] && !lote.cancelado) await esperar(500);
+        if (lote.cancelado) break;
+        lote.actual.paso = "Abriendo la oferta y leyendo sus preguntas";
+      }
+    }
+    const t0 = Date.now();
     try {
       const r = await prepararUna(cola[i], perfil, guardados, respuestasPersona);
       Object.assign(item, { preguntas: r.preguntas || [], cambiosCV: r.cambiosCV || [],
-                            descripcion: r.descripcion || "", competencias: r.competenciasCV || [] });
+                            descripcion: r.descripcion || "", competencias: r.competenciasCV || [],
+                            cvResumen: r.cvResumen || null, modoCV: r.modoCV || "" });
 
       // El portal postuló al entrar (ofertas sin preguntas): está ENVIADA.
       // Antes seguía hacia «enviar», no encontraba botón y la marcaba
@@ -796,6 +909,7 @@ async function correrLote({ vacantes, modo, aprobacion, respuestasPersona }) {
         portal: item.portal, empresa: item.empresa, puesto: item.titulo,
         url: item.url, estado: item.estado, motivo: item.motivo,
         descripcion: item.descripcion || "", competencias: item.competencias || [],
+        cvResumen: item.cvResumen || null, modoCV: item.modoCV || "", segundos: item.segundos || null,
         sinPago: (item.preguntas || []).some((q) => q.sinPagoAceptado),
       });
       // Y la cuenta anónima, que es lo único que nos llega a nosotros.
@@ -806,9 +920,16 @@ async function correrLote({ vacantes, modo, aprobacion, respuestasPersona }) {
             { portal: item.portal, motivo: item.motivo || item.estado });
     }
 
+    // Cuánto tardó DE VERDAD (Ali: «quiero saber cuánto tiempo te toma»).
+    item.segundos = Math.round((Date.now() - t0) / 1000);
+    if (["enviada", "fallida"].includes(item.estado)) {
+      const [min, max] = LIMITES_PORTAL[pid]?.espera || [3, 6];
+      libreDesde[pid] = Date.now() + (min + Math.random() * (max - min)) * 1000;
+    }
     lote.hechas = i + 1;
     await esperar(PAUSA_ENTRE_VACANTES);
   }
+  lote.segundos = Math.round((Date.now() - inicio) / 1000);
 
   const cuenta = (e) => lote.items.filter((i) => i.estado === e).length;
   lote.actual = null;
@@ -840,6 +961,8 @@ async function enviarAprobadas(ids) {
   for (let n = 0; n < seleccion.length; n++) {
     if (lote.cancelado) break;
     const item = seleccion[n];
+    const tope = await topeAlcanzado(item);
+    if (tope) { item.estado = "tope"; item.motivo = tope; lote.hechas = n + 1; continue; }
     try {
       // Se reabre el formulario: entre preparar y revisar, la pestaña ya
       // navegó a otra oferta.
@@ -956,7 +1079,12 @@ async function revisarVigilada(tabId) {
         recordadas[v.portal] = Date.now();
         await almacen.guardar("sesionesRecordadas", recordadas);
         chrome.runtime.sendMessage({ aviso: "sesionPortal", portal: v.portal }).catch(() => {});
+        // Conectado: la pestaña del portal ya no hace falta (Ali: «una vez
+        // que se conecte, cierra la pestaña de esa plataforma»). Es la que
+        // abrimos nosotros para entrar; la sesión queda en el navegador.
         await volverAlPanel();
+        await esperar(700);
+        await chrome.tabs.remove(tabId).catch(() => {});
         return;
       }
     } catch { /* aún sin content script en esa pestaña */ }
@@ -1006,6 +1134,10 @@ chrome.runtime.onMessage.addListener((msg, _e, responder) => {
           return responder(listo);
         }
         case "enviarUna": {
+          // Los topes del día también para una sola.
+          const tope = await topeAlcanzado(msg.vacante);
+          if (tope) return responder({ enviada: false, tope: true, error: tope });
+          const t0 = Date.now();
           const r = await escribirYEnviar(msg.respuestas);
           await almacen.tracker.anotar({
             portal: msg.vacante?.portal, empresa: msg.vacante?.empresa,
@@ -1013,6 +1145,8 @@ chrome.runtime.onMessage.addListener((msg, _e, responder) => {
             estado: r?.enviada ? "enviada" : "fallida", motivo: r?.mensaje || r?.error || "",
             sinPago: Boolean(msg.sinPago),
             descripcion: String(msg.descripcion || "").slice(0, 1200), competencias: msg.competencias || [],
+            cvResumen: msg.cvResumen || null, modoCV: msg.modoCV || "",
+            segundos: Math.round((Date.now() - t0) / 1000),
           });
           sincronizar().catch(() => {});
           medir(r?.enviada ? "postulacion_enviada" : "postulacion_omitida",
@@ -1073,18 +1207,12 @@ chrome.runtime.onMessage.addListener((msg, _e, responder) => {
                              cuantos: r.archivos.length });
         }
         case "cvPortalElegir": {
+          // Para TODOS los portales. El de Chamba Lista se sube a Computrabajo
+          // en la primera postulación de ahí (al elegirlo puede que aún no
+          // haya sesión: se elige en el paso 3, antes de conectar portales).
           const prefs = await almacen.preferencias.obtener();
-          await almacen.preferencias.guardar({ ...prefs,
-            cvPortal: { ...(prefs.cvPortal || {}), computrabajo: msg.modo } });
-          if (msg.modo !== "harvard") return responder({ ok: true });
-          // «Usar el de Chamba Lista»: se sube UNA vez y queda de principal.
-          const perfil = await almacen.perfil.obtener();
-          if (!perfil) return responder({ error: "Primero carga tu CV." });
-          const pedido = await cv.docxAdaptado(perfil, null, {});
-          if (!pedido || pedido.error) return responder({ error: pedido?.error || "No se pudo generar el CV." });
-          const tab = await pestanaDeTrabajo();
-          const puesto = await ponerCVEnComputrabajo(tab, pedido);
-          return responder({ ok: true, archivo: puesto.nombre });
+          await almacen.preferencias.guardar({ ...prefs, cvModo: msg.modo, cvHarvardEnComputrabajo: false });
+          return responder({ ok: true });
         }
         case "consentimiento":
           return responder({ casillas: CONSENTIMIENTO, tope: TOPE_POR_TANDA });

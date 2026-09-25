@@ -44,6 +44,33 @@ VENTANA_SEGUNDOS = int(os.environ.get("VENTANA_SEGUNDOS", "3600"))
 app = Flask(__name__, template_folder="templates", static_folder="static")
 app.config["MAX_CONTENT_LENGTH"] = 6 * 1024 * 1024   # 6 MB
 
+# Cabeceras de seguridad en TODAS las respuestas (Ali, 2026-09-25: «que
+# nadie sea capaz de hackear esto»).
+#   CSP: solo código y datos de este mismo dominio; ningún script en línea
+#        (los que había se movieron a static/js), ningún iframe ajeno.
+#   frame-ancestors / X-Frame-Options: nadie puede meter la web dentro de
+#        otra para engañar clics (clickjacking).
+#   nosniff: el navegador no «adivina» tipos de archivo.
+#   HSTS: siempre por https.
+_CSP = ("default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; "
+        "img-src 'self' data:; font-src 'self'; connect-src 'self'; object-src 'none'; "
+        "base-uri 'self'; form-action 'self'; frame-ancestors 'none'")
+
+
+@app.after_request
+def _cabeceras_seguras(respuesta):
+    respuesta.headers.setdefault("Content-Security-Policy", _CSP)
+    respuesta.headers.setdefault("X-Frame-Options", "DENY")
+    respuesta.headers.setdefault("X-Content-Type-Options", "nosniff")
+    respuesta.headers.setdefault("Referrer-Policy", "strict-origin-when-cross-origin")
+    respuesta.headers.setdefault("Strict-Transport-Security", "max-age=31536000; includeSubDomains")
+    respuesta.headers.setdefault("Permissions-Policy", "camera=(), microphone=(), geolocation=()")
+    # Las respuestas de la API llevan datos de la persona: ni cachés
+    # intermedias ni el disco del navegador.
+    if request.path.startswith("/api/"):
+        respuesta.headers.setdefault("Cache-Control", "no-store")
+    return respuesta
+
 _historial = defaultdict(deque)
 
 # Intentos de contraseña, contados aparte de los CV. Sin esto, probar
@@ -56,9 +83,19 @@ _intentos = defaultdict(deque)
 
 
 def _ip():
-    # Detrás de un proxy (Render, Railway) la IP real va en la cabecera.
-    reenviada = request.headers.get("X-Forwarded-For", "")
-    return reenviada.split(",")[0].strip() or request.remote_addr or "?"
+    """La IP de quien pide, sin fiarse de lo que mande el propio cliente.
+
+    Antes se tomaba el PRIMER valor de X-Forwarded-For, que lo escribe
+    quien hace la petición: bastaba mandar una IP inventada distinta en
+    cada intento para saltarse los límites (contraseñas, CV). Vercel pone
+    la IP real en x-vercel-forwarded-for / x-real-ip y no deja que el
+    cliente las falsee; fuera de Vercel se usa la de la conexión.
+    """
+    for cabecera in ("X-Vercel-Forwarded-For", "X-Real-Ip"):
+        valor = (request.headers.get(cabecera) or "").split(",")[0].strip()
+        if valor:
+            return valor
+    return request.remote_addr or "?"
 
 
 def _pasa(cubo, tope, ventana):
@@ -195,6 +232,14 @@ def estado():
         # arreglos que su Chrome no había cargado y parecía que no
         # funcionaban.
         "version_extension": _version_extension(),
+        # Cómo pagar un pack (Yape/Plin). El número vive en el entorno de
+        # Vercel, no en el código: se cambia sin desplegar y no queda en
+        # el repositorio. Sin número, la página pide escribir al correo.
+        "pago": {
+            "yape": os.environ.get("PAGO_YAPE", "").strip(),
+            "titular": os.environ.get("PAGO_TITULAR", "").strip(),
+            "correo": "chambalistaperu@gmail.com",
+        },
         "limite": LIMITE_PETICIONES,
         "ventana_horas": round(VENTANA_SEGUNDOS / 3600, 1),
         "max_mb": 6,
@@ -653,7 +698,16 @@ def cv_docx():
 # ---------------------------------------------------------------------------
 
 def _dispositivo():
-    """Identificador que genera la extensión. No es una cuenta ni un correo."""
+    """A quién se le cuenta la cuota de IA: a la CUENTA.
+
+    Antes era un identificador que manda la extensión (X-Dispositivo):
+    cualquiera con cuenta podía cambiarlo en cada petición y gastar la
+    clave de Gemini sin límite. Las rutas de IA piden sesión, así que se
+    cuenta por la cuenta, que no se regenera.
+    """
+    usuario = getattr(g, "usuario", None) or {}
+    if usuario.get("id"):
+        return f"u:{usuario['id']}"
     ident = (request.headers.get("X-Dispositivo") or "").strip()
     return ident[:64] if ident else f"ip:{_ip()}"
 

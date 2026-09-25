@@ -608,8 +608,11 @@ check("el enlace del correo aterriza en una página real", r.status_code == 200)
 _rec = r.get_data(as_text=True)
 check("que pide la contraseña nueva", 'id="clave"' in _rec)
 check("y no se indexa", "noindex" in _rec)
+# El script vive en static/js/recuperar.js desde 2026-09-25 (la CSP ya no
+# admite scripts en línea): se mira ahí.
+_rec_js = pathlib.Path("static/js/recuperar.js").read_text(encoding="utf-8")
 check("el token no se queda en la barra de direcciones",
-      "history.replaceState" in _rec)
+      "history.replaceState" in _rec_js and "/static/js/recuperar.js" in _rec)
 
 check("cambiar la contraseña exige el token del correo",
       cliente.post("/api/cuenta/clave-nueva",
@@ -1045,8 +1048,9 @@ _verif_tope = pathlib.Path("extension/lib/verificados.js").read_text(encoding="u
 # lo deseable: así el titular y el código no pueden desincronizarse—.
 # Leer solo dígitos reventaba el suite entero a mitad, en silencio.
 _tope_crudo = _re.search(r"TOPE_POR_TANDA = ([A-Z_0-9]+)", _verif_tope).group(1)
-_tope = (int(_re.search(r"PACK_MAYOR = (\d+)", _verif_tope).group(1))
-         if _tope_crudo == "PACK_MAYOR" else int(_tope_crudo))
+_tope = (int(_re.search(r"PACK_MAYOR = (\d+)", _verif_tope).group(1)) if _tope_crudo == "PACK_MAYOR"
+         else int(_re.search(r"TOPE_DIARIO = (\d+)", _verif_tope).group(1)) if _tope_crudo == "TOPE_DIARIO"
+         else int(_tope_crudo))
 check("el tope real está declarado en un solo sitio", _tope > 0, f"{_tope} por tanda")
 check("y el background lo importa, no lo redeclara",
       "import { TOPE_POR_TANDA }" in _fondo
@@ -1069,19 +1073,21 @@ check("y lo publica para que el panel lo lea",
 _verif2 = pathlib.Path("extension/lib/verificados.js").read_text(encoding="utf-8")
 _pack_mayor = int(_re.search(r"PACK_MAYOR = (\d+)", _verif2).group(1))
 _EN_LETRA = {5: "cinco", 15: "quince", 30: "treinta", 50: "cincuenta", 100: "cien"}
-_esperado = _EN_LETRA.get(_pack_mayor)
-check("el pack mayor se sabe escribir en letra", bool(_esperado), str(_pack_mayor))
+# Desde 2026-09-25 el titular dice lo que hace UN clic (la tanda, lo seguro
+# en un día); el pack mayor es lo que se compra y va en los precios.
+_esperado = _EN_LETRA.get(_tope)
+check("el tope de una tanda se sabe escribir en letra", bool(_esperado), str(_tope))
 
 _visible_web = _re.sub(r"<!--.*?-->", "", BASE_HTML, flags=_re.S).lower()
 _visible_panel = _re.sub(r"<!--.*?-->", "", _panel, flags=_re.S).lower()
 if _esperado:
-    check("el titular de la web dice el tamaño del pack mayor",
-          _esperado in _visible_web, f"el pack mayor es {_pack_mayor}")
+    check("el titular de la web dice lo que hace un clic",
+          _esperado in _visible_web, f"una tanda son {_tope}")
     # En el panel el titular lo escribe titularPortada() desde las
     # constantes; el HTML solo lleva el primer fotograma. Vale cualquiera
     # de los dos, pero alguno tiene que decir el número.
     check("y el del panel dice el mismo",
-          _esperado in _visible_panel or "PACK_MAYOR" in _panel_js)
+          _esperado in _visible_panel or "TOPE_POR_TANDA" in _panel_js)
 
 # El pack mayor del código y el que anuncia la landing son el mismo.
 check("el precio anunciado corresponde a ese pack",
@@ -1104,13 +1110,11 @@ def _sin_etiquetas(html):
 
 _LO_PROMETEN = [("web", _sin_etiquetas(_visible_web)),
                 ("panel", _sin_etiquetas(_visible_panel))]
-_frases = ["un clic. cien postulaciones", "un clic, cien postulaciones",
-           "cien postulaciones de un clic"]
+# «Un clic, N postulaciones» solo con la N que una tanda cumple.
 for _donde, _texto in _LO_PROMETEN:
-    _promete = any(f in _texto for f in _frases)
-    check(f"la {_donde} solo promete «un clic, cien» si el codigo lo cumple",
-          not _promete or _tope >= _pack_mayor,
-          f"promete={_promete}, tope={_tope}, pack={_pack_mayor}")
+    _dice = _re.findall(r"un clic\. (\w+) postulaciones", _texto)
+    check(f"la {_donde} promete de un clic solo lo que una tanda cumple",
+          all(_EN_LETRA.get(_tope) == d for d in _dice), f"dice={_dice}, tope={_tope}")
 
 # ---------------------------------------------------------------------
 titulo("EL ARCHIVO QUE RECIBE LA EMPRESA")
@@ -1425,6 +1429,46 @@ _c2 = app_web.app.test_client()
 check("sin sesión, /api/cuenta/nombre se cierra",
       _c2.post("/api/cuenta/nombre", json={"nombre": "X"}).status_code == 401)
 check("el registro de la web pide el nombre", 'id="nombre"' in BASE_HTML)
+
+
+# ---------------------------------------------------------------------
+titulo("SEGURIDAD — cabeceras, IP real, cuota por cuenta")
+# ---------------------------------------------------------------------
+# Ali, 2026-09-25: «que nadie sea capaz de hackear esto».
+_c3 = app_web.app.test_client()
+_r3 = _c3.get("/")
+_csp = _r3.headers.get("Content-Security-Policy", "")
+check("la web lleva CSP sin scripts en línea", "script-src 'self'" in _csp and "unsafe-inline" not in _csp.split("script-src")[1].split(";")[0])
+check("nadie puede meterla en un iframe", _r3.headers.get("X-Frame-Options") == "DENY" and "frame-ancestors 'none'" in _csp)
+check("nosniff y HSTS", _r3.headers.get("X-Content-Type-Options") == "nosniff"
+      and "max-age" in _r3.headers.get("Strict-Transport-Security", ""))
+check("las respuestas de la API no se guardan en caché",
+      _c3.get("/api/estado").headers.get("Cache-Control") == "no-store")
+for _plantilla in ["web", "privacidad", "recuperar"]:
+    _html = pathlib.Path(f"templates/{_plantilla}.html").read_text(encoding="utf-8")
+    check(f"{_plantilla}.html sin scripts en línea (la CSP los bloquearía)", "<script>" not in _html)
+
+with app_web.app.test_request_context("/", headers={"X-Forwarded-For": "1.2.3.4", "X-Real-Ip": "9.9.9.9"}):
+    check("la IP no sale de lo que el cliente escribe en X-Forwarded-For", app_web._ip() == "9.9.9.9")
+with app_web.app.test_request_context("/", headers={"X-Forwarded-For": "1.2.3.4"}):
+    check("sin cabecera de Vercel se usa la de la conexión, no la inventada", app_web._ip() != "1.2.3.4")
+
+from flask import g as _g
+with app_web.app.test_request_context("/", headers={"X-Dispositivo": "otro-cada-vez"}):
+    _g.usuario = {"id": "11111111-2222-3333-4444-555555555555"}
+    check("la cuota de IA se cuenta por la cuenta, no por lo que mande el navegador",
+          app_web._dispositivo() == "u:11111111-2222-3333-4444-555555555555")
+
+import proxy_ia as _px
+check("la cuota va a la base solo con un id de cuenta válido (nada inyectable)",
+      _px._UUID.match("u:11111111-2222-3333-4444-555555555555") and not _px._UUID.match("u:1' or 1=1"))
+check("hay migración para la tabla de cuota", pathlib.Path("supabase/005-uso-ia.sql").exists())
+
+# Nada de claves en el código.
+import subprocess as _sp
+_claves = _sp.run(["git", "grep", "-nE", r"AIza[0-9A-Za-z_-]{30,}|sb_secret_[0-9A-Za-z]{10,}|gsk_[A-Za-z0-9]{20,}", "--", "."],
+                  capture_output=True, text=True).stdout.strip()
+check("ninguna clave escrita en el repositorio", not _claves, _claves[:120])
 
 print(f"\n{'TODO OK' if fallos == 0 else f'{fallos} FALLO(S)'}")
 sys.exit(1 if fallos else 0)

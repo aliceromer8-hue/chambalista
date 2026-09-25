@@ -428,7 +428,9 @@ REGLAS ESTRICTAS:
 4. Si la pregunta pide un DATO que no está en el CV (un documento, un número, una fecha, un sueldo, una dirección), pon "FALTA_DATO: <qué dato hace falta>". Pero si pide una MOTIVACIÓN u opinión («¿por qué te interesa?», «¿qué te motiva?», «¿por qué deberíamos elegirte?»), respóndela con sinceridad uniendo la vacante con lo que el CV SÍ dice: eso no es inventar, y dejarla sin responder le cuesta la postulación a la persona.
 5. Responde SOLO lo que cada pregunta pide. Si preguntan el distrito, no menciones el teléfono.
 6. Máximo 400 caracteres por respuesta. Sin viñetas ni comillas envolventes.
-7. No copies fragmentos del CV en crudo: redacta una frase."""
+7. No copies fragmentos del CV en crudo: redacta una frase.
+8. Tono profesional y humano, como una persona segura que escribe bien: un solo párrafo corrido, con frases completas y conectadas. Sin guiones, viñetas, listas, numeraciones ni saltos de línea.
+9. Nunca uses datos personales (DNI, fecha de nacimiento, dirección, teléfono) salvo que la pregunta los pida literalmente. Una pregunta sobre estudios, experiencia o motivos se responde desde el CV."""
 
 
 def redactar_lote(enunciados, perfil, extras=None):

@@ -14,7 +14,10 @@ export const CAMPOS = [
     obligatorio: true,
     etiqueta: "DNI",
     ayuda: "8 dígitos. Casi todos los portales lo piden.",
-    patron: /\bdni\b|documento|identidad|n[uú]mero de documento|c\.?i\.?\b/i,
+    // Estricto. Antes llevaba «documento», «identidad» y «c.i.»; el último,
+    // con las tildes, encajaba en «institución», «atención», «remuneración»:
+    // una pregunta de estudios se contestó con el DNI (Ali, 2026-09-25).
+    patron: /(^|[^\p{L}])(dni|d\.n\.i\.?|n[uú]mero de documento|documento de identidad|documento nacional|carn[eé] de extranjer[ií]a)([^\p{L}]|$)/iu,
     validar: /^\d{8}$/,
     error: "El DNI peruano tiene 8 dígitos.",
     sensible: true,
@@ -57,7 +60,7 @@ export const CAMPOS = [
     obligatorio: true,
     etiqueta: "Pretensión salarial (S/)",
     ayuda: "Solo el número, por ejemplo 1500.",
-    patron: /pretensi[oó]n|expectativa salarial|salario esperado|remuneraci[oó]n/i,
+    patron: /pretensi[oó]n|expectativa salarial|salario esperado|aspiraci[oó]n salarial|remuneraci[oó]n (pretendida|esperada)|cu[aá]nto esperas ganar/i,
     validar: /^\d{3,6}$/,
     error: "Escribe solo el número, sin S/ ni comas.",
     sensible: false,
@@ -165,8 +168,14 @@ export function validar(datos) {
   return { limpio, errores };
 }
 
+// Una pregunta que pide que CUENTES algo (estudios, experiencia, motivos)
+// no se contesta con un dato suelto: se redacta desde tu CV. Los datos
+// sensibles COMPLEMENTAN; no sustituyen a una respuesta.
+const ES_PARA_REDACTAR = /estudi|carrera|formaci[oó]n|experiencia|conocimient|habilidad|cu[eé]ntanos|describe|explica|por qu[eé]|motiv|logro|proyecto|especialidad|instituci[oó]n|universidad|ciclo|herramienta/i;
+
 /** ¿Alguno de los datos guardados encaja con la etiqueta de este campo? */
 export function paraCampo(etiqueta, guardados = {}) {
+  if (ES_PARA_REDACTAR.test(etiqueta || "") || String(etiqueta || "").length > 140) return { campo: null, valor: null };
   for (const c of CAMPOS) {
     if (c.patron.test(etiqueta)) {
       return { campo: c, valor: guardados[c.clave] || null };

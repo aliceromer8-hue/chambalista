@@ -67,6 +67,29 @@ function lugarDe(enunciado) {
  *   `necesita` son los datos que la persona tiene que aportar; mientras
  *   haya alguno sin responder, `texto` va vacío.
  */
+/**
+ * Una respuesta en prosa: sin guiones, viñetas ni saltos de línea.
+ * Ali, 2026-09-25: «todas las respuestas salen del CV y en un tono
+ * profesional, sin guiones, corrido, humanizado». El modelo ya lo tiene
+ * como regla; esto es la red por si alguna se cuela como lista.
+ */
+export function enProsa(texto) {
+  const partes = String(texto || "")
+    .split(/\n+/)
+    .map((l) => l.replace(/^\s*(?:[-–—•*·]|\d+[.)])\s*/, "").trim())
+    .filter(Boolean);
+  // Tras una coma, «Estoy…» pasa a «estoy…» (solo palabras comunes: los
+  // nombres propios como Canva o Excel se quedan como están).
+  const COMUN = /^(Estoy|Tengo|Manejo|Soy|He|Cuento|Estudio|Me|Mi|Mis|El|La|Los|Las|Un|Una|En|Con|Por|Para|Actualmente|Además|También)\b/;
+  let t = partes.map((l, i) => {
+    const suave = i > 0 && !/[.!?:]$/.test(partes[i - 1]) ? l.replace(COMUN, (w) => w.toLowerCase()) : l;
+    return i < partes.length - 1 && !/[.!?:;,]$/.test(suave) ? `${suave},` : suave;
+  }).join(" ");
+  t = t.replace(/\s+[–—-]\s+/g, ", ").replace(/\s{2,}/g, " ").trim();
+  if (t && !/[.!?]$/.test(t)) t += ".";
+  return t.charAt(0).toUpperCase() + t.slice(1);
+}
+
 export async function redactar(preguntas, perfil, guardados = {}, respuestasPersona = {}, contexto = {}) {
   const salida = preguntas.map((p) => ({ ...p, clase: clasificar(p.enunciado), texto: "", necesita: [] }));
 
@@ -117,7 +140,12 @@ export async function redactar(preguntas, perfil, guardados = {}, respuestasPers
         respondido: true, automatica: !respuestasPersona[clave],
       });
       if (r === "Sí, completa") {
-        q.texto = `Sí, cuento con disponibilidad${lugar ? ` para asistir a ${lugar}` : ""}.`;
+        // Con sus datos, la respuesta dice algo: horario y cuándo empieza.
+        const horario = guardados.horario ? ` en horario de ${String(guardados.horario).toLowerCase()}` : "";
+        const inicio = guardados.disponibilidadInicio === "Inmediata" ? " y puedo incorporarme de inmediato"
+          : guardados.disponibilidadInicio && !/^\d{4}-/.test(guardados.disponibilidadInicio)
+            ? ` y puedo empezar ${String(guardados.disponibilidadInicio).toLowerCase()}` : "";
+        q.texto = `Sí, cuento con disponibilidad${lugar ? ` para asistir a ${lugar}` : ""}${horario}${inicio}.`;
       } else if (r === "Sí, con restricciones de horario") {
         q.texto = `Sí, cuento con disponibilidad${lugar ? ` para ${lugar}` : ""}, coordinando el horario según mis clases.`;
       } else if (r === "No") {
@@ -245,7 +273,7 @@ export async function redactar(preguntas, perfil, guardados = {}, respuestasPers
             q.texto = respuestasPersona[`extra_${q.indice}`];
           }
         } else {
-          q.texto = r.texto;
+          q.texto = enProsa(r.texto);
         }
       });
     }

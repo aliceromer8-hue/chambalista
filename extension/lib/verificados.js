@@ -70,5 +70,25 @@ export const PACKS = [
 ];
 export const PACK_MAYOR = 100;
 
-// Cuántas prepara una tanda de un clic. Ver el bloque de arriba.
-export const TOPE_POR_TANDA = PACK_MAYOR;
+// ── Lo seguro por día (Ali, 2026-09-25: «que no baneen tu cuenta») ──
+//
+// Investigado ese día:
+//   · LinkedIn limita Solicitud Sencilla a ~50 por 24 h y frena antes si
+//     van en ráfaga («burst»): lo trata como comportamiento no auténtico.
+//   · Indeed prohíbe en sus términos automatizar Indeed Apply y verifica
+//     con Persona que no seas un bot. Es el de más riesgo: el tope más bajo.
+//   · Computrabajo y Bumeran no publican límite: se va con margen.
+// Y los portales penalizan la RÁFAGA más que el número: entre dos
+// postulaciones del mismo portal se espera un rato al azar, como una
+// persona. La tanda alterna portales para que esas esperas se solapen.
+export const TOPE_DIARIO = 50;
+export const LIMITES_PORTAL = {
+  computrabajo: { dia: 25, espera: [5, 12] },
+  bumeran:      { dia: 20, espera: [5, 12] },
+  linkedin:     { dia: 20, espera: [30, 60] },
+  indeed:       { dia: 15, espera: [20, 40] },
+};
+
+// Cuántas manda una tanda de un clic: lo que es seguro en un día. El
+// titular de la portada («Un clic. Cincuenta postulaciones.») sale de aquí.
+export const TOPE_POR_TANDA = TOPE_DIARIO;

@@ -58,14 +58,11 @@
         <p class="antetitulo">Prácticas y primer empleo en Perú</p>
         <!-- Lo reescribe panel.js con titularPortada(), desde PACK_MAYOR y
            TOPE_POR_TANDA. Esto es solo el primer fotograma. -->
-        <h1 id="portada-titulo">Un clic.<br>Cien postulaciones.</h1>
+        <h1 id="portada-titulo">Un clic.<br>Cincuenta postulaciones.</h1>
         <p class="bajada" id="portada-bajada">
           Sube tu CV, elige dónde buscar y postula a todo lo que encaje contigo.
         </p>
         <div class="portada-acciones" id="portada-acciones"></div>
-        <!-- Dónde estás: cuenta → CV → portales → postular. Lo pinta
-             pintarRecorrido() según la etapa. -->
-        <ol class="recorrido" id="recorrido" aria-label="Tu avance"></ol>
         <!-- Lo que hace mientras tanto, escrito en vivo. Ilustrativo: son
              pasos, no postulaciones de nadie. -->
         <div class="escena" aria-hidden="true">
@@ -96,6 +93,9 @@
            cuando el tope real son 15: el doble. -->
         <div class="sello" id="sello"><span id="sello-tope">—</span><small>por tanda</small></div>
       </div>
+      <!-- Dónde estás, a lo ancho de la caja: los cinco pasos en una línea
+           (Ali: «hagámoslo más ancho, se ve más estético»). -->
+      <ol class="recorrido" id="recorrido" aria-label="Tu avance"></ol>
     </section>
 
     <div id="arranque" class="oculto"></div>
@@ -238,6 +238,11 @@
         <div><span class="ico" aria-hidden="true">🗂️</span><b>Juntamos las que encajan</b><span>Ordenadas por tu CV, sin las que ya postulaste.</span></div>
         <div><span class="ico" aria-hidden="true">🚀</span><b>Postulas a todas</b><span>Llena cada formulario, responde sus preguntas y la envía.</span></div>
       </div>
+      <div class="cinta" aria-label="Búsquedas de ejemplo">
+        <div class="cinta-mov">
+          <button class="mini-tarjeta boton-ejemplo" type="button" data-buscar-ejemplo="Practicante de marketing"><b>Practicante de marketing</b><i class="va">Buscar ↗</i></button><button class="mini-tarjeta boton-ejemplo" type="button" data-buscar-ejemplo="Asistente administrativo"><b>Asistente administrativo</b><i class="va">Buscar ↗</i></button><button class="mini-tarjeta boton-ejemplo" type="button" data-buscar-ejemplo="Practicante contable"><b>Practicante contable</b><i class="va">Buscar ↗</i></button><button class="mini-tarjeta boton-ejemplo" type="button" data-buscar-ejemplo="Analista de datos jr."><b>Analista de datos jr.</b><i class="va">Buscar ↗</i></button><button class="mini-tarjeta boton-ejemplo" type="button" data-buscar-ejemplo="Diseñador gráfico"><b>Diseñador gráfico</b><i class="va">Buscar ↗</i></button><button class="mini-tarjeta boton-ejemplo" type="button" data-buscar-ejemplo="Atención al cliente"><b>Atención al cliente</b><i class="va">Buscar ↗</i></button><button class="mini-tarjeta boton-ejemplo" type="button" data-buscar-ejemplo="Practicante de derecho"><b>Practicante de derecho</b><i class="va">Buscar ↗</i></button><button class="mini-tarjeta boton-ejemplo" type="button" data-buscar-ejemplo="Ejecutivo de ventas"><b>Ejecutivo de ventas</b><i class="va">Buscar ↗</i></button><button class="mini-tarjeta boton-ejemplo" type="button" data-buscar-ejemplo="Practicante de recursos humanos"><b>Practicante de recursos humanos</b><i class="va">Buscar ↗</i></button><button class="mini-tarjeta boton-ejemplo" type="button" data-buscar-ejemplo="Asistente de logística"><b>Asistente de logística</b><i class="va">Buscar ↗</i></button><button class="mini-tarjeta boton-ejemplo" type="button" data-buscar-ejemplo="Practicante de marketing"><b>Practicante de marketing</b><i class="va">Buscar ↗</i></button><button class="mini-tarjeta boton-ejemplo" type="button" data-buscar-ejemplo="Asistente administrativo"><b>Asistente administrativo</b><i class="va">Buscar ↗</i></button><button class="mini-tarjeta boton-ejemplo" type="button" data-buscar-ejemplo="Practicante contable"><b>Practicante contable</b><i class="va">Buscar ↗</i></button><button class="mini-tarjeta boton-ejemplo" type="button" data-buscar-ejemplo="Analista de datos jr."><b>Analista de datos jr.</b><i class="va">Buscar ↗</i></button><button class="mini-tarjeta boton-ejemplo" type="button" data-buscar-ejemplo="Diseñador gráfico"><b>Diseñador gráfico</b><i class="va">Buscar ↗</i></button><button class="mini-tarjeta boton-ejemplo" type="button" data-buscar-ejemplo="Atención al cliente"><b>Atención al cliente</b><i class="va">Buscar ↗</i></button><button class="mini-tarjeta boton-ejemplo" type="button" data-buscar-ejemplo="Practicante de derecho"><b>Practicante de derecho</b><i class="va">Buscar ↗</i></button><button class="mini-tarjeta boton-ejemplo" type="button" data-buscar-ejemplo="Ejecutivo de ventas"><b>Ejecutivo de ventas</b><i class="va">Buscar ↗</i></button><button class="mini-tarjeta boton-ejemplo" type="button" data-buscar-ejemplo="Practicante de recursos humanos"><b>Practicante de recursos humanos</b><i class="va">Buscar ↗</i></button><button class="mini-tarjeta boton-ejemplo" type="button" data-buscar-ejemplo="Asistente de logística"><b>Asistente de logística</b><i class="va">Buscar ↗</i></button>
+        </div>
+      </div>
     </div>
   </section>
 
@@ -298,9 +303,9 @@
         </label>
         </div>
 
-        <h2 style="margin-top:22px">Tu CV en Computrabajo</h2>
-        <p class="nota" id="cv-portal-actual">Computrabajo adjunta a tus postulaciones el CV que tienes como principal.
-          <button class="enlace" id="btn-ver-cv-portal">Ver cuál tengo</button></p>
+        <h2 style="margin-top:22px">Tu CV en los portales</h2>
+        <p class="nota" id="cv-portal-actual">Elige con qué CV postulas.
+          <button class="enlace" id="btn-ver-cv-portal">Ver cuál tienes en Computrabajo</button></p>
         <div id="cv-portal-opciones"></div>
 
         <h2 style="margin-top:22px">Portales</h2>
@@ -322,6 +327,7 @@
 
     <article class="tarjeta">
       <h2 id="titulo-datos">Tus datos para postular</h2>
+      <div class="cinta cinta-suave" aria-hidden="true"><div class="cinta-mov"><span class="mini-tarjeta"><b>¿Cuál es tu DNI?</b><i class="ok">Lo respondemos ✓</i></span><span class="mini-tarjeta"><b>¿Qué horario puedes cumplir?</b><i class="ok">Lo respondemos ✓</i></span><span class="mini-tarjeta"><b>¿Desde cuándo puedes empezar?</b><i class="ok">Lo respondemos ✓</i></span><span class="mini-tarjeta"><b>¿Cuál es tu pretensión salarial?</b><i class="ok">Lo respondemos ✓</i></span><span class="mini-tarjeta"><b>¿En qué distrito vives?</b><i class="ok">Lo respondemos ✓</i></span><span class="mini-tarjeta"><b>¿Por qué te interesa el puesto?</b><i class="ok">Lo respondemos ✓</i></span><span class="mini-tarjeta"><b>¿Tienes experiencia en el rubro?</b><i class="ok">Lo respondemos ✓</i></span><span class="mini-tarjeta"><b>¿Cuál es tu DNI?</b><i class="ok">Lo respondemos ✓</i></span><span class="mini-tarjeta"><b>¿Qué horario puedes cumplir?</b><i class="ok">Lo respondemos ✓</i></span><span class="mini-tarjeta"><b>¿Desde cuándo puedes empezar?</b><i class="ok">Lo respondemos ✓</i></span><span class="mini-tarjeta"><b>¿Cuál es tu pretensión salarial?</b><i class="ok">Lo respondemos ✓</i></span><span class="mini-tarjeta"><b>¿En qué distrito vives?</b><i class="ok">Lo respondemos ✓</i></span><span class="mini-tarjeta"><b>¿Por qué te interesa el puesto?</b><i class="ok">Lo respondemos ✓</i></span><span class="mini-tarjeta"><b>¿Tienes experiencia en el rubro?</b><i class="ok">Lo respondemos ✓</i></span></div></div>
       <p class="nota">Las empresas los preguntan y tu CV no los trae. <strong>Los obligatorios se piden antes de postular</strong>:
         con ellos respondemos por ti. Viven únicamente en tu navegador.</p>
       <div class="rejilla-datos" id="campos-datos"></div>

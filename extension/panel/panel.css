@@ -1645,3 +1645,157 @@ main { max-width: 1120px; }
 /* ── La hoja Harvard dentro del panel ── */
 .hoja-harvard { background: var(--papel-3); border-radius: var(--r-chico); padding: 14px; margin-top: 12px; max-height: 60vh; overflow-y: auto; }
 .memoria-cuenta { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin: -6px 0 12px; }
+
+/* ═══════════════════════════════════════════════════════════════════
+ * RONDA 2026-09-25 (c) — recorrido a lo ancho, paso 3, portales iguales,
+ * encaje por colores, portales con color y cintas en más sitios.
+ * Todo con transform/opacity: lo más barato de animar para cualquier
+ * máquina, y se para con la pestaña en segundo plano.
+ * ═══════════════════════════════════════════════════════════════════ */
+
+/* ── El recorrido, a lo ancho de la caja: cinco pasos en una línea ── */
+.portada > .recorrido {
+  grid-column: 1 / -1; max-width: none; width: 100%; margin: 26px 0 0;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+}
+.portada > .recorrido::before, .portada > .recorrido .avance { left: 10%; }
+.portada > .recorrido::before { right: 10%; }
+.portada > .recorrido .avance { width: calc(80% * var(--hecho, 0)); }
+.recorrido li .rotulo { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
+@media (max-width: 520px) {
+  .recorrido .bola { width: 26px; height: 26px; font-size: 11px; }
+  .recorrido::before, .recorrido .avance { top: 12px; }
+  .recorrido li .rotulo { font-size: 10px; }
+}
+
+/* ── Paso 3: dónde buscas, con qué CV, tus datos ── */
+.asistente { width: 100%; display: grid; gap: 14px; }
+.bloque-paso {
+  background: #FBFAF6; border: 2px solid #131316; border-radius: 12px; box-shadow: 3px 3px 0 #131316;
+  padding: 14px 16px; color: #131316; animation: entrar .4s both;
+}
+.bloque-paso:nth-child(2) { animation-delay: .08s; }
+.bloque-paso:nth-child(3) { animation-delay: .16s; }
+.bloque-paso h3 { display: flex; align-items: center; gap: 8px; font-size: 15px; margin: 0 0 8px; }
+.num-paso {
+  display: inline-grid; place-items: center; width: 22px; height: 22px; border-radius: 99px;
+  background: #D4F249; border: 2px solid #131316; font-size: 11px; font-family: var(--mono);
+}
+.bloque-paso input[type=text], .bloque-paso select, .bloque-paso input[type=date] {
+  width: 100%; padding: 10px 12px; border: 2px solid #131316; border-radius: 9px;
+  font: inherit; font-weight: 600; background: #fff; color: #131316;
+}
+.bloque-paso .rejilla-datos { margin-top: 6px; }
+.bloque-paso .campo-dato label { color: #131316; }
+.pregunta-lugar { margin: 0; font-size: 13.5px; }
+.nota-cv { font-size: 11.5px; margin-top: 6px; }
+.botones-paso { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; }
+.volver { color: #131316 !important; font-size: 13px; }
+.aviso-paso { background: var(--coral-suave); border: 2px solid var(--coral); border-radius: 9px; padding: 8px 12px; color: #131316 !important; opacity: 1 !important; }
+.boton.oscuro { background: #131316; color: #D4F249; border-color: #131316; }
+.boton.oscuro:disabled { opacity: .45; }
+
+/* ── Paso 4: los portales, todos por igual ── */
+.portales-iguales { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(220px, 100%), 1fr)); gap: 10px; }
+.insignia {
+  display: inline-block; font-size: 10px; font-weight: 800; text-transform: uppercase; letter-spacing: .04em;
+  background: #FFF3D6; color: #131316; border: 1.5px solid #FFC53D; border-radius: 99px; padding: 1px 8px;
+}
+.conectado-ok {
+  font-size: 12.5px; font-weight: 800; color: #1F7A45; background: #DFF7EA;
+  border: 2px solid #34D07F; border-radius: 99px; padding: 6px 12px; white-space: nowrap;
+  animation: saltito .5s both;
+}
+
+/* ── El buscador: solo tus portales; los demás, apagados ── */
+.chk-portal.apagado {
+  font: inherit; font-size: 12.5px; font-weight: 700; cursor: pointer; opacity: .6;
+  border-style: dashed; background: none; color: var(--tinta);
+}
+.chk-portal.apagado small { font-size: 10.5px; margin-left: 4px; text-decoration: underline; }
+.chk-portal.apagado:hover { opacity: 1; }
+
+/* ── Colores por portal: se distinguen de un vistazo ── */
+.fila-v { border-left-width: 6px; }
+.fila-v.portal-computrabajo { border-left-color: #E8590C; }
+.fila-v.portal-bumeran { border-left-color: #7C3AED; }
+.fila-v.portal-indeed { border-left-color: #2563EB; }
+.fila-v.portal-linkedin { border-left-color: #0E7490; }
+.fila-v.portal-computrabajo .portal-mini { color: #C2410C; }
+.fila-v.portal-bumeran .portal-mini { color: #6D28D9; }
+.fila-v.portal-indeed .portal-mini { color: #1D4ED8; }
+.fila-v.portal-linkedin .portal-mini { color: #0E7490; }
+.chk-portal.portal-computrabajo input { accent-color: #E8590C; }
+.chk-portal.portal-bumeran input { accent-color: #7C3AED; }
+.chk-portal.portal-indeed input { accent-color: #2563EB; }
+.chk-portal.portal-linkedin input { accent-color: #0E7490; }
+
+/* ── Encaje por colores (ver rangoEncaje en panel.js) ── */
+.encaje-v {
+  display: inline-flex; flex-direction: column; align-items: center; gap: 1px; min-width: 70px;
+  border: 2px solid #131316; border-radius: 10px; padding: 4px 8px 6px; position: relative; overflow: hidden;
+  background: var(--papel-2); color: #131316;
+}
+.encaje-v b { font-family: var(--mono); font-size: 14px; line-height: 1.1; }
+.encaje-v small { font-size: 9.5px; font-weight: 800; text-transform: uppercase; letter-spacing: .03em; white-space: nowrap; }
+.encaje-v::after {
+  content: ""; position: absolute; left: 0; bottom: 0; height: 4px; width: var(--p, 0%);
+  background: currentColor; opacity: .55; transform-origin: left; animation: llenar .9s cubic-bezier(.2, .7, .3, 1) both;
+}
+@keyframes llenar { from { transform: scaleX(0); } to { transform: scaleX(1); } }
+.encaje-v.e-top { background: #0E9F6E; color: #fff; border-color: #0B7A55; box-shadow: 0 0 0 0 rgba(14, 159, 110, .5); animation: brillo-top 2.6s ease-in-out infinite; }
+.encaje-v.e-alto { background: #C6F24E; }
+.encaje-v.e-medio { background: #FFD166; }
+.encaje-v.e-bajo { background: #FFD8C2; }
+.encaje-v.e-min { background: #ECEAE3; color: #55555F; border-color: #B9B6AC; }
+@keyframes brillo-top { 0%, 100% { box-shadow: 0 0 0 0 rgba(14, 159, 110, .45); } 50% { box-shadow: 0 0 0 6px rgba(14, 159, 110, 0); } }
+/* En el panel estrecho el porcentaje se queda (es lo que más se mira);
+ * solo se va la palabra. */
+@media (max-width: 560px) {
+  .vacante.fila-v { grid-template-columns: auto minmax(0, 1fr) auto auto; gap: 8px; }
+  .encaje-v { min-width: 46px; padding: 3px 5px 5px; }
+  .encaje-v small { display: none; }
+  .encaje-v b { font-size: 12.5px; }
+}
+
+/* ── Más portales, más vacantes: un adelanto difuminado ── */
+.teaser-portales { position: relative; margin-top: 10px; border-radius: var(--r-chico); overflow: hidden; }
+.teaser-filas { display: grid; gap: 8px; filter: blur(3px); opacity: .55; }
+.teaser-filas span {
+  display: block; height: 58px; border-radius: var(--r-chico); border: 2px solid var(--papel-3);
+  background: linear-gradient(90deg, var(--papel-2) 0 40%, var(--papel-3) 40% 60%, var(--papel-2) 60%);
+}
+.teaser-texto {
+  position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center;
+  gap: 4px; text-align: center; padding: 10px; background: rgba(251, 250, 246, .55);
+}
+.teaser-texto b { font-size: 14px; }
+.teaser-texto span { font-size: 12px; color: var(--tinta-2); font-weight: 600; }
+.teaser-texto .boton { margin-top: 6px; }
+
+/* ── Cuánto tardó cada una ── */
+.vivo-feed .tiempo { font-family: var(--mono); font-size: 10.5px; color: var(--tinta-2); margin-left: auto; white-space: nowrap; }
+.vivo-feed .tiempo + .por-que { margin-left: 8px; }
+
+/* ── Cintas: la animación que gustó, en más sitios ── */
+.cinta {
+  overflow: hidden; margin: 14px 0 4px;
+  mask-image: linear-gradient(90deg, transparent, #000 6%, #000 94%, transparent);
+}
+.cinta-mov { display: flex; gap: 10px; width: max-content; animation: desfilar 38s linear infinite; }
+.cinta:hover .cinta-mov { animation-play-state: paused; }
+.cinta-suave .cinta-mov { animation-duration: 46s; }
+.boton-ejemplo { cursor: pointer; font: inherit; text-align: left; }
+.boton-ejemplo:hover { background: #D4F249; transform: translateY(-2px); }
+.en-pausa .cinta-mov, .en-pausa .cinta-demo, .en-pausa .adorno, .en-pausa .encaje-v.e-top { animation-play-state: paused; }
+
+@media (prefers-reduced-motion: reduce) {
+  .cinta-mov, .bloque-paso, .conectado-ok, .encaje-v::after, .encaje-v.e-top { animation: none !important; }
+}
+/* La rejilla de portales y el asistente ocupan TODO el ancho de la fila
+ * de acciones (que es flex): sin esto se encogían y aplastaban las tarjetas. */
+.portada-acciones > .portales-iguales, .portada-acciones > .asistente, .portada-acciones > .botones-paso { width: 100%; flex: 1 1 100%; }
+.portada .portal-tarjeta .insignia { margin-top: 2px; }
+@media (max-width: 560px) {
+  .fila-v h3 { white-space: normal; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
+}
