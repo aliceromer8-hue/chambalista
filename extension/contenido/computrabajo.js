@@ -58,13 +58,84 @@
   }
 
   function leerDetalle() {
+    // `texto` conserva los saltos de línea para la vista previa del panel
+    // (Ali: «que se vea una vista previa del trabajo en la plataforma»).
+    const cuerpo = document.querySelector(SEL.detalleDesc);
+    const cabecera = document.querySelector(SEL.detalleTitulo)?.parentElement;
     return {
       titulo: C.texto(document, SEL.detalleTitulo),
+      empresaLinea: (cabecera?.querySelector("h1 + p, p")?.innerText || "").trim(),
       descripcion: C.texto(document, SEL.detalleDesc),
+      texto: (cuerpo?.innerText || "").trim().slice(0, 6000),
       requisitos: [...document.querySelectorAll(SEL.detalleRequisitos)]
         .map((li) => li.innerText.trim()).filter(Boolean).slice(0, 12),
+      // Sueldo, contrato y jornada: las primeras líneas cortas del bloque de
+      // ESTA oferta ([div-link=oferta]), hasta «Requerimientos». Buscando en
+      // toda la página se colaban las de «ofertas similares» (medido).
+      datos: (() => {
+        const caja = document.querySelector("[div-link='oferta']");
+        const hojas = caja ? [...caja.querySelectorAll("span, p, li")]
+          .filter((e) => !e.children.length).map((e) => (e.innerText || "").trim()).filter(Boolean) : [];
+        const corte = hojas.findIndex((x) => /^requerimientos$/i.test(x));
+        return (corte > 0 ? hojas.slice(0, corte) : []).filter((x) => x.length < 70).slice(0, 5);
+      })(),
       url: location.href,
     };
+  }
+
+  // ---------- tus CV en Word/PDF (candidate/cv/uploadcv) ----------
+  //
+  // Medido en el sitio real (2026-09-25): Computrabajo guarda VARIOS CV y
+  // el marcado «por defecto» (radio rbPrincipal) es el que se adjunta a
+  // tus postulaciones. Subir: el campo [input-file]; al cambiarlo, su
+  // propio script envía el formulario (máx. 12 MB). Principal: cambiar el
+  // radio navega y lo guarda. Borrar: #it-delete de la fila y #btDelete.
+  // Computrabajo quita los espacios del nombre: se reconoce por el id.
+  function cvArchivos() {
+    const archivos = [...document.querySelectorAll("input[name='rbPrincipal']")]
+      .filter((r) => r.value && r.value.length > 4)
+      .map((r) => {
+        const fila = r.closest("tr") || r.parentElement?.parentElement;
+        return { id: r.value, nombre: (fila?.textContent || "").replace(/\s+/g, " ").trim(), principal: r.checked };
+      });
+    const subir = document.querySelector(".it-up-cv");
+    return { archivos, puedeSubir: Boolean(subir && (subir.offsetWidth || subir.offsetHeight)),
+             enPagina: Boolean(document.querySelector("input[name='rbPrincipal']")) };
+  }
+
+  function cvSubir(nombre, base64) {
+    const campo = document.querySelector("[input-file]") || document.querySelector("input[type=file][id*='UploadCv']");
+    if (!campo) return { error: "No encontré dónde subir el CV en Computrabajo." };
+    const bytes = Uint8Array.from(atob(base64), (c) => c.charCodeAt(0));
+    const archivo = new File([bytes], nombre, {
+      type: /\.pdf$/i.test(nombre) ? "application/pdf"
+        : "application/vnd.openxmlformats-officedocument.wordprocessingml.document" });
+    const dt = new DataTransfer();
+    dt.items.add(archivo);
+    campo.files = dt.files;
+    // Su script escucha «change» y envía el formulario: la página se recarga.
+    campo.dispatchEvent(new Event("change", { bubbles: true }));
+    return { subiendo: true };
+  }
+
+  function cvPrincipal(id) {
+    const r = [...document.querySelectorAll("input[name='rbPrincipal']")].find((x) => x.value === id);
+    if (!r) return { error: "Ese CV ya no está en tu cuenta de Computrabajo." };
+    if (r.checked) return { yaEra: true };
+    r.click();                       // su script navega y lo guarda
+    return { navegando: true };
+  }
+
+  async function cvBorrar(id) {
+    const icono = [...document.querySelectorAll("#it-delete, [data-filecandidateid]")]
+      .find((e) => e.getAttribute("data-filecandidateid") === id && /delete/i.test(e.id + e.className));
+    if (!icono) return { error: "No encontré ese CV para quitarlo." };
+    icono.click();
+    await new Promise((r) => setTimeout(r, 500));
+    const confirmar = document.querySelector("#btDelete");
+    if (!confirmar) return { error: "Computrabajo no pidió confirmar el borrado." };
+    confirmar.click();
+    return { navegando: true };
   }
 
   // ---------- «Mis postulaciones» ----------
@@ -388,6 +459,10 @@
           case "ofertas":       return responder({ ofertas: leerOfertas(), sesion: haySesion() });
           case "detalle":       return responder(leerDetalle());
           case "postuladas":    return responder(leerPostuladas());
+          case "cvArchivos":    return responder(cvArchivos());
+          case "cvSubir":       return responder(cvSubir(msg.nombre, msg.base64));
+          case "cvPrincipal":   return responder(cvPrincipal(msg.id));
+          case "cvBorrar":      return responder(await cvBorrar(msg.id));
           case "abrirFormulario": return responder(await abrirFormulario());
           // `conArchivo`: si hay dónde subir un CV. Si no, el fondo ni
           // adapta el CV ni genera el Word: la página de preguntas usa el

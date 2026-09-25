@@ -163,3 +163,132 @@ export function explicar(base, disposicion = "cerca") {
   }
   return `Ofertas en toda tu zona de Lima (${permitidos.size} distritos).`;
 }
+
+
+// ═══════════════════════════════════════════════════════════════════
+// Cuánto te tomaría llegar (Ali, 2026-09-25)
+// ═══════════════════════════════════════════════════════════════════
+// «Algo muy importante en Lima es el lugar»: trabajos en tu zona, cerca
+// y lejos, y «te tomaría tanto tiempo desde Miraflores».
+//
+// Google Maps de verdad es una API de pago; aquí no se gasta. Así que:
+//   · el TIEMPO es una estimación nuestra, dicha como estimación: centro
+//     aproximado de cada distrito, distancia en línea recta × 1,4 (las
+//     calles no van en línea recta) a ~17 km/h, la velocidad media del
+//     transporte público limeño en hora punta, + 10 min de caminar y
+//     esperar;
+//   · el enlace «Ver ruta» abre Google Maps con el origen y el destino
+//     ya puestos, y ahí la persona ve la ruta real de ese momento. Un
+//     enlace no cuesta nada.
+
+// Centro aproximado de cada distrito [latitud, longitud].
+const CENTROS = {
+  "cercado de lima": [-12.046, -77.043], "breña": [-12.057, -77.050], "la victoria": [-12.070, -77.017],
+  "rimac": [-12.030, -77.030], "san luis": [-12.075, -76.995], "lince": [-12.084, -77.035],
+  "jesus maria": [-12.076, -77.049], "magdalena del mar": [-12.091, -77.070], "pueblo libre": [-12.074, -77.064],
+  "san miguel": [-12.077, -77.091], "miraflores": [-12.121, -77.030], "san isidro": [-12.098, -77.036],
+  "santiago de surco": [-12.145, -76.992], "san borja": [-12.101, -76.999], "barranco": [-12.148, -77.021],
+  "la molina": [-12.084, -76.936], "surquillo": [-12.113, -77.018], "los olivos": [-11.990, -77.071],
+  "san martin de porres": [-12.010, -77.080], "independencia": [-11.994, -77.047], "comas": [-11.936, -77.051],
+  "puente piedra": [-11.866, -77.074], "carabayllo": [-11.850, -77.030], "ancon": [-11.773, -77.175],
+  "santa rosa": [-11.804, -77.164], "villa el salvador": [-12.213, -76.937], "villa maria del triunfo": [-12.160, -76.935],
+  "san juan de miraflores": [-12.157, -76.970], "chorrillos": [-12.169, -77.018], "lurin": [-12.275, -76.870],
+  "pachacamac": [-12.230, -76.860], "punta hermosa": [-12.334, -76.823], "san bartolo": [-12.388, -76.781],
+  "san juan de lurigancho": [-11.980, -77.000], "ate": [-12.026, -76.922], "santa anita": [-12.044, -76.970],
+  "el agustino": [-12.044, -76.999], "chaclacayo": [-11.975, -76.767], "lurigancho": [-11.936, -76.697],
+  "cieneguilla": [-12.108, -76.815], "callao": [-12.056, -77.118], "bellavista": [-12.061, -77.105],
+  "la perla": [-12.070, -77.110], "la punta": [-12.072, -77.164], "carmen de la legua": [-12.040, -77.098],
+  "ventanilla": [-11.874, -77.132], "mi peru": [-11.855, -77.123],
+};
+
+// Cómo lo escribe la gente → cómo se llama en CENTROS.
+const ALIAS = {
+  "surco": "santiago de surco", "sjl": "san juan de lurigancho", "smp": "san martin de porres",
+  "magdalena": "magdalena del mar", "ate vitarte": "ate", "vitarte": "ate", "chosica": "lurigancho",
+  "lima": "cercado de lima", "cercado": "cercado de lima", "sjm": "san juan de miraflores",
+  "vmt": "villa maria del triunfo", "ves": "villa el salvador", "lima cercado": "cercado de lima",
+};
+
+const NOMBRES = Object.keys(CENTROS);
+const TITULO = (d) => d.replace(/\b\p{L}/gu, (c) => c.toUpperCase()).replace(/\bDe\b/g, "de").replace(/\bDel\b/g, "del");
+
+/**
+ * El distrito que menciona un texto («Los Olivos, Lima» → los olivos).
+ * Se busca el nombre MÁS LARGO que aparezca: «San Juan de Miraflores»
+ * contiene «Miraflores» y no es Miraflores.
+ */
+export function distritoEn(texto) {
+  const t = ` ${normal(texto)} `;
+  if (!t.trim()) return null;
+  const encontrados = [...NOMBRES, ...Object.keys(ALIAS)]
+    .filter((n) => t.includes(` ${n} `))
+    .sort((a, b) => b.length - a.length);
+  if (!encontrados.length) return null;
+  const n = encontrados[0];
+  // «Lima» a secas (el departamento) no dice el distrito: no se usa si
+  // hay otro nombre más preciso, y solo, significa «en Lima, sin más».
+  if (n === "lima" && encontrados.length === 1) return null;
+  return ALIAS[n] || n;
+}
+
+/** ¿Es un distrito de Lima que conocemos? («Miraflores» sí, «Arequipa» no). */
+export function esDistritoDeLima(texto) {
+  const d = distritoEn(texto);
+  return Boolean(d && CENTROS[d]);
+}
+
+function km(a, b) {
+  const R = 6371, rad = (g) => (g * Math.PI) / 180;
+  const dLat = rad(b[0] - a[0]), dLng = rad(b[1] - a[1]);
+  const h = Math.sin(dLat / 2) ** 2 + Math.cos(rad(a[0])) * Math.cos(rad(b[0])) * Math.sin(dLng / 2) ** 2;
+  return 2 * R * Math.asin(Math.sqrt(h));
+}
+
+/** Minutos estimados en transporte público, redondeados a 5. */
+export function minutosEstimados(kmLinea) {
+  const min = 10 + (kmLinea * 1.4 / 17) * 60;
+  return Math.max(10, Math.round(min / 5) * 5);
+}
+
+/**
+ * Dónde queda una vacante respecto a donde vive la persona.
+ *
+ *   franja  "tu_zona"  su distrito o uno que colinda
+ *           "cerca"    hasta ~9 km en línea recta
+ *           "lejos"    más allá
+ *           "remoto"   no hay que ir
+ *           null       la vacante no dice el distrito
+ */
+export function ubicar(ubicacionVacante, base) {
+  const texto = normal(ubicacionVacante);
+  if (/\b(remoto|home office|teletrabajo)\b/.test(texto) && !/h[ií]brido/.test(texto)) {
+    return { franja: "remoto", distrito: null, km: 0, minutos: 0 };
+  }
+  const origen = distritoEn(base);
+  const destino = distritoEn(ubicacionVacante);
+  if (!origen || !destino || !CENTROS[origen] || !CENTROS[destino]) {
+    return { franja: null, distrito: destino ? TITULO(destino) : null, km: null, minutos: null };
+  }
+  const distancia = km(CENTROS[origen], CENTROS[destino]);
+  const vecino = origen === destino || (VECINOS[origen] || []).includes(destino);
+  return {
+    franja: vecino ? "tu_zona" : distancia <= 9 ? "cerca" : "lejos",
+    distrito: TITULO(destino),
+    km: Math.round(distancia * 10) / 10,
+    minutos: origen === destino ? 15 : minutosEstimados(distancia),
+  };
+}
+
+/** Enlace a la ruta en transporte público en Google Maps. Gratis: es un enlace. */
+export function enlaceRuta(base, ubicacionVacante) {
+  const o = distritoEn(base), d = distritoEn(ubicacionVacante);
+  if (!o || !d) return null;
+  const q = (x) => encodeURIComponent(`${TITULO(x)}, Lima, Perú`);
+  return `https://www.google.com/maps/dir/?api=1&origin=${q(o)}&destination=${q(d)}&travelmode=transit`;
+}
+
+/** «Miraflores», bonito, para la interfaz. */
+export function nombreBonito(texto) {
+  const d = distritoEn(texto);
+  return d ? TITULO(d) : (texto || "").trim();
+}

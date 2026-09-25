@@ -9,6 +9,7 @@ import * as datos from "../lib/datos.js";
 import * as ia from "../lib/ia.js";
 import * as coincidencia from "../lib/coincidencia.js";
 import * as cv from "../lib/cv.js";
+import * as distritos from "../lib/distritos.js";
 import * as sesion from "../lib/sesion.js";
 import { PACK_MAYOR, TOPE_POR_TANDA } from "../lib/verificados.js";
 import { SERVIDOR } from "../lib/servidor.js";
@@ -263,6 +264,37 @@ function pintarGuias(etapa) {
  * lo de ahora late. Ali: «que cada persona sepa sin necesidad de decirle
  * a dónde tiene que ir primero»; y ahora, «más didáctico».
  */
+// Lo que hace Chamba Lista, escribiéndose solo en la portada. Son pasos,
+// no postulaciones de nadie: ilustra, no presume.
+const FRASES_VIVAS = [
+  "Buscando en Computrabajo, Bumeran, LinkedIn e Indeed…",
+  "Leyendo la oferta y sus preguntas…",
+  "Llenando el formulario con tu CV…",
+  "Respondiendo «¿por qué te interesa el puesto?»…",
+  "¡Postulación enviada! Vamos por la siguiente.",
+];
+let fraseViva = null;
+function animarFraseViva() {
+  const el = $("#frase-viva");
+  if (!el || fraseViva) return;
+  if (matchMedia("(prefers-reduced-motion: reduce)").matches) { el.textContent = FRASES_VIVAS[0]; return; }
+  let f = 0, c = 0, borrando = false;
+  fraseViva = setInterval(() => {
+    if ($("#portada")?.classList.contains("compacta") || document.hidden) return;
+    const frase = FRASES_VIVAS[f];
+    if (!borrando) {
+      c++;
+      el.textContent = frase.slice(0, c);
+      if (c >= frase.length) { borrando = true; c = frase.length + 28; }   // pausa al final
+    } else {
+      c -= c > frase.length ? 1 : 3;
+      el.textContent = frase.slice(0, Math.max(0, Math.min(c, frase.length)));
+      if (c <= 0) { borrando = false; c = 0; f = (f + 1) % FRASES_VIVAS.length; }
+    }
+  }, 45);
+}
+animarFraseViva();
+
 function pintarRecorrido(etapa) {
   const pasos = ["Tu cuenta", "Tu CV", "Portales", "Postular"];
   const ol = $("#recorrido");
@@ -576,7 +608,10 @@ function pintarDestacadas() {
 // ---------------------------------------------------------------------
 function iniciarBuscador() {
   $("#nivel").innerHTML = NIVELES.map((n) => `<option value="${n.id}">${n.nombre}</option>`).join("");
-  $("#ciudades").innerHTML = CIUDADES.map((c) => `<option value="${escapar(c)}">`).join("");
+  // Primero los distritos de Lima (lo que la gente escribe), luego ciudades.
+  const deLima = distritos.catalogo().map(distritos.nombreBonito);
+  $("#ciudades").innerHTML = [...new Set([...deLima, ...CIUDADES])]
+    .map((c) => `<option value="${escapar(c)}">`).join("");
   $("#portales").innerHTML = LISTA_PORTALES.map((p) =>
     `<label class="chk-portal"><input type="checkbox" class="chk-p" value="${p.id}" checked>` +
     `<span>${p.nombre}</span>` +
@@ -624,28 +659,80 @@ function filaVacante(v, i) {
   const e = v.encaje || {};
   const clase = e.puntaje == null ? "bajo" : e.puntaje >= 70 ? "alto" : e.puntaje >= 40 ? "" : "bajo";
   const elegida = estado.elegidas.has(v.id);
+  const l = v.lugar || {};
+  const donde = l.distrito || v.ubicacion || "";
   return `<article class="vacante fila-v${elegida ? " elegida" : ""}" data-id="${escapar(v.id)}"
              style="animation-delay:${Math.min(i % POR_PAGINA, 12) * 30}ms">
     <input type="checkbox" class="chk-v" aria-label="Elegir ${escapar(v.titulo)}"${elegida ? " checked" : ""}>
     <div style="min-width:0">
       <h3 title="${escapar(v.titulo)}">${escapar(v.titulo)}</h3>
-      <div class="meta"><span class="portal-mini">${escapar(v.portal)}</span> · ${escapar([v.empresa, v.ubicacion].filter(Boolean).join(" · "))}</div>
+      <div class="meta"><span class="portal-mini">${escapar(v.portal)}</span> · ${escapar([v.empresa, donde].filter(Boolean).join(" · "))}</div>
+      ${tiempoDeViaje(v)}
     </div>
     ${e.puntaje == null ? "<span></span>" : `<span class="encaje ${clase}">${e.puntaje}%</span>`}
-    <button class="boton ${v.postulable === false ? "secundario" : "primario"} chico btn-abrir">
-      ${v.postulable === false ? "Abrir" : "Postular"}
-    </button>
+    <div class="acciones-fila">
+      <button class="boton secundario chico btn-ver">Ver</button>
+      <button class="boton ${v.postulable === false ? "secundario" : "primario"} chico btn-abrir">
+        ${v.postulable === false ? "Abrir" : "Postular"}
+      </button>
+    </div>
   </article>`;
 }
 
 // De veinte en veinte: 67 filas de golpe son una pared.
 const POR_PAGINA = 20;
 
+// ── Dónde queda cada una (Ali, 2026-09-25) ──
+// «En Lima lo importante es el lugar»: en tu zona, cerca y lejos, y
+// «te tomaría tanto desde Miraflores». El tiempo es una ESTIMACIÓN nuestra
+// (distritos.js dice cómo se calcula) y se dice así; «ruta» abre Google
+// Maps con la ruta real de ese momento, que es gratis porque es un enlace.
+const FRANJAS = {
+  tu_zona: { titulo: "En tu zona", nota: "tu distrito y los que colindan" },
+  remoto:  { titulo: "Remotos", nota: "sin traslado" },
+  cerca:   { titulo: "Cerca de ti", nota: "a menos de una hora, aprox." },
+  sin:     { titulo: "Sin distrito exacto", nota: "la oferta solo dice «Lima»" },
+  lejos:   { titulo: "Más lejos", nota: "más de una hora, aprox." },
+};
+const ORDEN_FRANJAS = ["tu_zona", "remoto", "cerca", "sin", "lejos"];
+const franjaDe = (v) => v.lugar?.franja || "sin";
+
+function tiempoDeViaje(v) {
+  const l = v.lugar;
+  if (!l || !estado.dondeVive) return "";
+  if (l.franja === "remoto") return `<span class="viaje remoto">Remoto · sin traslado</span>`;
+  if (l.minutos == null) return "";
+  const desde = distritos.nombreBonito(estado.dondeVive);
+  const ruta = distritos.enlaceRuta(estado.dondeVive, v.ubicacion);
+  return `<span class="viaje ${escapar(l.franja)}" title="Estimado en transporte público desde ${escapar(desde)}">`
+    + `≈ ${l.minutos} min desde ${escapar(desde)}</span>`
+    + (ruta ? ` <a class="enlace-ruta" href="${escapar(ruta)}" target="_blank" rel="noopener">ruta</a>` : "");
+}
+
+/** Ordena por franja (manteniendo el orden por encaje dentro de cada una). */
+function ordenarPorLugar() {
+  if (!estado.dondeVive) return;
+  for (const v of estado.vacantes) v.lugar = distritos.ubicar(v.ubicacion, estado.dondeVive);
+  const pos = new Map(estado.vacantes.map((v, i) => [v.id, i]));
+  estado.vacantes.sort((a, b) => ORDEN_FRANJAS.indexOf(franjaDe(a)) - ORDEN_FRANJAS.indexOf(franjaDe(b))
+    || pos.get(a.id) - pos.get(b.id));
+}
+
 function pintarLista() {
   const lista = $("#lista-vacantes");
   const visibles = estado.vacantes.slice(0, estado.mostrar);
   const quedan = estado.vacantes.length - visibles.length;
-  lista.innerHTML = visibles.map(filaVacante).join("")
+  const cuantasPor = {};
+  for (const v of estado.vacantes) cuantasPor[franjaDe(v)] = (cuantasPor[franjaDe(v)] || 0) + 1;
+  let anterior = null;
+  lista.innerHTML = visibles.map((v, i) => {
+    const f = franjaDe(v);
+    const cabeza = estado.dondeVive && f !== anterior
+      ? `<h4 class="franja-titulo ${f}"><span>${FRANJAS[f].titulo}</span><b>${cuantasPor[f]}</b><small>${FRANJAS[f].nota}</small></h4>`
+      : "";
+    anterior = f;
+    return cabeza + filaVacante(v, i);
+  }).join("")
     + (quedan > 0 ? `<button class="ver-mas" id="btn-ver-mas">Ver ${Math.min(quedan, POR_PAGINA)} más · quedan ${quedan}</button>` : "");
   conectarTarjetas(lista);
   $("#btn-ver-mas")?.addEventListener("click", () => {
@@ -659,6 +746,7 @@ function conectarTarjetas(raiz) {
   raiz.querySelectorAll(".vacante").forEach((el) => {
     const v = estado.vacantes.find((x) => x.id === el.dataset.id);
     el.querySelector(".btn-abrir")?.addEventListener("click", () => abrirVacante(v));
+    el.querySelector(".btn-ver")?.addEventListener("click", () => verVacante(v));
     el.querySelector(".chk-v")?.addEventListener("change", (ev) => {
       if (ev.target.checked) estado.elegidas.add(el.dataset.id);
       else estado.elegidas.delete(el.dataset.id);
@@ -771,6 +859,8 @@ $("#btn-buscar").addEventListener("click", async () => {
     // Si el filtro se lo come todo, se enseña todo: mejor ruido que nada.
     if (!delTema.length) estado.fueraDeTema = [];
     estado.vacantes = delTema.length ? delTema : todas;
+    estado.dondeVive = r.dondeVive || "";
+    ordenarPorLugar();
 
     if (!estado.vacantes.length) {
       $("#lista-vacantes").innerHTML = `<div class="vacio-guiado" style="grid-column:1/-1">
@@ -816,6 +906,7 @@ $("#btn-buscar").addEventListener("click", async () => {
       ver.addEventListener("click", () => {
         estado.vacantes = [...estado.vacantes, ...estado.fueraDeTema];
         estado.fueraDeTema = [];
+        ordenarPorLugar();
         pintarLista();
         ver.remove();
       });
@@ -827,6 +918,69 @@ $("#btn-buscar").addEventListener("click", async () => {
     boton.disabled = false;
     boton.textContent = "Buscar";
   }
+});
+
+// ---------------------------------------------------------------------
+// Ver una vacante sin salir de aquí (Ali, 2026-09-25)
+// ---------------------------------------------------------------------
+// «Debe verse una vista previa del trabajo en la plataforma», y un «ver
+// completo» que lleve al portal recordando volver para que la postulación
+// sea automática.
+async function verVacante(v) {
+  if (!v) return;
+  estado.vacanteAbierta = v;
+  $("#modal").classList.remove("oculto");
+  const c = $("#modal-contenido");
+  const l = v.lugar || {};
+  const cab = `<p class="vista-portal">${escapar(v.portal || "")}</p>
+    <h2>${escapar(v.titulo)}</h2>
+    <p class="nota">${escapar([v.empresa, l.distrito || v.ubicacion].filter(Boolean).join(" · "))}</p>
+    ${tiempoDeViaje(v) ? `<p class="vista-viaje">${tiempoDeViaje(v)}</p>` : ""}`;
+  c.innerHTML = cab + `<div class="esqueleto" style="height:190px;margin-top:14px"></div>`;
+  let d = {};
+  try {
+    d = (await enviar({ accion: "verVacante", vacante: v }))?.detalle || {};
+  } catch { /* se enseña lo que haya */ }
+  if (d.descripcion) v.descripcion = d.descripcion;      // sirve luego para adaptar el CV
+  const texto = d.texto || d.descripcion || "";
+  c.innerHTML = cab
+    + ((d.datos || []).length ? `<div class="etiquetas">${d.datos.map((x) => `<span class="etiqueta">${escapar(x)}</span>`).join("")}</div>` : "")
+    + `<div class="vista-texto">${texto ? escapar(texto) : "Esta oferta no trae descripción en el portal."}</div>`
+    + ((d.requisitos || []).length ? `<h4 class="vista-sub">Requisitos</h4><ul class="vista-lista">${d.requisitos.map((x) => `<li>${escapar(x)}</li>`).join("")}</ul>` : "")
+    + `<div class="fila-botones vista-acciones">
+         <button class="boton primario" id="vista-postular">${v.postulable === false ? "Abrir en el portal" : "Postular"}</button>
+         <button class="boton secundario" id="vista-completa">Ver completa en ${escapar(v.portal || "el portal")} ↗</button>
+       </div>
+       <p class="nota">Si la abres en ${escapar(v.portal || "el portal")}, vuelve aquí para postular: así se llena y se envía sola.</p>`;
+  $("#vista-postular").addEventListener("click", () => abrirVacante(v));
+  $("#vista-completa").addEventListener("click", () => {
+    chrome.tabs.create({ url: v.url, active: true });
+    $("#modal").classList.add("oculto");
+    mostrarRecordatorio(v);
+  });
+}
+
+function mostrarRecordatorio(v) {
+  estado.recordar = v;
+  $("#rec-texto").innerHTML = `Estás viendo <b>${escapar(v.titulo)}</b> en ${escapar(v.portal || "el portal")}. `
+    + `Cuando termines, vuelve aquí y pulsa Postular: se llena y se envía sola.`;
+  $("#recordatorio").classList.remove("oculto");
+}
+$("#rec-postular").addEventListener("click", () => {
+  const v = estado.recordar;
+  $("#recordatorio").classList.add("oculto");
+  if (v) abrirVacante(v);
+});
+$("#rec-cerrar").addEventListener("click", () => { $("#recordatorio").classList.add("oculto"); estado.recordar = null; });
+// Al volver a esta pestaña, el recordatorio se hace notar.
+document.addEventListener("visibilitychange", () => {
+  if (document.hidden || !estado.recordar) return;
+  const r = $("#recordatorio");
+  irA("vacantes");
+  r.scrollIntoView({ behavior: "smooth", block: "center" });
+  r.classList.remove("late");
+  void r.offsetWidth;
+  r.classList.add("late");
 });
 
 // ---------------------------------------------------------------------
@@ -1239,10 +1393,67 @@ async function guardarModo(auto) {
   await pintarInterruptores();
 }
 
+// Ali, 2026-09-25: «actualmente tienes este CV en tu cuenta: ¿usar el
+// nuevo generado aquí, mantenerte con el que tienes, o que generemos un
+// CV adaptado por cada vacante?». Computrabajo es el portal donde se
+// puede (guarda varios y adjunta el principal); en los demás, más adelante.
+const OPCIONES_CV = [
+  { id: "portal", titulo: "Mantener el que tengo", texto: "Computrabajo adjunta el CV que ya tienes como principal." },
+  { id: "harvard", titulo: "Usar el de Chamba Lista", texto: "Subimos una vez tu CV en formato Harvard y queda como principal." },
+  { id: "adaptado", titulo: "Uno adaptado a cada vacante", texto: "Antes de cada postulación subimos tu CV adaptado a esa oferta y lo dejamos de principal. Unos segundos más por postulación." },
+];
+
+function opcionesCV(nombreGrupo, elegido) {
+  return `<div class="opciones-cv" role="radiogroup">` + OPCIONES_CV.map((o) =>
+    `<label class="opcion-cv${o.id === elegido ? " elegida" : ""}">
+       <input type="radio" name="${nombreGrupo}" value="${o.id}"${o.id === elegido ? " checked" : ""}>
+       <span><b>${o.titulo}</b><small>${o.texto}</small></span>
+     </label>`).join("") + `</div>`;
+}
+
+async function cvElegido() {
+  return (await almacen.preferencias.obtener()).cvPortal?.computrabajo || null;
+}
+
+/** Pregunta qué CV tiene en Computrabajo (abre su «Mi currículum» en segundo plano). */
+async function cvActualEnPortal(dondeEscribir) {
+  dondeEscribir.textContent = "Mirando tu cuenta de Computrabajo…";
+  const r = await enviar({ accion: "cvPortalEstado" }).catch((e) => ({ error: e.message }));
+  if (r?.error) { dondeEscribir.textContent = r.error; return null; }
+  dondeEscribir.innerHTML = r?.principal
+    ? `Ahora tu CV principal en Computrabajo es <b>${escapar(r.principal)}</b>.`
+    : "En Computrabajo no tienes ningún CV en Word/PDF como principal.";
+  return r;
+}
+
+async function guardarCV(modo, estadoEl) {
+  if (estadoEl) estadoEl.textContent = modo === "harvard" ? "Subiendo tu CV a Computrabajo…" : "Guardado.";
+  const r = await enviar({ accion: "cvPortalElegir", modo }).catch((e) => ({ error: e.message }));
+  if (r?.error) { avisar(r.error, "mal"); if (estadoEl) estadoEl.textContent = r.error; return false; }
+  avisar(modo === "harvard" ? "Tu CV de Chamba Lista quedó como principal en Computrabajo."
+    : modo === "adaptado" ? "Cada postulación irá con su CV adaptado." : "Se usará el CV que ya tienes.", "bien");
+  if (estadoEl && r?.archivo) estadoEl.innerHTML = `Listo: <b>${escapar(r.archivo)}</b> es tu CV principal.`;
+  pintarCVPerfil();
+  return true;
+}
+
+async function pintarCVPerfil() {
+  const caja = $("#cv-portal-opciones");
+  if (!caja) return;
+  caja.innerHTML = opcionesCV("cv-perfil", await cvElegido());
+  caja.querySelectorAll("input[name='cv-perfil']").forEach((i) => i.addEventListener("change", () => {
+    caja.querySelectorAll(".opcion-cv").forEach((l) => l.classList.toggle("elegida", l.contains(i)));
+    guardarCV(i.value, $("#cv-portal-actual"));
+  }));
+}
+$("#btn-ver-cv-portal")?.addEventListener("click", () => cvActualEnPortal($("#cv-portal-actual")));
+pintarCVPerfil();
+
 function mostrarElegirModo(auto, alSeguir) {
   estado.trasElegir = alSeguir || null;
   $("#sw-elegir").checked = auto;
   queSignifica(auto);
+  pintarElegirCV();
   $("#bloque-riesgo").classList.remove("oculto");
   $("#bloque-riesgo").scrollIntoView({ behavior: "smooth", block: "center" });
 }
@@ -1265,12 +1476,27 @@ document.querySelectorAll(".sw-auto:not(#sw-elegir)").forEach((sw) => {
 $("#sw-elegir").addEventListener("change", (e) => queSignifica(e.target.checked));
 pintarInterruptores();
 
+/** En «¿Cómo quieres que postule?», también con qué CV, si va a Computrabajo. */
+async function pintarElegirCV() {
+  const caja = $("#elegir-cv");
+  const vaComputrabajo = vacantesParaLote().some((v) => (v.portalId || "") === "computrabajo");
+  const elegido = await cvElegido();
+  if (!vaComputrabajo || elegido) { caja.classList.add("oculto"); return; }
+  caja.innerHTML = `<h4>¿Con qué CV postulas en Computrabajo?</h4><p class="nota" id="cv-actual-lote"></p>`
+    + opcionesCV("cv-lote", "portal");
+  caja.classList.remove("oculto");
+  cvActualEnPortal($("#cv-actual-lote"));
+  caja.querySelectorAll("input[name='cv-lote']").forEach((i) => i.addEventListener("change", () =>
+    caja.querySelectorAll(".opcion-cv").forEach((l) => l.classList.toggle("elegida", l.contains(i)))));
+}
+
 $("#btn-lote-auto").addEventListener("click", async () => {
   const { auto, elegido } = await modoActual();
   const aprobacion = await almacen.leer("aprobacionAuto", null);
+  const faltaCV = vacantesParaLote().some((v) => (v.portalId || "") === "computrabajo") && !(await cvElegido());
   // La primera vez se elige el modo (con lo que significa a la vista).
   // Después, directo: «la persona no debe tocar nada».
-  if (!elegido || (auto && !aprobacion)) {
+  if (!elegido || (auto && !aprobacion) || faltaCV) {
     return mostrarElegirModo(true, (siAuto) => arrancarLote(siAuto ? "automatico" : "revisado"));
   }
   if (auto) estado.aprobacion = aprobacion;
@@ -1283,6 +1509,13 @@ $("#btn-cancelar-auto").addEventListener("click", () => {
 });
 $("#btn-confirmar-auto").addEventListener("click", async () => {
   const auto = $("#sw-elegir").checked;
+  const cvLote = document.querySelector("input[name='cv-lote']:checked");
+  if (cvLote && !$("#elegir-cv").classList.contains("oculto")) {
+    $("#btn-confirmar-auto").disabled = true;
+    const ok = await guardarCV(cvLote.value, $("#cv-actual-lote"));
+    $("#btn-confirmar-auto").disabled = false;
+    if (!ok) return;
+  }
   await guardarModo(auto);
   $("#bloque-riesgo").classList.add("oculto");
   avisar(auto ? "Chamba Lista postula sola." : "Te avisaremos antes de cada envío.", "bien");
@@ -1301,6 +1534,12 @@ async function arrancarLote(modo) {
   $("#vivo-feed").innerHTML = "";
   $("#en-vivo").classList.remove("fin");
   $("#btn-cancelar-lote").classList.remove("oculto");
+  $("#btn-pausar-lote").classList.remove("oculto");
+  $("#btn-reanudar-lote").classList.add("oculto");
+  $("#btn-pausar-lote").textContent = "⏸ Pausar";
+  $("#en-vivo").classList.remove("pausa");
+  estado.lotePausado = false;
+  estado.modoLote = modo;
   $("#vivo-enviadas").textContent = "0";
   $("#contador-vivo span").textContent = modo === "automatico" ? "enviadas" : "listas";
   $("#vivo-portal").textContent = "Empezando";
@@ -1387,6 +1626,12 @@ function seguirLote() {
       clearInterval(temporizador);
       $("#en-vivo").classList.add("fin");
       $("#btn-cancelar-lote").classList.add("oculto");
+      $("#btn-pausar-lote").classList.add("oculto");
+      $("#en-vivo").classList.remove("pausa");
+      // Si se canceló con vacantes por hacer, se ofrece seguir con esas.
+      estado.pendientesLote = (s.items || []).filter((i) => i.estado === "pendiente");
+      $("#btn-reanudar-lote").textContent = `Reanudar las ${estado.pendientesLote.length} que faltan`;
+      $("#btn-reanudar-lote").classList.toggle("oculto", !estado.pendientesLote.length);
       $("#vivo-portal").textContent = "Terminado";
       $("#vivo-titulo").textContent = exitos
         ? (s.modo === "automatico" ? "¡Listo! Postulaciones enviadas" : "¡Listas para revisar!")
@@ -1462,13 +1707,43 @@ function pintarResultadoLote(s) {
   $("#acciones-lote").classList.add("oculto");
 }
 
-$("#btn-cancelar-lote").addEventListener("click", () => enviar({ accion: "loteCancelar" }));
+$("#btn-cancelar-lote").addEventListener("click", async () => {
+  if (!confirm("¿Cancelar las postulaciones que faltan? Las ya enviadas se quedan enviadas.")) return;
+  await enviar({ accion: "loteCancelar" });
+  avisar("Postulaciones canceladas. Puedes reanudar las que faltan.", "bien");
+});
+// Pausa ENTRE vacantes: la que está en curso termina.
+$("#btn-pausar-lote").addEventListener("click", async () => {
+  estado.lotePausado = !estado.lotePausado;
+  await enviar({ accion: estado.lotePausado ? "lotePausar" : "loteReanudar" });
+  $("#btn-pausar-lote").textContent = estado.lotePausado ? "▶ Reanudar" : "⏸ Pausar";
+  $("#en-vivo").classList.toggle("pausa", estado.lotePausado);
+  if (estado.lotePausado) $("#vivo-paso").textContent = "En pausa: termina la que está en curso y espera.";
+});
+// Después de cancelar: seguir con las que quedaron sin hacer.
+$("#btn-reanudar-lote").addEventListener("click", () => {
+  const ids = new Set((estado.pendientesLote || []).map((i) => i.id));
+  const quedan = estado.vacantes.filter((v) => ids.has(v.id));
+  const lista = quedan.length ? quedan : (estado.pendientesLote || []);
+  if (!lista.length) return;
+  estado.elegidas = new Set(lista.map((v) => v.id));
+  if (!quedan.length) estado.vacantes = lista;
+  arrancarLote(estado.modoLote || "automatico");
+});
 
 // ---------------------------------------------------------------------
 // Pipeline: columnas con arrastre
 // ---------------------------------------------------------------------
 async function pintarPipeline() {
   const lista = await almacen.tracker.listar();
+  // Ali, 2026-09-25: «que las postulaciones se vean más bonitas, menos
+  // saturadas». Arriba, cuántas hay en cada etapa; debajo, columnas
+  // claras con fichas limpias: puesto, empresa, portal y fecha. El motivo
+  // de una omitida va en gris, no en rojo: es información, no una alarma.
+  $("#resumen-pipeline").innerHTML = almacen.ETAPAS.map((e) => {
+    const n = lista.filter((p) => p.etapa === e.id).length;
+    return `<span class="res-etapa ${e.id}"><span class="punto ${e.id}"></span>${e.nombre} <b>${n}</b></span>`;
+  }).join("");
   $("#columnas").innerHTML = almacen.ETAPAS.map((e) => {
     const suyas = lista.filter((p) => p.etapa === e.id);
     return `<div class="columna" data-etapa="${e.id}">
@@ -1476,18 +1751,21 @@ async function pintarPipeline() {
       ${suyas.map((p) => {
         const f = fechaCorta(p.fecha);
         return `<div class="ficha" draggable="true" data-id="${escapar(p.id)}">
+          <div class="ficha-arriba"><span class="portal-mini">${escapar(p.portal || "")}</span>${f ? `<span class="fecha">${escapar(f)}</span>` : ""}</div>
           <strong>${escapar(p.puesto || "—")}</strong>
-          <div class="sub">${escapar([p.empresa, f].filter(Boolean).join(" · "))}</div>
+          ${p.empresa ? `<div class="sub">${escapar(p.empresa)}</div>` : ""}
           ${p.motivo ? `<div class="motivo">${escapar(p.motivo)}</div>` : ""}
-          ${p.estado === "externa" && p.url
-            ? `<a class="enlace" href="${escapar(p.url)}" target="_blank" rel="noopener">Abrir en su web</a> ` : ""}
-          <button class="enlace boton-cv" data-cv="${escapar(p.id)}">CV adaptado</button>
-          <select class="mover">
-            ${almacen.ETAPAS.map((x) =>
-              `<option value="${x.id}"${x.id === e.id ? " selected" : ""}>${x.nombre}</option>`).join("")}
-          </select>
+          <div class="ficha-acciones">
+            ${p.estado === "externa" && p.url
+              ? `<a class="accion-mini" href="${escapar(p.url)}" target="_blank" rel="noopener">Abrir en su web ↗</a>` : ""}
+            <button class="accion-mini boton-cv" data-cv="${escapar(p.id)}">CV adaptado</button>
+            <select class="mover" aria-label="Mover a otra etapa">
+              ${almacen.ETAPAS.map((x) =>
+                `<option value="${x.id}"${x.id === e.id ? " selected" : ""}>${x.nombre}</option>`).join("")}
+            </select>
+          </div>
         </div>`;
-      }).join("") || `<p class="vacio" style="font-size:12px">Vacío</p>`}
+      }).join("") || `<p class="vacio-col">Nada aquí todavía</p>`}
     </div>`;
   }).join("");
 

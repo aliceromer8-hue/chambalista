@@ -1298,7 +1298,11 @@ titulo("LA PESTAÑA SIN CONTENT SCRIPT — el fallo mas probable del primer inte
     const entiende = new Set(
       [...src.matchAll(/(?:case\s+|accion\s*===\s*)"([a-zA-Z]+)"/g)].map((m) => m[1]),
     );
-    const faltan = manda.filter((a) => !entiende.has(a));
+    // Las del CV en la cuenta son solo de Computrabajo (el único portal
+    // donde se sube por ahora): los demás no las reciben nunca.
+    const SOLO_COMPUTRABAJO = ["cvArchivos", "cvSubir", "cvPrincipal", "cvBorrar"];
+    const faltan = manda.filter((a) => !entiende.has(a)
+      && (portal === "computrabajo" || !SOLO_COMPUTRABAJO.includes(a)));
     check(`${portal} entiende todo lo que le pide el fondo`, faltan.length === 0,
       faltan.length ? `no entiende: ${faltan.join(", ")}` : "");
   }
@@ -1847,6 +1851,86 @@ titulo("LA PESTAÑA SIN CONTENT SCRIPT — el fallo mas probable del primer inte
   check("sin sesión se espera a que la cabecera cargue antes de rendirse", /i < 6 && !haySesion\(\)/.test(ct));
   check("un «Enviar» que hace navegar se comprueba en la página nueva",
     /dudosa: true/.test(fo) && /if \(ping\?\.enviada\) return \{ enviada: true/.test(fo));
+}
+
+// ══════════════════════════════════════════════════════════════════════
+// RONDA 2026-09-25 (b) — lugar, vista previa, CV en la cuenta, pausa
+// ══════════════════════════════════════════════════════════════════════
+{
+  titulo("LUGAR — en tu zona, cerca, lejos, y cuánto se tarda");
+  const d = await import(`${BASE}lib/distritos.js`);
+  const u = (a, b) => d.ubicar(a, b);
+  check("mismo distrito: en tu zona", u("Miraflores, Lima", "Miraflores").franja === "tu_zona");
+  check("un distrito que colinda: en tu zona", u("San Isidro, Lima", "Miraflores").franja === "tu_zona");
+  check("San Juan de Miraflores NO es Miraflores", d.distritoEn("San Juan de Miraflores, Lima") === "san juan de miraflores");
+  check("Los Olivos desde Miraflores: lejos, más de una hora",
+    u("Los Olivos, Lima", "Miraflores").franja === "lejos" && u("Los Olivos, Lima", "Miraflores").minutos >= 60);
+  check("remoto: sin traslado", u("Remoto", "Miraflores").franja === "remoto");
+  check("«Lima» a secas no dice distrito", u("Lima", "Miraflores").franja === null);
+  check("alias de la calle: Surco, SJL, SMP", d.distritoEn("Surco") === "santiago de surco"
+    && d.distritoEn("SJL") === "san juan de lurigancho" && d.distritoEn("smp") === "san martin de porres");
+  check("la ruta es un enlace de Google Maps (gratis), en transporte público",
+    /^https:\/\/www\.google\.com\/maps\/dir\/\?api=1&origin=.*&travelmode=transit$/.test(d.enlaceRuta("Miraflores", "Los Olivos")));
+  const fs = await import("node:fs/promises");
+  const fo = await fs.readFile(new URL("background.js", BASE), "utf8");
+  const pj = await fs.readFile(new URL("panel/panel.js", BASE), "utf8");
+  check("un distrito de Lima busca en toda Lima (y el panel ordena por cercanía)",
+    /ciudadPortal = dondeVive \? "Lima" : ciudad/.test(fo) && /function ordenarPorLugar/.test(pj));
+  check("el tiempo se dice como estimación", /Estimado en transporte público desde/.test(pj) && /≈ \$\{l\.minutos\} min/.test(pj));
+}
+
+{
+  titulo("VISTA PREVIA — la oferta aquí, y volver para postular");
+  const fs = await import("node:fs/promises");
+  const fo = await fs.readFile(new URL("background.js", BASE), "utf8");
+  const pj = await fs.readFile(new URL("panel/panel.js", BASE), "utf8");
+  const ct = await fs.readFile(new URL("contenido/computrabajo.js", BASE), "utf8");
+  check("cada fila tiene «Ver»", /btn-ver/.test(pj) && /verVacante\(v\)/.test(pj));
+  check("se lee en una pestaña aparte que se cierra (no pisa la tanda)",
+    /case "verVacante"[\s\S]{0,300}chrome\.tabs\.create\(\{ url: msg\.vacante\.url, active: false \}\)/.test(fo)
+    && /chrome\.tabs\.remove\(temporal\.id\)/.test(fo));
+  check("la ficha conserva los saltos de línea", /texto: \(cuerpo\?\.innerText/.test(ct));
+  check("«ver completa» abre el portal y recuerda volver", /mostrarRecordatorio\(v\)/.test(pj)
+    && /vuelve aquí y pulsa Postular/.test(pj));
+}
+
+{
+  titulo("CV EN TU CUENTA — Computrabajo: mantener, el de Chamba Lista, o adaptado");
+  const fs = await import("node:fs/promises");
+  const fo = await fs.readFile(new URL("background.js", BASE), "utf8");
+  const ct = await fs.readFile(new URL("contenido/computrabajo.js", BASE), "utf8");
+  const pj = await fs.readFile(new URL("panel/panel.js", BASE), "utf8");
+  check("las tres opciones que pidió Ali", /id: "portal"/.test(pj) && /id: "harvard"/.test(pj) && /id: "adaptado"/.test(pj));
+  check("se dice qué CV tiene ahora", /Ahora tu CV principal en Computrabajo es/.test(pj));
+  check("subir usa el campo del portal y su propio envío", /\[input-file\]/.test(ct) && /dispatchEvent\(new Event\("change"/.test(ct));
+  check("el nuevo se reconoce por id, no por nombre (el portal quita espacios)", /!idsAntes\.has\(a\.id\)/.test(fo));
+  check("y se comprueba que quedó de principal", /no lo dejó como principal/.test(fo));
+  check("solo se borran CV NUESTROS, nunca los suyos",
+    /nuestros\.includes\(a\.id\)/.test(fo) && !/cvBorrar", id: (?!nuestro\.id|viejo\.id)/.test(fo));
+  check("con «adaptado», el CV va a la cuenta ANTES de abrir la postulación",
+    fo.indexOf('prefsCV.computrabajo === "adaptado"') < fo.indexOf('accion: "abrirFormulario"'));
+}
+
+{
+  titulo("TANDA — pausar, reanudar y cancelar, a la vista");
+  const fs = await import("node:fs/promises");
+  const fo = await fs.readFile(new URL("background.js", BASE), "utf8");
+  const ph = await fs.readFile(new URL("panel/panel.html", BASE), "utf8");
+  check("la pausa espera ENTRE vacantes, nunca a media postulación", /while \(lote\.pausado && !lote\.cancelado\) await esperar/.test(fo));
+  check("«Cancelar postulaciones» es un botón, no un enlace escondido",
+    /class="boton peligro" id="btn-cancelar-lote">Cancelar postulaciones/.test(ph) && !/Cancelar tanda/.test(ph));
+  check("y se puede reanudar lo que faltaba", /id="btn-reanudar-lote"/.test(ph));
+}
+
+{
+  titulo("PORTADA Y POSTULACIONES — con vida y sin saturar");
+  const fs = await import("node:fs/promises");
+  const ph = await fs.readFile(new URL("panel/panel.html", BASE), "utf8");
+  const pc = await fs.readFile(new URL("panel/panel.css", BASE), "utf8");
+  check("la portada tiene adornos animados y una frase que se escribe", /class="adornos"/.test(ph) && /id="frase-viva"/.test(ph));
+  check("la cinta no desborda la portada", /\.portada-texto, \.escena \{ min-width: 0; max-width: 100%; \}/.test(pc));
+  check("Postulaciones: resumen por etapa y columnas claras", /id="resumen-pipeline"/.test(ph) && /\.res-etapa/.test(pc));
+  check("todo lo nuevo respeta «reducir movimiento»", /prefers-reduced-motion: reduce\)\s*\{\s*\.adorno, \.cinta-demo/.test(pc));
 }
 
 console.log(`

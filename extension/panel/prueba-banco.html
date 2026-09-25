@@ -110,6 +110,18 @@
           return { iniciado: true, total: items.length };
         }
         if (a === "loteEstado") return window.__lote || null;
+        if (a === "lotePausar" || a === "loteReanudar") { return { pausado: a === "lotePausar" }; }
+        if (a === "verVacante") {
+          await new Promise((r) => setTimeout(r, 700));
+          return { detalle: {
+            titulo: msg.vacante.titulo,
+            texto: "Nos encontramos en la búsqueda de practicantes de marketing para el área de leads.\n\n¿Qué harás?\n- Apoyar campañas digitales\n- Analizar datos de leads en Excel\n- Coordinar con el equipo comercial\n\n¿Qué ofrecemos?\nSubvención de ley, horario de L a V y buen ambiente.",
+            datos: ["S/ 1,130 (Mensual)", "Tiempo completo", "Presencial y remoto"],
+            requisitos: ["Educación mínima: Universitario", "Estudiante de 8.º ciclo en adelante"],
+          } };
+        }
+        if (a === "cvPortalEstado") { await new Promise((r) => setTimeout(r, 600)); return { principal: "CV-Alice-Romero-ARTESCO.pdf", cuantos: 5 }; }
+        if (a === "cvPortalElegir") { await new Promise((r) => setTimeout(r, 900)); window.__cvModo = msg.modo; return { ok: true, archivo: msg.modo === "harvard" ? "CVAliceRomero-ChambaLista.docx" : undefined }; }
         if (a === "consentimiento") return { casillas: [{ clave: "irreversible", texto: "Entiendo que una postulación enviada NO se puede deshacer." }, { clave: "sinRevisar", texto: "Entiendo que no voy a revisar cada postulación antes de que se envíe." }, { clave: "respuestasIA", texto: "Entiendo que las respuestas las redacta una IA desde mi CV y pueden tener errores." }, { clave: "responsable", texto: "Asumo que soy responsable del contenido que se envíe en mi nombre." }], tope: await topeReal() };
         // La accion real es «sesionPortales» y devuelve los cuatro. Con la
         // lista vacia la etapa 2 no pintaba ninguna tarjeta de portal, que
@@ -123,7 +135,11 @@
         if (a === "estadoLote") return { fase: "inactivo", items: [] };
         // Una búsqueda de «practicante de marketing» como la que hizo Ali,
         // con una de diseño gráfico colada — la que salió en su prueba.
-        if (a === "buscar") return { termino: msg.puesto, errores: [], vacantes: [
+        if (a === "buscar") return { termino: msg.puesto, errores: [], dondeVive: /miraflores|molina|surco|olivos|isidro/i.test(msg.ciudad || "") ? msg.ciudad : "", vacantes: [
+          { id: "5", portal: "Computrabajo", portalId: "computrabajo", postulable: true, titulo: "Practicante de Marketing Digital", empresa: "Agencia Norte", ubicacion: "San Isidro, Lima", url: "https://pe.computrabajo.com/x5" },
+          { id: "6", portal: "Bumeran", portalId: "bumeran", postulable: true, titulo: "Asistente de Marketing", empresa: "Retail Sur", ubicacion: "Callao", url: "https://www.bumeran.com.pe/x6" },
+          { id: "7", portal: "Indeed", portalId: "indeed", postulable: true, titulo: "Practicante de Marketing y Contenidos", empresa: "Startup Z", ubicacion: "Remoto", url: "https://pe.indeed.com/x7" },
+          { id: "8", portal: "Computrabajo", portalId: "computrabajo", postulable: true, titulo: "Practicante de Marketing", empresa: "Tienda Q", ubicacion: "Miraflores, Lima", url: "https://pe.computrabajo.com/x8" },
           { id: "1", portal: "Indeed", portalId: "indeed", postulable: true, titulo: "Practicante de Marketing / Gestión y análisis de leads", empresa: "TALENTEA", ubicacion: "Los Olivos, Lima", url: "https://pe.indeed.com/x1" },
           { id: "2", portal: "Computrabajo", portalId: "computrabajo", postulable: true, titulo: "Practicante de Diseño Gráfico", empresa: "Estudio X", ubicacion: "Lima", url: "https://pe.computrabajo.com/x2" },
           { id: "3", portal: "Computrabajo", portalId: "computrabajo", postulable: true, titulo: "Asistente de Redes Sociales", empresa: "Agencia Y", ubicacion: "Miraflores", url: "https://pe.computrabajo.com/x3" },
@@ -216,7 +232,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Chamba Lista — Panel</title>
-<link rel="stylesheet" href="panel.css?v=1790351039">
+<link rel="stylesheet" href="panel.css?v=1790353419">
 </head>
 <body>
 
@@ -256,6 +272,16 @@
     <!-- Portada: manda cuando la persona es nueva, se encoge cuando ya
          está lista. El panel es landing y tablero según el momento. -->
     <section class="portada" id="portada">
+      <!-- Adornos: aviones de papel, hojas y chispas que flotan alrededor
+           de la caja. Decoración pura, fuera del árbol de accesibilidad. -->
+      <div class="adornos" aria-hidden="true">
+        <span class="adorno avioncito a1">✈</span>
+        <span class="adorno hojita a2"></span>
+        <span class="adorno chispa a3">✦</span>
+        <span class="adorno hojita a4"></span>
+        <span class="adorno avioncito a5">✈</span>
+        <span class="adorno chispa a6">✦</span>
+      </div>
       <div class="portada-texto">
         <p class="antetitulo">Prácticas y primer empleo en Perú</p>
         <!-- Lo reescribe panel.js con titularPortada(), desde PACK_MAYOR y
@@ -268,6 +294,21 @@
         <!-- Dónde estás: cuenta → CV → portales → postular. Lo pinta
              pintarRecorrido() según la etapa. -->
         <ol class="recorrido" id="recorrido" aria-label="Tu avance"></ol>
+        <!-- Lo que hace mientras tanto, escrito en vivo. Ilustrativo: son
+             pasos, no postulaciones de nadie. -->
+        <div class="escena" aria-hidden="true">
+          <p class="frase-viva"><span id="frase-viva"></span><span class="cursor">▋</span></p>
+          <div class="cinta-demo">
+            <span class="mini-tarjeta"><b>Practicante de marketing</b><i class="ok">Enviada ✓</i></span>
+            <span class="mini-tarjeta"><b>Asistente administrativo</b><i class="ok">Enviada ✓</i></span>
+            <span class="mini-tarjeta"><b>Analista de datos jr.</b><i class="va">Llenando…</i></span>
+            <span class="mini-tarjeta"><b>Diseñador gráfico</b><i class="ok">Enviada ✓</i></span>
+            <span class="mini-tarjeta"><b>Practicante contable</b><i class="ok">Enviada ✓</i></span>
+            <span class="mini-tarjeta"><b>Practicante de marketing</b><i class="ok">Enviada ✓</i></span>
+            <span class="mini-tarjeta"><b>Asistente administrativo</b><i class="ok">Enviada ✓</i></span>
+            <span class="mini-tarjeta"><b>Analista de datos jr.</b><i class="va">Llenando…</i></span>
+          </div>
+        </div>
       </div>
       <div class="portada-arte" aria-hidden="true">
         <div class="hoja-flotante">
@@ -331,7 +372,8 @@
         Deja la ciudad vacía si te da igual dónde.</p>
       <div class="fila-busqueda">
         <input type="text" id="puesto" placeholder="¿Qué puesto buscas? Ej.: practicante de derecho, enfermera, cajero" autocomplete="off">
-        <input type="text" id="ciudad" list="ciudades" placeholder="Ciudad (opcional)" autocomplete="off">
+        <input type="text" id="ciudad" list="ciudades" placeholder="¿Dónde vives? Ej.: Miraflores"
+               aria-label="Tu distrito o ciudad" autocomplete="off">
         <datalist id="ciudades"></datalist>
         <select id="nivel"></select>
         <button class="boton primario" id="btn-buscar">Buscar</button>
@@ -339,6 +381,16 @@
       <div class="fila-portales" id="portales"></div>
       <p class="nota" id="resumen-busqueda"></p>
     </article>
+
+    <!-- Ali: «que haya una opción de verlo completo y ahí ya lo lleva a la
+         página, pero recordarle que si quiere postular debe volver para que
+         sea automático». -->
+    <div class="recordatorio oculto" id="recordatorio" role="status">
+      <span class="rec-icono" aria-hidden="true">↩</span>
+      <span class="rec-texto" id="rec-texto"></span>
+      <button class="boton primario chico" id="rec-postular">Postular</button>
+      <button class="cerrar-mini" id="rec-cerrar" aria-label="Quitar recordatorio">×</button>
+    </div>
 
     <!-- Fija abajo mientras hay resultados: es LA acción de esta pantalla
          y estaba entre el buscador y la lista, en rojo de peligro, sin que
@@ -373,6 +425,7 @@
           </span>
         </label>
       <div class="que-significa" id="que-significa"></div>
+      <div class="elegir-cv oculto" id="elegir-cv"></div>
       <div class="fila-botones">
         <button class="boton secundario" id="btn-cancelar-auto">Ahora no</button>
         <button class="boton primario" id="btn-confirmar-auto">Empezar</button>
@@ -394,12 +447,16 @@
             <path d="M43 7 22 29v10l5-6" stroke="currentColor" stroke-width="2.5" stroke-linejoin="round"/>
           </svg>
         </div>
+        <div class="vivo-controles">
+          <button class="boton secundario" id="btn-pausar-lote">⏸ Pausar</button>
+          <button class="boton peligro" id="btn-cancelar-lote">Cancelar postulaciones</button>
+          <button class="boton primario oculto" id="btn-reanudar-lote">Reanudar</button>
+        </div>
         <ol class="vivo-feed" id="vivo-feed"></ol>
       </div>
       <div class="consola" id="consola" role="status" aria-live="polite"></div>
       <div class="barra"><div id="relleno"></div></div>
       <p class="nota" id="texto-progreso"></p>
-      <button class="enlace" id="btn-cancelar-lote">Cancelar tanda</button>
     </div>
 
     <div class="rejilla-vacantes" id="lista-vacantes">
@@ -417,9 +474,8 @@
       <h2>Tus postulaciones</h2>
       <button class="enlace" id="btn-exportar">Exportar CSV</button>
     </div>
-    <p class="pista"><strong>Aquí sabes en qué va cada una sin abrir el correo.</strong>
-      Cuando una empresa te escriba, arrastra su tarjeta a «Entrevista». Si te dicen que no,
-      a «Descartada». Así ves de un vistazo cuántas siguen vivas.</p>
+    <div class="resumen-pipeline" id="resumen-pipeline"></div>
+    <p class="pista">Cuando una empresa te escriba, arrastra su tarjeta a «Entrevista».</p>
     <div class="columnas" id="columnas"></div>
   </section>
 
@@ -466,6 +522,11 @@
           </span>
         </label>
         </div>
+
+        <h2 style="margin-top:22px">Tu CV en Computrabajo</h2>
+        <p class="nota" id="cv-portal-actual">Computrabajo adjunta a tus postulaciones el CV que tienes como principal.
+          <button class="enlace" id="btn-ver-cv-portal">Ver cuál tengo</button></p>
+        <div id="cv-portal-opciones"></div>
 
         <h2 style="margin-top:22px">Portales</h2>
         <p class="nota">Entras tú en la web de cada portal, una sola vez, y queda conectado.</p>
@@ -516,6 +577,6 @@
   </div>
 </div>
 
-<script type="module" src="panel.js?v=1790351039"></script>
+<script type="module" src="panel.js?v=1790353419"></script>
 </body>
 </html>

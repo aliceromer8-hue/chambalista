@@ -13,6 +13,7 @@ import * as huecos from "./lib/huecos.js";
 import * as sesion from "./lib/sesion.js";
 import { medir } from "./lib/medir.js";
 import { TOPE_POR_TANDA } from "./lib/verificados.js";
+import * as distritos from "./lib/distritos.js";
 
 // Lo que dice el servidor cuando se agota la cuota gratuita de IA.
 // Viene de proxy_ia.py: «Llegaste al límite de N usos gratis.»
@@ -156,6 +157,74 @@ async function postuladasEnPortal(tabId, pid) {
   return vistas;
 }
 
+// ---------------------------------------------------------------------
+// Tu CV en tu cuenta del portal (Ali, 2026-09-25)
+// ---------------------------------------------------------------------
+// «Agregar el CV adaptado a la cuenta de la persona». Computrabajo guarda
+// varios CV en Word/PDF y adjunta a tus postulaciones el marcado como
+// principal. Tres opciones, que elige la persona:
+//   portal    mantener el que ya tiene
+//   harvard   subir UNA vez el CV de Chamba Lista y dejarlo de principal
+//   adaptado  antes de cada postulación, subir uno adaptado a esa vacante
+//             y dejarlo de principal (se quita el adaptado anterior, que
+//             es nuestro; los suyos no se tocan nunca)
+const URL_CV_COMPUTRABAJO = "https://candidato.pe.computrabajo.com/candidate/cv/uploadcv";
+
+async function cvDelPortal(tabId) {
+  const r = await irY(tabId, URL_CV_COMPUTRABAJO, "cvArchivos");
+  if (!r?.enPagina) throw new Error("No se pudo abrir «Mi currículum» de Computrabajo. ¿Tienes la sesión abierta?");
+  return r;
+}
+
+/** Sube un CV a Computrabajo y lo deja de principal. Devuelve su id. */
+async function ponerCVEnComputrabajo(tabId, pedido, { reemplazarNuestro = false } = {}) {
+  let antes = await cvDelPortal(tabId);
+  const nuestros = await almacen.leer("cvNuestrosComputrabajo", []);
+
+  // Si está lleno, se hace sitio quitando un CV NUESTRO; los suyos, jamás.
+  if (!antes.puedeSubir) {
+    const nuestro = antes.archivos.find((a) => nuestros.includes(a.id) && !a.principal)
+      || antes.archivos.find((a) => nuestros.includes(a.id));
+    if (!nuestro) throw new Error("Tu Computrabajo ya tiene el máximo de CV guardados. Borra uno allí y vuelve a intentarlo.");
+    await hablarCon(tabId, { accion: "cvBorrar", id: nuestro.id }).catch(() => null);
+    await esperar(1500);
+    await pestanaLista(tabId, 15000);
+    antes = await cvDelPortal(tabId);
+  }
+
+  await hablarCon(tabId, { accion: "cvSubir", nombre: pedido.nombre, base64: pedido.base64 }).catch((e) => {
+    if (!SE_FUE_LA_PAGINA.test(e.message || "")) throw e;   // subir recarga la página
+  });
+  await esperar(2500);
+  await pestanaLista(tabId, 20000);
+  const despues = await hablarCon(tabId, { accion: "cvArchivos" });
+  const idsAntes = new Set(antes.archivos.map((a) => a.id));
+  const nuevo = (despues?.archivos || []).find((a) => !idsAntes.has(a.id));
+  if (!nuevo) throw new Error("Computrabajo no guardó el CV. Puede que el archivo no le guste; prueba con tu CV del portal.");
+
+  await hablarCon(tabId, { accion: "cvPrincipal", id: nuevo.id }).catch((e) => {
+    if (!SE_FUE_LA_PAGINA.test(e.message || "")) throw e;
+  });
+  await esperar(1500);
+  await pestanaLista(tabId, 15000);
+  const final = await hablarCon(tabId, { accion: "cvArchivos" });
+  if (!final?.archivos?.find((a) => a.id === nuevo.id)?.principal) {
+    throw new Error("Se subió el CV pero Computrabajo no lo dejó como principal.");
+  }
+
+  // El adaptado anterior (nuestro) sobra: solo se guarda el último.
+  if (reemplazarNuestro) {
+    for (const viejo of final.archivos.filter((a) => nuestros.includes(a.id) && a.id !== nuevo.id)) {
+      await hablarCon(tabId, { accion: "cvBorrar", id: viejo.id }).catch(() => null);
+      await esperar(1500);
+      await pestanaLista(tabId, 15000);
+    }
+  }
+  const quedan = reemplazarNuestro ? [nuevo.id] : [...nuestros, nuevo.id];
+  await almacen.guardar("cvNuestrosComputrabajo", quedan.slice(-10));
+  return { id: nuevo.id, nombre: nuevo.nombre };
+}
+
 async function buscar({ puesto, ciudad, nivel, portales: elegidos }) {
   const termino = terminoBusqueda(puesto, nivel);
   if (!termino) throw new Error("Escribe qué puesto buscas.");
@@ -166,13 +235,21 @@ async function buscar({ puesto, ciudad, nivel, portales: elegidos }) {
   let ocultasPortal = 0;
   const errores = [];
 
+  // Si escribió un DISTRITO de Lima (lo normal: «Miraflores»), se busca en
+  // toda Lima y el panel ordena por cercanía: en tu zona, cerca, lejos.
+  // Buscar «en Miraflores» en el portal escondía lo de San Isidro, que
+  // está a 25 minutos (Ali, 2026-09-25: «buscar el lugar y también
+  // lugares cercanos»).
+  const dondeVive = distritos.esDistritoDeLima(ciudad) ? ciudad : "";
+  const ciudadPortal = dondeVive ? "Lima" : ciudad;
+
   for (const pid of elegidos?.length ? elegidos : ["computrabajo"]) {
     const portal = PORTALES[pid];
     if (!portal) continue;
     try {
       const yaEnPortal = await postuladasEnPortal(tabId, pid);
       for (let pagina = 1; pagina <= 2; pagina++) {
-        const r = await irY(tabId, portal.url(termino, ciudad, pagina), "ofertas");
+        const r = await irY(tabId, portal.url(termino, ciudadPortal, pagina), "ofertas");
         // Solo Computrabajo necesita sesión: los otros listan en público.
         if (portal.postulable && r?.sesion === false) {
           errores.push({ portal: portal.nombre, error: "Necesitas iniciar sesión." });
@@ -194,7 +271,7 @@ async function buscar({ puesto, ciudad, nivel, portales: elegidos }) {
       medir("busqueda", { portal: pid, ok: false });
     }
   }
-  return { vacantes, errores, termino, ocultasPortal };
+  return { vacantes, errores, termino, ocultasPortal, dondeVive };
 }
 
 // ---------------------------------------------------------------------
@@ -300,6 +377,26 @@ async function prepararUna(vacante, perfil, guardados, respuestasPersona) {
   reporte.competenciasCV = confirmadas;
   reporte.descripcion = (vacante.descripcion || "").slice(0, 1200);
 
+  // CV adaptado a ESTA vacante en tu cuenta de Computrabajo, si lo
+  // elegiste. Va antes de abrir la postulación: Computrabajo adjunta el
+  // CV principal en el momento de postular.
+  const prefsCV = (await almacen.preferencias.obtener()).cvPortal || {};
+  if ((vacante.portalId || "") === "computrabajo" && prefsCV.computrabajo === "adaptado") {
+    try {
+      const listo = await cvAdaptado(perfil, vacante, confirmadas);
+      if (listo?.pedido && !listo.pedido.error) {
+        const puesto = await ponerCVEnComputrabajo(tabId, listo.pedido, { reemplazarNuestro: true });
+        reporte.cv = { adjuntado: true, enCuenta: true, archivo: puesto.nombre };
+        reporte.cambiosCV = listo.cambios || [];
+      } else {
+        reporte.cv = { adjuntado: false, nota: "No se pudo generar el CV adaptado: va el principal de tu cuenta." };
+      }
+    } catch (e) {
+      reporte.cv = { adjuntado: false, nota: `No se pudo poner el CV adaptado en Computrabajo (${e.message}). Va el principal de tu cuenta.` };
+    }
+    await irY(tabId, vacante.url, "ping").catch(() => null);
+  }
+
   // Dónde estaba la pestaña ANTES de pulsar «Postularme»: si después
   // está en otra página, el formulario está en esa página.
   const urlAntes = (await chrome.tabs.get(tabId).catch(() => null))?.url || "";
@@ -380,7 +477,9 @@ async function prepararUna(vacante, perfil, guardados, respuestasPersona) {
 
   // El Word antes que las respuestas: si el portal autocompleta algo al
   // recibirlo, lo que se escriba después es lo que manda.
-  if (cvListo?.pedido && !cvListo.pedido.error) {
+  if (reporte.cv?.enCuenta) {
+    // ya está: se subió a tu cuenta de Computrabajo antes de abrir
+  } else if (cvListo?.pedido && !cvListo.pedido.error) {
     reporte.cambiosCV = cvListo.cambios || [];
     reporte.cv = await adjuntarPedido(tabId, cvListo.pedido);
   } else if (conArchivo) {
@@ -571,6 +670,8 @@ async function correrLote({ vacantes, modo, aprobacion, respuestasPersona }) {
   };
 
   for (let i = 0; i < cola.length; i++) {
+    // En pausa se espera aquí, ENTRE vacantes: nunca a media postulación.
+    while (lote.pausado && !lote.cancelado) await esperar(400);
     if (lote.cancelado) break;
     const item = lote.items[i];
     // Lo que el panel enseña «en vivo»: cuál va y qué se le está haciendo.
@@ -891,8 +992,53 @@ chrome.runtime.onMessage.addListener((msg, _e, responder) => {
           return responder({ iniciado: true });
         case "loteCancelar":
           lote.cancelado = true;
+          lote.pausado = false;
           lote.mensaje = "Cancelado. No se enviarán más.";
           return responder({ cancelado: true });
+        case "lotePausar":
+          lote.pausado = true;
+          return responder({ pausado: true });
+        case "loteReanudar":
+          lote.pausado = false;
+          return responder({ pausado: false });
+
+        // Vista previa de una vacante: su ficha, leída en la pestaña de
+        // trabajo (en segundo plano) para enseñarla en el panel.
+        case "verVacante": {
+          // En una pestaña APARTE y en segundo plano, que se cierra al
+          // leer: la de trabajo puede estar a media tanda.
+          const temporal = await chrome.tabs.create({ url: msg.vacante.url, active: false });
+          try {
+            await esperar(1200);
+            await pestanaLista(temporal.id, 20000);
+            const d = await hablarCon(temporal.id, { accion: "detalle" });
+            return responder({ detalle: d || null });
+          } finally {
+            chrome.tabs.remove(temporal.id).catch(() => {});
+          }
+        }
+
+        // Tu CV en Computrabajo: cuál tienes y qué hacemos con él.
+        case "cvPortalEstado": {
+          const tab = await pestanaDeTrabajo();
+          const r = await cvDelPortal(tab);
+          return responder({ principal: r.archivos.find((a) => a.principal)?.nombre || null,
+                             cuantos: r.archivos.length });
+        }
+        case "cvPortalElegir": {
+          const prefs = await almacen.preferencias.obtener();
+          await almacen.preferencias.guardar({ ...prefs,
+            cvPortal: { ...(prefs.cvPortal || {}), computrabajo: msg.modo } });
+          if (msg.modo !== "harvard") return responder({ ok: true });
+          // «Usar el de Chamba Lista»: se sube UNA vez y queda de principal.
+          const perfil = await almacen.perfil.obtener();
+          if (!perfil) return responder({ error: "Primero carga tu CV." });
+          const pedido = await cv.docxAdaptado(perfil, null, {});
+          if (!pedido || pedido.error) return responder({ error: pedido?.error || "No se pudo generar el CV." });
+          const tab = await pestanaDeTrabajo();
+          const puesto = await ponerCVEnComputrabajo(tab, pedido);
+          return responder({ ok: true, archivo: puesto.nombre });
+        }
         case "consentimiento":
           return responder({ casillas: CONSENTIMIENTO, tope: TOPE_POR_TANDA });
         case "sesionPortales": {

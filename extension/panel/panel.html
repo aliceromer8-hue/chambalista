@@ -44,6 +44,16 @@
     <!-- Portada: manda cuando la persona es nueva, se encoge cuando ya
          está lista. El panel es landing y tablero según el momento. -->
     <section class="portada" id="portada">
+      <!-- Adornos: aviones de papel, hojas y chispas que flotan alrededor
+           de la caja. Decoración pura, fuera del árbol de accesibilidad. -->
+      <div class="adornos" aria-hidden="true">
+        <span class="adorno avioncito a1">✈</span>
+        <span class="adorno hojita a2"></span>
+        <span class="adorno chispa a3">✦</span>
+        <span class="adorno hojita a4"></span>
+        <span class="adorno avioncito a5">✈</span>
+        <span class="adorno chispa a6">✦</span>
+      </div>
       <div class="portada-texto">
         <p class="antetitulo">Prácticas y primer empleo en Perú</p>
         <!-- Lo reescribe panel.js con titularPortada(), desde PACK_MAYOR y
@@ -56,6 +66,21 @@
         <!-- Dónde estás: cuenta → CV → portales → postular. Lo pinta
              pintarRecorrido() según la etapa. -->
         <ol class="recorrido" id="recorrido" aria-label="Tu avance"></ol>
+        <!-- Lo que hace mientras tanto, escrito en vivo. Ilustrativo: son
+             pasos, no postulaciones de nadie. -->
+        <div class="escena" aria-hidden="true">
+          <p class="frase-viva"><span id="frase-viva"></span><span class="cursor">▋</span></p>
+          <div class="cinta-demo">
+            <span class="mini-tarjeta"><b>Practicante de marketing</b><i class="ok">Enviada ✓</i></span>
+            <span class="mini-tarjeta"><b>Asistente administrativo</b><i class="ok">Enviada ✓</i></span>
+            <span class="mini-tarjeta"><b>Analista de datos jr.</b><i class="va">Llenando…</i></span>
+            <span class="mini-tarjeta"><b>Diseñador gráfico</b><i class="ok">Enviada ✓</i></span>
+            <span class="mini-tarjeta"><b>Practicante contable</b><i class="ok">Enviada ✓</i></span>
+            <span class="mini-tarjeta"><b>Practicante de marketing</b><i class="ok">Enviada ✓</i></span>
+            <span class="mini-tarjeta"><b>Asistente administrativo</b><i class="ok">Enviada ✓</i></span>
+            <span class="mini-tarjeta"><b>Analista de datos jr.</b><i class="va">Llenando…</i></span>
+          </div>
+        </div>
       </div>
       <div class="portada-arte" aria-hidden="true">
         <div class="hoja-flotante">
@@ -119,7 +144,8 @@
         Deja la ciudad vacía si te da igual dónde.</p>
       <div class="fila-busqueda">
         <input type="text" id="puesto" placeholder="¿Qué puesto buscas? Ej.: practicante de derecho, enfermera, cajero" autocomplete="off">
-        <input type="text" id="ciudad" list="ciudades" placeholder="Ciudad (opcional)" autocomplete="off">
+        <input type="text" id="ciudad" list="ciudades" placeholder="¿Dónde vives? Ej.: Miraflores"
+               aria-label="Tu distrito o ciudad" autocomplete="off">
         <datalist id="ciudades"></datalist>
         <select id="nivel"></select>
         <button class="boton primario" id="btn-buscar">Buscar</button>
@@ -127,6 +153,16 @@
       <div class="fila-portales" id="portales"></div>
       <p class="nota" id="resumen-busqueda"></p>
     </article>
+
+    <!-- Ali: «que haya una opción de verlo completo y ahí ya lo lleva a la
+         página, pero recordarle que si quiere postular debe volver para que
+         sea automático». -->
+    <div class="recordatorio oculto" id="recordatorio" role="status">
+      <span class="rec-icono" aria-hidden="true">↩</span>
+      <span class="rec-texto" id="rec-texto"></span>
+      <button class="boton primario chico" id="rec-postular">Postular</button>
+      <button class="cerrar-mini" id="rec-cerrar" aria-label="Quitar recordatorio">×</button>
+    </div>
 
     <!-- Fija abajo mientras hay resultados: es LA acción de esta pantalla
          y estaba entre el buscador y la lista, en rojo de peligro, sin que
@@ -161,6 +197,7 @@
           </span>
         </label>
       <div class="que-significa" id="que-significa"></div>
+      <div class="elegir-cv oculto" id="elegir-cv"></div>
       <div class="fila-botones">
         <button class="boton secundario" id="btn-cancelar-auto">Ahora no</button>
         <button class="boton primario" id="btn-confirmar-auto">Empezar</button>
@@ -182,12 +219,16 @@
             <path d="M43 7 22 29v10l5-6" stroke="currentColor" stroke-width="2.5" stroke-linejoin="round"/>
           </svg>
         </div>
+        <div class="vivo-controles">
+          <button class="boton secundario" id="btn-pausar-lote">⏸ Pausar</button>
+          <button class="boton peligro" id="btn-cancelar-lote">Cancelar postulaciones</button>
+          <button class="boton primario oculto" id="btn-reanudar-lote">Reanudar</button>
+        </div>
         <ol class="vivo-feed" id="vivo-feed"></ol>
       </div>
       <div class="consola" id="consola" role="status" aria-live="polite"></div>
       <div class="barra"><div id="relleno"></div></div>
       <p class="nota" id="texto-progreso"></p>
-      <button class="enlace" id="btn-cancelar-lote">Cancelar tanda</button>
     </div>
 
     <div class="rejilla-vacantes" id="lista-vacantes">
@@ -205,9 +246,8 @@
       <h2>Tus postulaciones</h2>
       <button class="enlace" id="btn-exportar">Exportar CSV</button>
     </div>
-    <p class="pista"><strong>Aquí sabes en qué va cada una sin abrir el correo.</strong>
-      Cuando una empresa te escriba, arrastra su tarjeta a «Entrevista». Si te dicen que no,
-      a «Descartada». Así ves de un vistazo cuántas siguen vivas.</p>
+    <div class="resumen-pipeline" id="resumen-pipeline"></div>
+    <p class="pista">Cuando una empresa te escriba, arrastra su tarjeta a «Entrevista».</p>
     <div class="columnas" id="columnas"></div>
   </section>
 
@@ -254,6 +294,11 @@
           </span>
         </label>
         </div>
+
+        <h2 style="margin-top:22px">Tu CV en Computrabajo</h2>
+        <p class="nota" id="cv-portal-actual">Computrabajo adjunta a tus postulaciones el CV que tienes como principal.
+          <button class="enlace" id="btn-ver-cv-portal">Ver cuál tengo</button></p>
+        <div id="cv-portal-opciones"></div>
 
         <h2 style="margin-top:22px">Portales</h2>
         <p class="nota">Entras tú en la web de cada portal, una sola vez, y queda conectado.</p>
