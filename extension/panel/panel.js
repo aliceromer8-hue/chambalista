@@ -10,6 +10,7 @@ import * as ia from "../lib/ia.js";
 import * as coincidencia from "../lib/coincidencia.js";
 import * as cv from "../lib/cv.js";
 import * as distritos from "../lib/distritos.js";
+import { sincronizar } from "../lib/sincro.js";
 import * as sesion from "../lib/sesion.js";
 import { PACK_MAYOR, TOPE_POR_TANDA } from "../lib/verificados.js";
 import { SERVIDOR } from "../lib/servidor.js";
@@ -119,6 +120,7 @@ document.querySelectorAll("[data-ir]").forEach((b) => b.addEventListener("click"
 // ---------------------------------------------------------------------
 async function pintarInicio() {
   pintarCuenta();
+  await refrescarDatosOk();
   const r = await almacen.tracker.resumen();
 
   pintarPortada(r);
@@ -295,15 +297,33 @@ function animarFraseViva() {
 }
 animarFraseViva();
 
-function pintarRecorrido(etapa) {
-  const pasos = ["Tu cuenta", "Tu CV", "Portales", "Postular"];
+function pintarRecorrido(hechos) {
+  // Cinco pasos: tus datos van después del CV (Ali: obligatorios antes de
+  // postular). `etapa` = el primero sin hacer.
+  const pasos = ["Tu cuenta", "Tu CV", "Tus datos", "Portales", "Postular"];
   const ol = $("#recorrido");
   if (!ol) return;
-  ol.style.setProperty("--hecho", String(Math.min(etapa, 3) / 3));
+  let etapa = hechos.findIndex((h) => !h);
+  if (etapa === -1) etapa = pasos.length;
+  ol.style.setProperty("--hecho", String(Math.min(etapa, pasos.length - 1) / (pasos.length - 1)));
   ol.innerHTML = `<span class="avance" aria-hidden="true"></span>` + pasos.map((p, i) =>
     `<li class="${i < etapa ? "hecho" : i === etapa ? "ahora" : ""}"${i === etapa ? ' aria-current="step"' : ""}>
        <span class="bola">${i < etapa ? "✓" : i + 1}</span><span class="rotulo">${p}</span></li>`).join("");
 }
+
+/** «Completa tus datos», primero, mientras falten los obligatorios. */
+function botonDatos() {
+  if (estado.datosOk) return "";
+  return `<button class="aviso-datos" data-ir-datos>
+    <b>Completa tus datos para postular</b>
+    <span>${estado.faltanDatos.length} ${estado.faltanDatos.length === 1 ? "dato" : "datos"}: DNI, distrito, horario… · 1 minuto</span></button>`;
+}
+document.addEventListener("click", (e) => {
+  if (!e.target.closest?.("[data-ir-datos]")) return;
+  irA("perfil");
+  (estado.faltanDatos || []).forEach((c) => document.querySelector(`.campo-dato[data-campo="${c.clave}"]`)?.classList.add("falta"));
+  document.querySelector(".campo-dato.falta")?.scrollIntoView({ behavior: "smooth", block: "center" });
+});
 
 /**
  * El nombre con el que se saluda: el de la CUENTA, nunca el del CV.
@@ -387,7 +407,8 @@ function pintarPortada(resumen) {
   const etapa = !estado.conCuenta ? 0 : !estado.perfil ? 1 : !conectados.length ? 2 : 3;
 
   portada.classList.toggle("compacta", etapa === 3);
-  pintarRecorrido(etapa);
+  pintarRecorrido([estado.conCuenta, Boolean(estado.perfil), Boolean(estado.datosOk),
+                   conectados.length > 0, resumen.total > 0]);
 
   // El sello «15 por tanda» solo cuando ya significa algo.
   //
@@ -521,7 +542,7 @@ function pintarPortada(resumen) {
 
 
 
-    acciones.innerHTML = `<div class="portales-portada" style="width:100%">`
+    acciones.innerHTML = botonDatos() + `<div class="portales-portada" style="width:100%">`
       + primeros.map(filaPortal).join("")
       + (resto.length
         ? `<details class="mas-portales"${resto.some((p) => conectando.has(p.id)) ? " open" : ""}>
@@ -541,7 +562,10 @@ function pintarPortada(resumen) {
   $("#portada-titulo").textContent = cuantas
     // «postulación» pierde la tilde en plural: no se puede pegar «es».
     ? `Llevas ${cuantas} ${cuantas === 1 ? "postulación" : "postulaciones"}`
-    : `Todo listo${nombreCorto ? `, ${nombreCorto}` : ""}. ¿Qué buscamos hoy?`;
+    : !estado.datosOk
+      // «Todo listo» con los datos sin poner era mentira: sin ellos no se postula.
+      ? `Casi listo${nombreCorto ? `, ${nombreCorto}` : ""}. Falta un paso.`
+      : `Todo listo${nombreCorto ? `, ${nombreCorto}` : ""}. ¿Qué buscamos hoy?`;
   $("#portada-bajada").textContent = cuantas
     ? `${resumen.entrevistas} en entrevista · ${conectados.length} ${conectados.length === 1 ? "portal conectado" : "portales conectados"}`
     : `${conectados.length} ${conectados.length === 1 ? "portal conectado" : "portales conectados"}. Escribe el puesto que buscas y empezamos.`;
@@ -549,7 +573,7 @@ function pintarPortada(resumen) {
   // opción de añadir los demás desaparecía de Inicio y solo quedaba en
   // Mi perfil, donde nadie la buscaba.
   const sinConectar = sesionesCache.filter((p) => !p.sesion);
-  acciones.innerHTML = `<button class="boton primario" id="p-buscar">Buscar y postular</button>`
+  acciones.innerHTML = botonDatos() + `<button class="boton primario" id="p-buscar">Buscar y postular</button>`
     + (sinConectar.length
       ? `<details class="mas-portales"${sinConectar.some((p) => conectando.has(p.id)) ? " open" : ""}>
            <summary><span class="mas-signo" aria-hidden="true">+</span> Conectar más portales
@@ -861,6 +885,7 @@ $("#btn-buscar").addEventListener("click", async () => {
     estado.vacantes = delTema.length ? delTema : todas;
     estado.dondeVive = r.dondeVive || "";
     ordenarPorLugar();
+    pintarCVBarra();
 
     if (!estado.vacantes.length) {
       $("#lista-vacantes").innerHTML = `<div class="vacio-guiado" style="grid-column:1/-1">
@@ -988,6 +1013,10 @@ document.addEventListener("visibilitychange", () => {
 // ---------------------------------------------------------------------
 async function abrirVacante(vacante) {
   if (!vacante) return;
+  if (vacante.postulable !== false) {
+    if (!(await exigirDatos(() => abrirVacante(vacante)))) return;
+    if (!(await exigirCV([vacante], () => abrirVacante(vacante)))) return;
+  }
   estado.vacanteAbierta = vacante;
   estado.respuestasPersona = {};
   $("#modal").classList.remove("oculto");
@@ -1328,7 +1357,12 @@ $("#modal").addEventListener("click", (e) => { if (e.target.id === "modal") $("#
 // ---------------------------------------------------------------------
 // Lote
 // ---------------------------------------------------------------------
-$("#btn-lote-revisar").addEventListener("click", () => arrancarLote("revisado"));
+$("#btn-lote-revisar").addEventListener("click", async () => {
+  const seguir = () => $("#btn-lote-revisar").click();
+  if (!(await exigirDatos(seguir))) return;
+  if (!(await exigirCV(vacantesParaLote(), seguir))) return;
+  arrancarLote("revisado");
+});
 
 // ── Cómo postula: UN interruptor, el mismo en todas partes ──
 //
@@ -1434,6 +1468,7 @@ async function guardarCV(modo, estadoEl) {
     : modo === "adaptado" ? "Cada postulación irá con su CV adaptado." : "Se usará el CV que ya tienes.", "bien");
   if (estadoEl && r?.archivo) estadoEl.innerHTML = `Listo: <b>${escapar(r.archivo)}</b> es tu CV principal.`;
   pintarCVPerfil();
+  pintarCVBarra();
   return true;
 }
 
@@ -1491,6 +1526,7 @@ async function pintarElegirCV() {
 }
 
 $("#btn-lote-auto").addEventListener("click", async () => {
+  if (!(await exigirDatos(() => $("#btn-lote-auto").click()))) return;
   const { auto, elegido } = await modoActual();
   const aprobacion = await almacen.leer("aprobacionAuto", null);
   const faltaCV = vacantesParaLote().some((v) => (v.portalId || "") === "computrabajo") && !(await cvElegido());
@@ -1736,6 +1772,9 @@ $("#btn-reanudar-lote").addEventListener("click", () => {
 // ---------------------------------------------------------------------
 async function pintarPipeline() {
   const lista = await almacen.tracker.listar();
+  $("#memoria-cuenta").textContent = estado.conCuenta
+    ? "Guardadas en tu cuenta: no se pierden al actualizar Chamba Lista ni al cambiar de equipo."
+    : "Entra a tu cuenta para guardarlas y no perderlas.";
   // Ali, 2026-09-25: «que las postulaciones se vean más bonitas, menos
   // saturadas». Arriba, cuántas hay en cada etapa; debajo, columnas
   // claras con fichas limpias: puesto, empresa, portal y fecha. El motivo
@@ -1785,6 +1824,7 @@ function conectarArrastre() {
     // El menú sirve de alternativa accesible al arrastre.
     f.querySelector(".mover")?.addEventListener("change", async (e) => {
       await almacen.tracker.moverEtapa(f.dataset.id, e.target.value);
+      sincronizar().catch(() => {});
       avisar("Movida de etapa", "bien");
       pintarPipeline();
     });
@@ -1923,6 +1963,7 @@ $("#archivo-cv").addEventListener("change", async (e) => {
     perfil = j.perfil;
     estado.perfil = perfil;
     await almacen.perfil.guardar(perfil);
+    sesion.subirPerfil(perfil).catch(() => {});      // a tu cuenta: no se pierde
   } catch (err) {
     // Sin coletillas sobre el estado del servidor: «si el servicio está
     // dormido» no significa nada para quien lo lee y encima suele ser
@@ -1954,9 +1995,57 @@ $("#archivo-cv").addEventListener("change", async (e) => {
   } catch (err) {
     console.error("[panel] el CV se guardó pero falló al pintar:", err);
   }
+  // Siguiente paso: tus datos, si faltan (sin ellos no se postula).
+  if (!(await refrescarDatosOk())) {
+    avisar("CV cargado. Ahora tus datos para postular: 1 minuto.", "bien");
+    estado.faltanDatos.forEach((c) => document.querySelector(`.campo-dato[data-campo="${c.clave}"]`)?.classList.add("falta"));
+    document.querySelector(".campo-dato.falta")?.scrollIntoView({ behavior: "smooth", block: "center" });
+    return;
+  }
   avisar("CV cargado", "bien");
   irA("inicio");
   $("#portada")?.scrollIntoView({ behavior: "smooth", block: "start" });
+});
+
+// ── Ver tu CV en formato Harvard ──
+// Antes era un enlace a una dirección vieja que ya no existe: «no me lleva
+// a ningún lado» (Ali, 2026-09-25). Ahora se ve aquí y se descarga.
+async function bajarDocx(doc) {
+  const bytes = Uint8Array.from(atob(doc.base64), (ch) => ch.charCodeAt(0));
+  const url = URL.createObjectURL(new Blob([bytes],
+    { type: "application/vnd.openxmlformats-officedocument.wordprocessingml.document" }));
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = doc.nombre || "CV.docx";
+  a.click();
+  setTimeout(() => URL.revokeObjectURL(url), 4000);
+}
+
+$("#btn-ver-harvard")?.addEventListener("click", async () => {
+  const perfil = estado.perfil || await almacen.perfil.obtener();
+  if (!perfil) { avisar("Primero carga tu CV.", "mal"); return; }
+  $("#modal").classList.remove("oculto");
+  $("#modal-contenido").innerHTML = `<h2>Tu CV en formato Harvard</h2>
+    <div class="esqueleto" style="height:320px;margin-top:14px"></div>`;
+  let html = "";
+  try {
+    const r = await sesion.conCuenta("/api/cv/preview", {
+      method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(perfil),
+    });
+    html = r.ok ? (await r.json()).html || "" : "";
+  } catch { /* se dice abajo */ }
+  $("#modal-contenido").innerHTML = `<h2>Tu CV en formato Harvard</h2>
+    ${html ? `<div class="hoja-harvard">${html}</div>` : `<p class="aviso alerta">No se pudo generar la vista previa ahora. Prueba en un momento.</p>`}
+    <div class="fila-botones vista-acciones"><button class="boton primario" id="bajar-harvard">Descargar en Word</button></div>`;
+  $("#bajar-harvard").addEventListener("click", async (ev) => {
+    const b = ev.currentTarget;
+    b.disabled = true; b.textContent = "Generando…";
+    const doc = await cv.docxAdaptado(perfil, null, {});
+    b.disabled = false; b.textContent = "Descargar en Word";
+    if (!doc || doc.error) { avisar(doc?.error || "No se pudo generar el Word.", "mal"); return; }
+    await bajarDocx(doc);
+    avisar("CV descargado", "bien");
+  });
 });
 
 /**
@@ -2057,6 +2146,7 @@ async function pintarCamposDatos() {
   $("#campos-datos").innerHTML = datos.CAMPOS.map((c) => {
     const v = guardados[c.clave] || "";
     const cabecera = `<label>${escapar(c.etiqueta)}`
+      + (c.obligatorio ? `<span class="obligatorio-chip">obligatorio</span>` : "")
       + (c.sensible ? `<span class="sensible">sensible</span>` : "")
       + `<span class="ayuda"> ${escapar(c.ayuda)}</span></label>`;
 
@@ -2066,7 +2156,7 @@ async function pintarCamposDatos() {
       const enLista = c.opciones.includes(v);
       const fecha = !enLista && /^\d{4}-\d{2}-\d{2}$/.test(v) ? v : "";
       const elegida = fecha ? c.conFecha : v;
-      return `<div class="campo-dato">${cabecera}
+      return `<div class="campo-dato${c.obligatorio ? " obligatorio" : ""}" data-campo="${c.clave}">${cabecera}
         <select data-clave="${c.clave}" data-tipo="opciones">
           <option value="">Sin responder</option>
           ${c.opciones.map((o) =>
@@ -2082,7 +2172,7 @@ async function pintarCamposDatos() {
       const corte = v.indexOf(":");
       const red = corte > 0 ? v.slice(0, corte).trim() : c.opciones[0];
       const usuario = corte > 0 ? v.slice(corte + 1).trim() : v;
-      return `<div class="campo-dato">${cabecera}
+      return `<div class="campo-dato${c.obligatorio ? " obligatorio" : ""}" data-campo="${c.clave}">${cabecera}
         <div class="par-red">
           <select data-red-de="${c.clave}">
             ${c.opciones.map((o) =>
@@ -2094,8 +2184,8 @@ async function pintarCamposDatos() {
       </div>`;
     }
 
-    return `<div class="campo-dato">${cabecera}
-      <input type="text" data-clave="${c.clave}" value="${escapar(v)}" placeholder="Opcional"></div>`;
+    return `<div class="campo-dato${c.obligatorio ? " obligatorio" : ""}" data-campo="${c.clave}">${cabecera}
+      <input type="text" data-clave="${c.clave}" value="${escapar(v)}" placeholder="${c.obligatorio ? "Obligatorio" : "Opcional"}"></div>`;
   }).join("");
 
   // El selector de fecha aparece solo cuando toca.
@@ -2142,7 +2232,120 @@ $("#btn-guardar-datos").addEventListener("click", async () => {
   await almacen.datosPersonales.guardar(limpio);
   const n = Object.keys(limpio).length;
   $("#estado-datos").textContent = `Guardados ${n} dato(s), solo en tu navegador.`;
+  await refrescarDatosOk();
+  document.querySelectorAll(".campo-dato.falta").forEach((el) => el.classList.remove("falta"));
+  if (!estado.datosOk) {
+    const faltan = estado.faltanDatos.map((c) => c.etiqueta).join(", ");
+    $("#estado-datos").textContent += ` Para postular falta: ${faltan}.`;
+    estado.faltanDatos.forEach((c) => document.querySelector(`.campo-dato[data-campo="${c.clave}"]`)?.classList.add("falta"));
+    avisar(`Guardado. Para postular falta: ${faltan}`, "mal");
+    return;
+  }
   avisar(`${n} dato(s) guardados`, "bien");
+  pintarInicio();
+  // Había una postulación esperando estos datos: se sigue sola.
+  const seguir = estado.trasDatos;
+  estado.trasDatos = null;
+  if (seguir) {
+    avisar("Datos listos. Seguimos con tu postulación.", "bien");
+    irA("vacantes");
+    seguir();
+  }
+});
+
+// ---------------------------------------------------------------------
+// Antes de postular: tus datos y tu CV (Ali, 2026-09-25)
+// ---------------------------------------------------------------------
+// «Eso es obligatorio antes de postular; si no, ¿con qué info respondes?»
+// y «debe preguntarme con qué CV: acabo de postular con el ARTESCO que
+// tenía en la página y quería uno nuevo o adaptado. Eso no puede volver a
+// pasar». Nada se envía sin las dos cosas.
+async function refrescarDatosOk() {
+  estado.faltanDatos = datos.faltanObligatorios(await almacen.datosPersonales.obtener());
+  estado.datosOk = !estado.faltanDatos.length;
+  return estado.datosOk;
+}
+
+/** true si puede seguir. Si faltan datos, los pide y guarda qué hacer después. */
+async function exigirDatos(alSeguir) {
+  if (await refrescarDatosOk()) return true;
+  estado.trasDatos = alSeguir || null;
+  $("#modal").classList.remove("oculto");
+  $("#modal-contenido").innerHTML = `
+    <h2>Antes de postular: tus datos</h2>
+    <p class="nota">Las empresas los preguntan en casi todas las postulaciones y tu CV no los trae.
+      Se guardan solo en tu navegador y con ellos respondemos por ti.</p>
+    <ul class="faltan-datos">${estado.faltanDatos.map((c) => `<li>${escapar(c.etiqueta)}</li>`).join("")}</ul>
+    <div class="fila-botones"><button class="boton primario" id="ir-a-datos">Completarlos ahora · 1 minuto</button></div>`;
+  $("#ir-a-datos").addEventListener("click", () => {
+    $("#modal").classList.add("oculto");
+    irA("perfil");
+    estado.faltanDatos.forEach((c) => document.querySelector(`.campo-dato[data-campo="${c.clave}"]`)?.classList.add("falta"));
+    const primero = document.querySelector(".campo-dato.falta");
+    primero?.scrollIntoView({ behavior: "smooth", block: "center" });
+    primero?.querySelector("input, select")?.focus();
+  });
+  return false;
+}
+
+/** true si puede seguir. En Computrabajo, sin CV elegido, se pregunta. */
+async function exigirCV(vacantes, alSeguir) {
+  const vaComputrabajo = vacantes.some((v) => (v.portalId || "") === "computrabajo");
+  if (!vaComputrabajo || await cvElegido()) return true;
+  preguntarCV(alSeguir);
+  return false;
+}
+
+function preguntarCV(alSeguir) {
+  $("#modal").classList.remove("oculto");
+  $("#modal-contenido").innerHTML = `
+    <h2>¿Con qué CV postulas?</h2>
+    <p class="nota" id="cv-actual-modal"></p>
+    ${opcionesCV("cv-modal", "")}
+    <p class="nota">Esto es para Computrabajo. En Indeed, LinkedIn y Bumeran va el CV que tienes guardado en tu perfil de cada portal.</p>
+    <div class="fila-botones"><button class="boton primario" id="cv-modal-seguir" disabled>Seguir con este CV</button></div>`;
+  cvActualEnPortal($("#cv-actual-modal"));
+  const caja = $("#modal-contenido");
+  caja.querySelectorAll("input[name='cv-modal']").forEach((i) => i.addEventListener("change", () => {
+    caja.querySelectorAll(".opcion-cv").forEach((l) => l.classList.toggle("elegida", l.contains(i)));
+    $("#cv-modal-seguir").disabled = false;
+  }));
+  $("#cv-modal-seguir").addEventListener("click", async () => {
+    const elegido = caja.querySelector("input[name='cv-modal']:checked")?.value;
+    if (!elegido) return;
+    $("#cv-modal-seguir").disabled = true;
+    $("#cv-modal-seguir").textContent = elegido === "harvard" ? "Subiendo tu CV…" : "Guardando…";
+    const ok = await guardarCV(elegido, $("#cv-actual-modal"));
+    if (!ok) { $("#cv-modal-seguir").disabled = false; $("#cv-modal-seguir").textContent = "Seguir con este CV"; return; }
+    $("#modal").classList.add("oculto");
+    pintarCVBarra();
+    if (alSeguir) alSeguir();
+  });
+}
+
+const NOMBRE_CV = { portal: "el que ya tienes en Computrabajo", harvard: "el de Chamba Lista", adaptado: "uno adaptado a cada vacante" };
+
+/** Con qué CV se va a postular, a la vista junto al botón de postular. */
+async function pintarCVBarra() {
+  const b = $("#cv-elegido");
+  if (!b) return;
+  const e = await cvElegido();
+  b.innerHTML = e ? `CV: <b>${NOMBRE_CV[e]}</b> · cambiar` : `CV: <b>elige con cuál postular</b>`;
+}
+$("#cv-elegido")?.addEventListener("click", () => preguntarCV(null));
+
+// Tu historial de Computrabajo, aunque no haya pasado por Chamba Lista.
+$("#btn-importar-ct")?.addEventListener("click", async (ev) => {
+  const b = ev.currentTarget;
+  b.disabled = true;
+  b.textContent = "Leyendo tus postulaciones de Computrabajo…";
+  const r = await enviar({ accion: "importarComputrabajo" }).catch((e) => ({ error: e.message }));
+  b.disabled = false;
+  b.textContent = "Traer mis postulaciones de Computrabajo";
+  if (r?.error) { avisar(r.error, "mal"); return; }
+  await sincronizar().catch(() => null);
+  avisar(r?.nuevas ? `${r.nuevas} postulación(es) traídas de Computrabajo` : "Ya tenías todas las de Computrabajo", "bien");
+  pintarPipeline();
 });
 
 $("#btn-borrar-datos").addEventListener("click", async () => {
@@ -2329,6 +2532,17 @@ function pintarPortales() {
     // Token muerto: mejor pedir la contraseña que fallar en cada botón.
     if (!u) estado.conCuenta = false;
     else estado.usuario = u;
+  }
+  if (estado.conCuenta) {
+    // Una versión nueva empieza con el navegador vacío: lo tuyo está en tu
+    // cuenta y se trae aquí.
+    if (!estado.perfil) {
+      const guardado = await sesion.bajarPerfil().catch(() => null);
+      if (guardado) { estado.perfil = guardado; await almacen.perfil.guardar(guardado); pintarPerfil(); }
+    } else {
+      sesion.subirPerfil(estado.perfil).catch(() => {});
+    }
+    await sincronizar().catch(() => null);
   }
   await revisarSesion();
   await pintarInicio();

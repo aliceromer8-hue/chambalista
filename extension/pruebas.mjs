@@ -1933,6 +1933,64 @@ titulo("LA PESTAÑA SIN CONTENT SCRIPT — el fallo mas probable del primer inte
   check("todo lo nuevo respeta «reducir movimiento»", /prefers-reduced-motion: reduce\)\s*\{\s*\.adorno, \.cinta-demo/.test(pc));
 }
 
+// ══════════════════════════════════════════════════════════════════════
+// RONDA 2026-09-25 (c) — datos y CV ANTES de postular, Harvard, memoria
+// ══════════════════════════════════════════════════════════════════════
+{
+  titulo("ANTES DE POSTULAR — tus datos obligatorios y con qué CV");
+  const d = await import(`${BASE}lib/datos.js`);
+  const obligatorios = d.CAMPOS.filter((c) => c.obligatorio).map((c) => c.clave);
+  check("DNI, nacimiento, distrito, pretensión, disponibilidad y horario son obligatorios",
+    ["dni", "fechaNacimiento", "distrito", "pretension", "disponibilidadInicio", "horario"].every((k) => obligatorios.includes(k)),
+    obligatorios.join(","));
+  check("sin datos, faltan los seis", d.faltanObligatorios({}).length === 6);
+  check("con los seis, no falta nada", d.faltanObligatorios({ dni: "1", fechaNacimiento: "1", distrito: "1",
+    pretension: "1", disponibilidadInicio: "1", horario: "1" }).length === 0);
+  check("«¿qué horario puedes?» se responde con el dato guardado",
+    d.paraCampo("¿Qué horario tienes disponible?", { horario: "Tiempo completo" }).valor === "Tiempo completo");
+
+  const fs = await import("node:fs/promises");
+  const pj = await fs.readFile(new URL("panel/panel.js", BASE), "utf8");
+  const av = pj.slice(pj.indexOf("async function abrirVacante"), pj.indexOf("async function abrirVacante") + 400);
+  check("«Postular» pide los datos y el CV ANTES de nada", /exigirDatos\(/.test(av) && /exigirCV\(/.test(av));
+  check("la tanda también", /\$\("#btn-lote-auto"\)\.addEventListener\("click", async \(\) => \{\s*if \(!\(await exigirDatos/.test(pj)
+    && /\$\("#btn-lote-revisar"\)[\s\S]{0,200}exigirCV/.test(pj));
+  check("el CV se pregunta sin nada marcado: se elige, no se da por hecho",
+    /opcionesCV\("cv-modal", ""\)/.test(pj) && /id="cv-modal-seguir" disabled/.test(pj));
+  check("guardados los datos, la postulación sigue sola", /const seguir = estado\.trasDatos;/.test(pj));
+  check("el CV elegido se ve junto al botón de postular", /function pintarCVBarra/.test(pj));
+  check("«Todo listo» solo cuando lo está", /Casi listo/.test(pj));
+}
+
+{
+  titulo("HARVARD — se ve aquí y se descarga");
+  const fs = await import("node:fs/promises");
+  const ph = await fs.readFile(new URL("panel/panel.html", BASE), "utf8");
+  const pj = await fs.readFile(new URL("panel/panel.js", BASE), "utf8");
+  const pc = await fs.readFile(new URL("panel/panel.css", BASE), "utf8");
+  check("ya no apunta a la dirección vieja", !/onrender\.com/.test(ph) && /id="btn-ver-harvard"/.test(ph));
+  check("la vista previa sale del servidor y se descarga en Word",
+    /\/api\/cv\/preview/.test(pj) && /id="bajar-harvard"/.test(pj));
+  check("con la hoja de estilos del CV", /\.cv-preview \{/.test(pc));
+}
+
+{
+  titulo("MEMORIA — tus postulaciones viven en tu cuenta");
+  const fs = await import("node:fs/promises");
+  const pj = await fs.readFile(new URL("panel/panel.js", BASE), "utf8");
+  const fo = await fs.readFile(new URL("background.js", BASE), "utf8");
+  const al = await fs.readFile(new URL("lib/almacen.js", BASE), "utf8");
+  const si = await fs.readFile(new URL("lib/sincro.js", BASE), "utf8");
+  check("al abrir el panel se trae lo de tu cuenta (CV y postulaciones)",
+    /await sincronizar\(\)/.test(pj) && /sesion\.bajarPerfil\(\)/.test(pj));
+  check("al terminar una tanda y al enviar una, se sube", (fo.match(/sincronizar\(\)\.catch/g) || []).length >= 2);
+  check("si la nube no contesta, no se toca nada", /if \(remotas === null\) return/.test(si));
+  check("a la nube solo van estados que la tabla admite", /ETAPAS_NUBE\.has\(r\.etapa\) \? r\.etapa : "por_postular"/.test(si));
+  check("la misma oferta se reemplaza, no se apila", /claveOferta\(r\.url\) !== k/.test(al));
+  check("tu «Mis postulaciones» de Computrabajo entra al historial", /async function importarPostuladas/.test(fo)
+    && /candidate\/match\/postulada\/|postulada\/\$\{encodeURIComponent\(k\)\}/.test(fo));
+}
+
 console.log(`
 ${fallos === 0 ? "TODO OK" : `${fallos} FALLO(S)`}`);
 

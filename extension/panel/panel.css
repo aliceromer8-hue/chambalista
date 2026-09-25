@@ -1576,3 +1576,72 @@ main { max-width: 1120px; }
 /* Fijo quedaba debajo de la cabecera (que en un panel estrecho ocupa
  * tres líneas). Va en su sitio y, al volver, el panel lo trae a la vista. */
 .recordatorio { position: static; }
+
+/* La hoja del CV Harvard, igual que en la web (copiado de web.css). */
+.cv-preview {
+  font-family: "Times New Roman", Times, serif;
+  color: #131316;
+  background: #fff;
+  line-height: 1.4;
+  /* El relleno reproduce los márgenes de la hoja. En A4 con márgenes de
+   * 0.75" el texto ocupa el 82 % del ancho, así que queda un 9 % de aire
+   * a cada lado: eso es lo que se ve al imprimirlo y lo que hacía falta
+   * aquí, porque el texto llegaba pegado al borde. */
+  padding: 7% 9%;
+  border-radius: 3px;
+  box-shadow: 0 1px 3px rgba(19, 19, 22, .16), 0 6px 18px -6px rgba(19, 19, 22, .18);
+  max-width: 760px;
+  margin: 0 auto;
+}
+@media (max-width: 640px) { .cv-preview { padding: 24px 20px; } }
+.cv-preview h1 {
+  text-align: center; font-size: 1.4rem; font-weight: 700;
+  letter-spacing: 0; margin: 0 0 4px;
+}
+.cv-preview .cv-contacto {
+  text-align: center; font-size: .82rem; margin: 0 0 12px; color: #333;
+  border-bottom: 1px solid currentColor; padding-bottom: 8px;
+}
+.cv-preview h2 {
+  font-size: .88rem; font-weight: 700; text-transform: uppercase;
+  letter-spacing: .02em; margin: 15px 0 6px; padding-bottom: 3px;
+  border-bottom: 1px solid currentColor;
+}
+.cv-preview p { margin: 2px 0; font-size: .86rem; }
+.cv-preview p.just { text-align: justify; }
+.cv-preview ul { margin: 3px 0 6px 20px; padding: 0; }
+.cv-preview li { font-size: .86rem; margin: 2px 0; }
+.cv-preview .cv-fila { display: flex; justify-content: space-between; gap: 14px; }
+.cv-preview .cv-fila .der { text-align: right; white-space: nowrap; }
+.cv-preview strong { font-weight: 700; }
+.cv-preview em { font-style: italic; }
+
+/* ── Tus datos para postular: los obligatorios se ven ── */
+.obligatorio-chip {
+  background: var(--lima); color: #131316; border: 2px solid var(--tinta);
+  border-radius: 99px; padding: 0 7px; font-size: 9.5px; font-weight: 800; margin-left: 5px;
+}
+.campo-dato.falta input, .campo-dato.falta select { border-color: var(--coral); background: var(--coral-suave); }
+.campo-dato.falta label { color: var(--coral); }
+.campo-dato.falta { animation: latido .6s cubic-bezier(.3, 1.6, .5, 1); }
+.aviso-datos {
+  display: flex; flex-direction: column; align-items: flex-start; gap: 2px; width: 100%;
+  text-align: left; cursor: pointer; font: inherit; color: #131316;
+  background: #FBFAF6; border: 2px solid #131316; border-radius: 12px; box-shadow: 3px 3px 0 #131316;
+  padding: 12px 16px; margin-bottom: 12px; animation: latido 1.2s 1s cubic-bezier(.3, 1.6, .5, 1);
+}
+.aviso-datos b { font-size: 14.5px; }
+.aviso-datos span { font-size: 12px; opacity: .75; font-weight: 600; }
+.aviso-datos:hover { transform: translate(-1px, -1px); box-shadow: 4px 4px 0 #131316; }
+.faltan-datos { margin: 10px 0 4px; padding-left: 20px; font-weight: 700; }
+
+/* ── Con qué CV se postula, junto al botón ── */
+.cv-elegido {
+  background: none; border: 1.5px dashed var(--tinta-2); border-radius: 99px; padding: 5px 11px;
+  font: inherit; font-size: 11.5px; color: var(--tinta); cursor: pointer;
+}
+.cv-elegido:hover { border-style: solid; background: var(--papel-2); }
+
+/* ── La hoja Harvard dentro del panel ── */
+.hoja-harvard { background: var(--papel-3); border-radius: var(--r-chico); padding: 14px; margin-top: 12px; max-height: 60vh; overflow-y: auto; }
+.memoria-cuenta { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin: -6px 0 12px; }

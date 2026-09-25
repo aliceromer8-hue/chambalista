@@ -154,6 +154,9 @@
     const postuladas = [...document.querySelectorAll("[data-match]")].map((d) => ({
       titulo: limpio(d.querySelector("h1, h2, h3")),
       empresa: limpio(d.querySelector("p.fs16")),
+      // «Postulado», «CV visto», «Finalista», «Proceso finalizado».
+      estado: limpio(d.querySelector("p.fc_link")),
+      cuando: limpio(d.querySelector("p.fc_aux")),
     })).filter((x) => x.titulo);
     const sig = document.querySelector("span[title='Siguiente'][data-path]");
     return { postuladas, siguiente: sig ? sig.getAttribute("data-path") : null };

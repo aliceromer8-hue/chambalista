@@ -1,12 +1,17 @@
 // Datos que los portales piden y no están en el CV.
 //
-// La persona puede guardarlos una vez para que los formularios se
-// completen solos. Todo es opcional y vive únicamente en su navegador.
-// Lo que no guarde se sigue reportando como pendiente en la revisión.
+// La persona los guarda una vez y los formularios se completan solos.
+// Viven únicamente en su navegador.
+//
+// Los marcados `obligatorio` se piden ANTES de postular (Ali, 2026-09-25:
+// «eso es obligatorio antes de postular, si no, ¿con qué info respondes?»).
+// DNI, nacimiento, distrito, cuándo empiezas, horario y pretensión: lo que
+// las preguntas de selección piden casi siempre y el CV no trae.
 
 export const CAMPOS = [
   {
     clave: "dni",
+    obligatorio: true,
     etiqueta: "DNI",
     ayuda: "8 dígitos. Casi todos los portales lo piden.",
     patron: /\bdni\b|documento|identidad|n[uú]mero de documento|c\.?i\.?\b/i,
@@ -17,6 +22,7 @@ export const CAMPOS = [
   },
   {
     clave: "fechaNacimiento",
+    obligatorio: true,
     etiqueta: "Fecha de nacimiento",
     ayuda: "DD/MM/AAAA",
     patron: /nacimiento|birth|fecha de nac/i,
@@ -27,6 +33,7 @@ export const CAMPOS = [
   },
   {
     clave: "distrito",
+    obligatorio: true,
     etiqueta: "Distrito donde vives",
     ayuda: "Por ejemplo: Surco, Miraflores, Los Olivos.",
     patron: /distrito|residencia|d[oó]nde vives/i,
@@ -47,6 +54,7 @@ export const CAMPOS = [
   },
   {
     clave: "pretension",
+    obligatorio: true,
     etiqueta: "Pretensión salarial (S/)",
     ayuda: "Solo el número, por ejemplo 1500.",
     patron: /pretensi[oó]n|expectativa salarial|salario esperado|remuneraci[oó]n/i,
@@ -57,6 +65,7 @@ export const CAMPOS = [
   },
   {
     clave: "disponibilidadInicio",
+    obligatorio: true,
     etiqueta: "Disponibilidad para empezar",
     ayuda: "Elige una, o pon la fecha exacta.",
     // Escribiendo a mano cada quien ponía una cosa: «ya», «cuando sea»,
@@ -76,6 +85,19 @@ export const CAMPOS = [
     plantilla: (v) => (/^\d{4}-\d{2}-\d{2}$/.test(v)
       ? `Puedo empezar a partir del ${enCastellano(v)}.`
       : `Mi disponibilidad para empezar es ${v.toLowerCase()}.`),
+  },
+  {
+    clave: "horario",
+    obligatorio: true,
+    etiqueta: "Horario que puedes cumplir",
+    ayuda: "Lo preguntan casi todas las prácticas y los primeros empleos.",
+    tipo: "opciones",
+    opciones: ["Tiempo completo", "Medio tiempo (mañanas)", "Medio tiempo (tardes)", "Por horas", "Flexible"],
+    patron: /horario|turno|disponibilidad horaria|jornada/i,
+    validar: /^.{3,60}$/,
+    error: "Elige tu horario.",
+    sensible: false,
+    plantilla: (v) => `Puedo cumplir un horario de ${v.toLowerCase()}.`,
   },
   {
     clave: "redes",
@@ -167,4 +189,10 @@ function enCastellano(iso) {
   const [a, m, d] = iso.split("-").map(Number);
   if (!a || !m || !d || m < 1 || m > 12) return iso;
   return `${d} de ${MESES[m - 1]} de ${a}`;
+}
+
+
+/** Los obligatorios que faltan. Sin ellos no se postula. */
+export function faltanObligatorios(guardados = {}) {
+  return CAMPOS.filter((c) => c.obligatorio && !String(guardados[c.clave] || "").trim());
 }

@@ -14,6 +14,7 @@ import * as sesion from "./lib/sesion.js";
 import { medir } from "./lib/medir.js";
 import { TOPE_POR_TANDA } from "./lib/verificados.js";
 import * as distritos from "./lib/distritos.js";
+import { sincronizar } from "./lib/sincro.js";
 
 // Lo que dice el servidor cuando se agota la cuota gratuita de IA.
 // Viene de proxy_ia.py: «Llegaste al límite de N usos gratis.»
@@ -148,13 +149,48 @@ const clavePuesto = (t, e) => `${t}|${e}`.toLowerCase().normalize("NFD")
 async function postuladasEnPortal(tabId, pid) {
   let url = URL_POSTULADAS[pid];
   const vistas = new Set();
+  const leidas = [];
   for (let pag = 0; pag < 3 && url; pag++) {
     const r = await irY(tabId, url, "postuladas").catch(() => null);
     if (!r?.postuladas?.length) break;
     r.postuladas.forEach((x) => vistas.add(clavePuesto(x.titulo, x.empresa)));
+    leidas.push(...r.postuladas);
     url = r.siguiente;
   }
+  await importarPostuladas(pid, leidas).catch(() => {});
   return vistas;
+}
+
+/**
+ * Lo que el portal dice que ya postulaste entra en TU historial, aunque
+ * no haya pasado por Chamba Lista (o pasara por una versión anterior cuyo
+ * historial se quedó en otra carpeta). Solo lo que aún no está.
+ */
+async function importarPostuladas(pid, leidas) {
+  if (!leidas.length) return;
+  const lista = await almacen.tracker.listar();
+  const ya = new Set(lista.map((r) => clavePuesto(r.puesto, r.empresa)));
+  const portal = PORTALES[pid]?.nombre || pid;
+  let nuevas = 0;
+  for (const x of leidas.slice().reverse()) {
+    const k = clavePuesto(x.titulo, x.empresa);
+    if (!x.empresa || ya.has(k)) continue;
+    ya.add(k);
+    await almacen.tracker.anotar({
+      portal, puesto: x.titulo, empresa: x.empresa,
+      // Sin enlace a la oferta en «Mis postulaciones»: una dirección
+      // propia por puesto + empresa, para que la nube la guarde una vez.
+      // (En la RUTA, no tras «#»: claveOferta ignora el ancla y todas
+      // las importadas habrían compartido clave, pisándose.)
+      url: `${URL_POSTULADAS[pid]}postulada/${encodeURIComponent(k)}`,
+      estado: "enviada",
+      etapa: /finalista/i.test(x.estado) ? "entrevista" : "enviada",
+      motivo: [`En ${portal}: ${x.estado || "Postulado"}`, x.cuando].filter(Boolean).join(" · "),
+      importada: true,
+    });
+    nuevas++;
+  }
+  if (nuevas) sincronizar().catch(() => {});
 }
 
 // ---------------------------------------------------------------------
@@ -776,6 +812,7 @@ async function correrLote({ vacantes, modo, aprobacion, respuestasPersona }) {
 
   const cuenta = (e) => lote.items.filter((i) => i.estado === e).length;
   lote.actual = null;
+  sincronizar().catch(() => {});
   lote.fase = modo === "automatico" ? "terminado" : "listo";
   const extra = [
     cuenta("ya_postulada") && (cuenta("ya_postulada") === 1 ? "1 ya la tenías" : `${cuenta("ya_postulada")} ya las tenías`),
@@ -977,6 +1014,7 @@ chrome.runtime.onMessage.addListener((msg, _e, responder) => {
             sinPago: Boolean(msg.sinPago),
             descripcion: String(msg.descripcion || "").slice(0, 1200), competencias: msg.competencias || [],
           });
+          sincronizar().catch(() => {});
           medir(r?.enviada ? "postulacion_enviada" : "postulacion_omitida",
                 { portal: msg.vacante?.portalId || msg.vacante?.portal,
                   motivo: r?.enviada ? undefined : String(r?.error || r?.mensaje || "").slice(0, 60) });
@@ -995,6 +1033,15 @@ chrome.runtime.onMessage.addListener((msg, _e, responder) => {
           lote.pausado = false;
           lote.mensaje = "Cancelado. No se enviarán más.";
           return responder({ cancelado: true });
+        case "sincronizar":
+          return responder(await sincronizar());
+        case "importarComputrabajo": {
+          const tab = await pestanaDeTrabajo();
+          const antes = (await almacen.tracker.listar()).length;
+          await postuladasEnPortal(tab, "computrabajo");
+          const despues = (await almacen.tracker.listar()).length;
+          return responder({ nuevas: Math.max(0, despues - antes) });
+        }
         case "lotePausar":
           lote.pausado = true;
           return responder({ pausado: true });

@@ -177,6 +177,7 @@
           </span>
         </label>
       <div class="acciones-derecha">
+        <button class="cv-elegido" id="cv-elegido" type="button"></button>
         <span class="cuenta-sel" id="cuenta-marcadas"></span>
         <button class="boton secundario" id="btn-lote-revisar">Una por una</button>
         <button class="boton primario" id="btn-lote-auto">Postular a todas</button>
@@ -248,6 +249,8 @@
     </div>
     <div class="resumen-pipeline" id="resumen-pipeline"></div>
     <p class="pista">Cuando una empresa te escriba, arrastra su tarjeta a «Entrevista».</p>
+    <p class="nota memoria-cuenta"><span id="memoria-cuenta"></span>
+      <button class="enlace" id="btn-importar-ct" type="button">Traer mis postulaciones de Computrabajo</button></p>
     <div class="columnas" id="columnas"></div>
   </section>
 
@@ -278,7 +281,7 @@
         <div class="fila-botones">
           <input type="file" id="archivo-cv" accept=".pdf,.docx,.doc,.txt" hidden>
           <button class="boton primario" id="btn-cargar-cv">Cargar CV</button>
-          <a class="boton secundario" id="enlace-harvard" href="https://chamba-lista.onrender.com" target="_blank" rel="noopener">Ver en formato Harvard</a>
+          <button class="boton secundario" id="btn-ver-harvard" type="button">Ver en formato Harvard</button>
         </div>
       </article>
 
@@ -318,8 +321,9 @@
     </div>
 
     <article class="tarjeta">
-      <h2>Datos para llenar formularios</h2>
-      <p class="nota">Los portales piden esto y no está en tu CV. Lo que guardes se rellena solo; lo que no, te lo avisamos al postular. <strong>Todo es opcional</strong> y vive únicamente en tu navegador.</p>
+      <h2 id="titulo-datos">Tus datos para postular</h2>
+      <p class="nota">Las empresas los preguntan y tu CV no los trae. <strong>Los obligatorios se piden antes de postular</strong>:
+        con ellos respondemos por ti. Viven únicamente en tu navegador.</p>
       <div class="rejilla-datos" id="campos-datos"></div>
       <div class="fila-botones">
         <button class="boton primario" id="btn-guardar-datos">Guardar</button>

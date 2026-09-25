@@ -140,10 +140,14 @@ export const tracker = {
     };
   },
   async anotar(registro) {
-    const lista = await leer(CLAVES.tracker, []);
+    // La misma oferta otra vez (externa y luego enviada, por ejemplo)
+    // REEMPLAZA su ficha: antes se apilaban dos o tres por oferta.
+    const k = claveOferta(registro.url);
+    const lista = (await leer(CLAVES.tracker, [])).filter((r) => !registro.url || claveOferta(r.url) !== k);
+    const ahora = new Date().toISOString();
     lista.unshift({
       id: crypto.randomUUID().slice(0, 8),
-      fecha: new Date().toISOString(),
+      fecha: ahora, actualizado: ahora,
       etapa: ETAPA_DE_ESTADO[registro.estado] || "por_postular",
       ...registro,
     });
