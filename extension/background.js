@@ -68,12 +68,26 @@ const GUION_POR_DOMINIO = [
   [/(^|\.)linkedin\.com$/,     ["contenido/comun.js", "contenido/linkedin.js"]],
 ];
 
-async function hablarCon(tabId, mensaje) {
+// Lo que se puede repetir sin consecuencias: leer. Pulsar («abrir»,
+// «siguiente», «enviar») NUNCA se repite solo.
+const SE_PUEDE_REPETIR = new Set(["ping", "sesion", "ofertas", "detalle", "preguntas"]);
+const SE_FUE_LA_PAGINA = /back.forward cache|message channel|port closed|message port|page.*(moved|navigat)/i;
+
+async function hablarCon(tabId, mensaje, intento = 0) {
   try {
     // La directa a propósito: esta es la que puede fallar por falta de
     // content script, y es justo lo que el catch de abajo arregla.
     return await chrome.tabs.sendMessage(tabId, mensaje);
   } catch (e) {
+    // La página navegó mientras se le hablaba (Computrabajo: /match/ salta
+    // sola a /candidate/kq). Visto en la tanda de Ali del 2026-09-25: tres
+    // postulaciones perdidas con «The page keeping the extension port is
+    // moved into back/forward cache». Leer otra vez, ya en la página
+    // nueva, es seguro.
+    if (SE_FUE_LA_PAGINA.test(e.message || "") && SE_PUEDE_REPETIR.has(mensaje.accion) && intento < 3) {
+      await esperar(900);
+      return hablarCon(tabId, mensaje, intento + 1);
+    }
     if (!/Receiving end does not exist|Could not establish connection/i.test(e.message || "")) {
       throw e;
     }
@@ -123,6 +137,25 @@ async function pestanaDeTrabajo() {
 // Búsqueda
 // ---------------------------------------------------------------------
 
+// Dónde ve cada portal «tus postulaciones». Solo Computrabajo por ahora:
+// es el que esconde la marca en el listado (medido 2026-09-25).
+const URL_POSTULADAS = { computrabajo: "https://candidato.pe.computrabajo.com/candidate/match/" };
+const clavePuesto = (t, e) => `${t}|${e}`.toLowerCase().normalize("NFD")
+  .replace(/[\u0300-\u036f]/g, "").replace(/\s+/g, " ").trim();
+
+/** Las que ya postulaste en ese portal, leídas de su «Mis postulaciones». */
+async function postuladasEnPortal(tabId, pid) {
+  let url = URL_POSTULADAS[pid];
+  const vistas = new Set();
+  for (let pag = 0; pag < 3 && url; pag++) {
+    const r = await irY(tabId, url, "postuladas").catch(() => null);
+    if (!r?.postuladas?.length) break;
+    r.postuladas.forEach((x) => vistas.add(clavePuesto(x.titulo, x.empresa)));
+    url = r.siguiente;
+  }
+  return vistas;
+}
+
 async function buscar({ puesto, ciudad, nivel, portales: elegidos }) {
   const termino = terminoBusqueda(puesto, nivel);
   if (!termino) throw new Error("Escribe qué puesto buscas.");
@@ -130,12 +163,14 @@ async function buscar({ puesto, ciudad, nivel, portales: elegidos }) {
   const tabId = await pestanaDeTrabajo();
   const vistos = new Set();
   const vacantes = [];
+  let ocultasPortal = 0;
   const errores = [];
 
   for (const pid of elegidos?.length ? elegidos : ["computrabajo"]) {
     const portal = PORTALES[pid];
     if (!portal) continue;
     try {
+      const yaEnPortal = await postuladasEnPortal(tabId, pid);
       for (let pagina = 1; pagina <= 2; pagina++) {
         const r = await irY(tabId, portal.url(termino, ciudad, pagina), "ofertas");
         // Solo Computrabajo necesita sesión: los otros listan en público.
@@ -145,6 +180,7 @@ async function buscar({ puesto, ciudad, nivel, portales: elegidos }) {
         }
         const nuevas = (r?.ofertas || []).filter((v) => {
           const k = `${v.titulo}|${v.empresa}`.toLowerCase();
+          if (yaEnPortal.has(clavePuesto(v.titulo, v.empresa))) { ocultasPortal++; return false; }
           if (vistos.has(k) || v.yaPostulado) return false;
           vistos.add(k);
           return true;
@@ -158,7 +194,7 @@ async function buscar({ puesto, ciudad, nivel, portales: elegidos }) {
       medir("busqueda", { portal: pid, ok: false });
     }
   }
-  return { vacantes, errores, termino };
+  return { vacantes, errores, termino, ocultasPortal };
 }
 
 // ---------------------------------------------------------------------
@@ -258,6 +294,11 @@ async function prepararUna(vacante, perfil, guardados, respuestasPersona) {
   // contesta, no entra nada. Nunca las decide el modelo.
   reporte.huecos = huecos.detectar(vacante, perfil);
   const confirmadas = huecos.aCompetencias(reporte.huecos, respuestasPersona?.habilidades || {});
+  // Lo necesario para rehacer el CV adaptado a ESTA vacante cuando se
+  // pida desde Postulaciones. Guardar el Word de cada una llenaría el
+  // almacén; los datos para generarlo ocupan poco.
+  reporte.competenciasCV = confirmadas;
+  reporte.descripcion = (vacante.descripcion || "").slice(0, 1200);
 
   // Dónde estaba la pestaña ANTES de pulsar «Postularme»: si después
   // está en otra página, el formulario está en esa página.
@@ -300,6 +341,8 @@ async function prepararUna(vacante, perfil, guardados, respuestasPersona) {
       }
     }
   }
+  if (abierto?.yaPostulado) return { ...reporte, yaPostulado: true, error: abierto.error || "Ya habías postulado a esta." };
+  if (abierto?.externo) return { ...reporte, externo: true, error: abierto.error || "Se postula en la web de la empresa." };
   if (abierto?.requiereLogin) return { ...reporte, requiereLogin: true, nota: abierto.nota };
   if (abierto?.captcha) return { ...reporte, captcha: true, nota: abierto.nota };
   if (abierto?.error) return { ...reporte, error: abierto.error };
@@ -321,7 +364,14 @@ async function prepararUna(vacante, perfil, guardados, respuestasPersona) {
   //
   // Ahora se mira primero si hay dónde adjuntar. Si no, eso no se hace.
   // Si sí, las dos llamadas a la IA —redactar y adaptar— van en paralelo.
-  const leido = await hablarCon(tabId, { accion: "preguntas" }).catch(() => ({}));
+  // Si no se pueden leer, se DICE. Antes un fallo aquí se tragaba como
+  // «cero preguntas» y la postulación seguía hacia un envío imposible.
+  let leido;
+  try {
+    leido = await hablarCon(tabId, { accion: "preguntas" });
+  } catch (e) {
+    return { ...reporte, error: `No se pudo leer el formulario (${e.message}).` };
+  }
   const conArchivo = Boolean(leido?.conArchivo);
   const [redaccion, cvListo] = await Promise.all([
     redactarPantalla(leido?.preguntas || [], perfil, guardados, respuestasPersona, vacante),
@@ -430,12 +480,19 @@ async function buscarFormularioAbierto(tabIdOriginal, urlAntes = "") {
     // Computrabajo encadena redirecciones (/match/ → /candidate/kq). Se
     // espera a que la dirección deje de cambiar y la página termine: si
     // no, se leen preguntas en la página intermedia y se pierden.
+    //
+    // /match/ NO es el destino: es una página de paso que se queda un rato
+    // y luego salta sola. Con «dos lecturas iguales» bastaba que tardara
+    // un segundo para leer ahí las preguntas —cero— y que la página se
+    // fuera a media conversación. Era la tanda de Ali del 2026-09-25: en
+    // Computrabajo, 0 preguntas leídas y ninguna enviada.
+    const DE_PASO = /computrabajo\.com\/match|\/applybyapplyablejobid/i;
     let anterior = "", estable = 0;
-    for (let i = 0; i < 30 && estable < 2; i++) {
+    for (let i = 0; i < 50 && estable < 3; i++) {
       await esperar(500);
       const t = await chrome.tabs.get(tabIdOriginal).catch(() => null);
       if (!t) return null;
-      estable = (t.url === anterior && t.status === "complete") ? estable + 1 : 0;
+      estable = (t.url === anterior && t.status === "complete" && !DE_PASO.test(t.url)) ? estable + 1 : 0;
       anterior = t.url;
     }
     await pestanaLista(tabIdOriginal, 15000);
@@ -467,7 +524,21 @@ async function escribirYEnviar(respuestasAprobadas) {
     if (!s?.avanzado) break;
     await rellenarPantalla(tabId, perfil, guardados, {}, await almacen.leer("vacanteTrabajo", {}));
   }
-  return hablarCon(tabId, { accion: "enviar" });
+  try {
+    return await hablarCon(tabId, { accion: "enviar" });
+  } catch (e) {
+    // «Enviar» hizo navegar la página y el mensaje se cortó a medias. En la
+    // tanda del 2026-09-25 eso se anotó como fallo y las postulaciones SÍ
+    // habían entrado (Computrabajo: Runway 7 y TALENTEA, «Postulado» en
+    // Mis postulaciones). Se mira la página nueva antes de decir nada.
+    if (!SE_FUE_LA_PAGINA.test(e.message || "")) throw e;
+    await esperar(1500);
+    await pestanaLista(tabId, 15000);
+    const ping = await hablarCon(tabId, { accion: "ping" }).catch(() => null);
+    if (ping?.enviada) return { enviada: true, mensaje: "El portal confirmó la postulación." };
+    return { enviada: false, dudosa: true,
+             error: "La página cambió al enviar y no se pudo confirmar. Mírala en «Mis postulaciones» del portal." };
+  }
 }
 
 // ---------------------------------------------------------------------
@@ -502,11 +573,21 @@ async function correrLote({ vacantes, modo, aprobacion, respuestasPersona }) {
   for (let i = 0; i < cola.length; i++) {
     if (lote.cancelado) break;
     const item = lote.items[i];
+    // Lo que el panel enseña «en vivo»: cuál va y qué se le está haciendo.
+    lote.actual = { titulo: item.titulo, empresa: item.empresa, portal: item.portal,
+                    paso: "Abriendo la oferta y leyendo sus preguntas" };
     try {
       const r = await prepararUna(cola[i], perfil, guardados, respuestasPersona);
-      Object.assign(item, { preguntas: r.preguntas || [], cambiosCV: r.cambiosCV || [] });
+      Object.assign(item, { preguntas: r.preguntas || [], cambiosCV: r.cambiosCV || [],
+                            descripcion: r.descripcion || "", competencias: r.competenciasCV || [] });
 
-      if (r.requiereLogin) { item.estado = "omitida"; item.motivo = "Necesitas iniciar sesión."; }
+      // El portal postuló al entrar (ofertas sin preguntas): está ENVIADA.
+      // Antes seguía hacia «enviar», no encontraba botón y la marcaba
+      // «no se pudo» aunque ya hubiera salido.
+      if (r.enviadaDirecto) { item.estado = "enviada"; item.motivo = r.nota || "Enviada."; }
+      else if (r.yaPostulado) { item.estado = "ya_postulada"; item.motivo = "Ya habías postulado a esta."; }
+      else if (r.externo) { item.estado = "externa"; item.motivo = "Se postula en la web de la empresa."; }
+      else if (r.requiereLogin) { item.estado = "omitida"; item.motivo = "Necesitas iniciar sesión."; }
       else if (r.captcha)  { item.estado = "omitida"; item.motivo = "Apareció un CAPTCHA."; }
       else if (r.error)    { item.estado = "omitida"; item.motivo = r.error; }
       else {
@@ -553,11 +634,18 @@ async function correrLote({ vacantes, modo, aprobacion, respuestasPersona }) {
     if (modo === "automatico" && soloRevisado && item.estado === "preparada") {
       item.estado = "omitida";
       item.motivo = `${item.portal} no envía en automático: queda lista para que la envíes tú.`;
+    } else if (modo !== "automatico" && ["ya_postulada", "externa", "enviada"].includes(item.estado)) {
+      await almacen.tracker.anotar({
+        portal: item.portal, empresa: item.empresa, puesto: item.titulo,
+        url: item.url, estado: item.estado, motivo: item.motivo,
+        descripcion: item.descripcion || "", competencias: item.competencias || [],
+      });
     } else if (modo === "automatico") {
       if (item.estado === "preparada") {
         const aprobadas = {};
         item.preguntas.forEach((q) => { if (q.texto) aprobadas[q.indice] = q.texto; });
         try {
+          lote.actual = { ...lote.actual, paso: "Llenando el formulario y enviando" };
           const env = await escribirYEnviar(aprobadas);
           item.estado = env?.enviada ? "enviada" : "fallida";
           item.motivo = env?.mensaje || env?.error || "";
@@ -570,6 +658,7 @@ async function correrLote({ vacantes, modo, aprobacion, respuestasPersona }) {
       await almacen.tracker.anotar({
         portal: item.portal, empresa: item.empresa, puesto: item.titulo,
         url: item.url, estado: item.estado, motivo: item.motivo,
+        descripcion: item.descripcion || "", competencias: item.competencias || [],
         sinPago: (item.preguntas || []).some((q) => q.sinPagoAceptado),
       });
       // Y la cuenta anónima, que es lo único que nos llega a nosotros.
@@ -585,10 +674,19 @@ async function correrLote({ vacantes, modo, aprobacion, respuestasPersona }) {
   }
 
   const cuenta = (e) => lote.items.filter((i) => i.estado === e).length;
+  lote.actual = null;
   lote.fase = modo === "automatico" ? "terminado" : "listo";
-  lote.mensaje = modo === "automatico"
-    ? `Enviadas ${cuenta("enviada")} de ${lote.total}. Omitidas ${cuenta("omitida")}.`
-    : `${cuenta("preparada")} de ${lote.total} listas para revisar. Nada se ha enviado.`;
+  const extra = [
+    cuenta("ya_postulada") && (cuenta("ya_postulada") === 1 ? "1 ya la tenías" : `${cuenta("ya_postulada")} ya las tenías`),
+    cuenta("externa") && (cuenta("externa") === 1
+      ? "1 se postula en la web de la empresa (te la dejamos en Postulaciones)"
+      : `${cuenta("externa")} se postulan en la web de la empresa (te las dejamos en Postulaciones)`),
+  ].filter(Boolean).join(" · ");
+  lote.mensaje = (modo === "automatico"
+    ? `Enviadas ${cuenta("enviada")} de ${lote.total}.`
+      + (cuenta("omitida") + cuenta("fallida") ? ` Sin enviar: ${cuenta("omitida") + cuenta("fallida")}.` : "")
+    : `${cuenta("preparada")} de ${lote.total} listas para revisar. Nada se ha enviado.`)
+    + (extra ? ` ${extra}.` : "");
 }
 
 async function enviarAprobadas(ids) {
@@ -607,19 +705,27 @@ async function enviarAprobadas(ids) {
     try {
       // Se reabre el formulario: entre preparar y revisar, la pestaña ya
       // navegó a otra oferta.
-      await prepararUna(item, perfil, guardados, {});
+      const re = await prepararUna(item, perfil, guardados, {});
+      if (re?.enviadaDirecto || re?.yaPostulado) {
+        item.estado = "enviada";
+        item.motivo = re.nota || re.error || "";
+        throw { yaResuelta: true };
+      }
       const aprobadas = {};
       item.preguntas.forEach((q) => { if (q.texto) aprobadas[q.indice] = q.texto; });
       const env = await escribirYEnviar(aprobadas);
       item.estado = env?.enviada ? "enviada" : "fallida";
       item.motivo = env?.mensaje || env?.error || "";
     } catch (e) {
-      item.estado = "fallida";
-      item.motivo = e.message;
+      if (!e?.yaResuelta) {
+        item.estado = "fallida";
+        item.motivo = e.message;
+      }
     }
     await almacen.tracker.anotar({
       portal: item.portal, empresa: item.empresa, puesto: item.titulo,
       url: item.url, estado: item.estado, motivo: item.motivo,
+      descripcion: item.descripcion || "", competencias: item.competencias || [],
       sinPago: (item.preguntas || []).some((q) => q.sinPagoAceptado),
     });
     medir(item.estado === "enviada" ? "postulacion_enviada" : "postulacion_omitida",
@@ -659,6 +765,20 @@ async function enviarAprobadas(ids) {
 //
 // Ahora lo vigilado se guarda en el almacén y el oyente vive arriba, así
 // que sobrevive a que Chrome duerma y despierte la extensión.
+const ES_ACCESO = /\/(login|acceso|auth|ingresar|registro|signin|signup|uas\/login|checkpoint)/i;
+
+/**
+ * Al conectar un portal, de vuelta al panel: ahí está el siguiente.
+ * Ali, 2026-09-25: conectaba Bumeran, se quedaba en Bumeran y tenía que
+ * volver a buscar el panel para seguir con el siguiente.
+ */
+async function volverAlPanel() {
+  const [panel] = await chrome.tabs.query({ url: URL_PANEL }).catch(() => []);
+  if (!panel) return;
+  await chrome.tabs.update(panel.id, { active: true }).catch(() => {});
+  await chrome.windows.update(panel.windowId, { focused: true }).catch(() => {});
+}
+
 async function vigilarAcceso(tabId, portalId) {
   const vigilando = await almacen.leer("vigilando", {});
   vigilando[tabId] = { portal: portalId, hasta: Date.now() + 15 * 60 * 1000 };
@@ -673,6 +793,17 @@ async function revisarVigilada(tabId) {
     delete vigilando[tabId];
     return almacen.guardar("vigilando", vigilando);
   }
+  // Indeed termina el acceso en secure.indeed.com, que no es nuestro: si
+  // ya salió de /auth, se entró. Se lleva la pestaña a pe.indeed.com, que
+  // sí lo es, y ahí se comprueba.
+  const pestana = await chrome.tabs.get(tabId).catch(() => null);
+  try {
+    const u = new URL(pestana?.url || "");
+    if (v.portal === "indeed" && u.hostname === "secure.indeed.com" && !/\/auth/.test(u.pathname)) {
+      await chrome.tabs.update(tabId, { url: "https://pe.indeed.com/" });
+      return;
+    }
+  } catch { /* sin dirección todavía */ }
   // Muchos portales pintan la cabecera con sesión un momento DESPUÉS de
   // cargar: se mira ya y se vuelve a mirar al rato.
   for (const espera of [0, 1500, 4000]) {
@@ -687,6 +818,7 @@ async function revisarVigilada(tabId) {
         recordadas[v.portal] = Date.now();
         await almacen.guardar("sesionesRecordadas", recordadas);
         chrome.runtime.sendMessage({ aviso: "sesionPortal", portal: v.portal }).catch(() => {});
+        await volverAlPanel();
         return;
       }
     } catch { /* aún sin content script en esa pestaña */ }
@@ -742,6 +874,7 @@ chrome.runtime.onMessage.addListener((msg, _e, responder) => {
             puesto: msg.vacante?.titulo, url: msg.vacante?.url,
             estado: r?.enviada ? "enviada" : "fallida", motivo: r?.mensaje || r?.error || "",
             sinPago: Boolean(msg.sinPago),
+            descripcion: String(msg.descripcion || "").slice(0, 1200), competencias: msg.competencias || [],
           });
           medir(r?.enviada ? "postulacion_enviada" : "postulacion_omitida",
                 { portal: msg.vacante?.portalId || msg.vacante?.portal,
@@ -774,8 +907,15 @@ chrome.runtime.onMessage.addListener((msg, _e, responder) => {
                 for (const t of tabs) {
                   try {
                     const r = await hablarCon(t.id, { accion: "sesion" });
-                    if (r) return { id: p.id, nombre: p.nombre, postulable: p.postulable,
-                                    acceso: p.acceso, sesion: Boolean(r.sesion), abierto: true };
+                    // null = esa página no lo deja claro: se mira la siguiente.
+                    if (r?.sesion === true) return { id: p.id, nombre: p.nombre, postulable: p.postulable,
+                                    acceso: p.acceso, sesion: true, abierto: true };
+                    // «Sin sesión» solo vale lejos de la página de acceso:
+                    // ahí, antes de entrar, es lo normal.
+                    if (r?.sesion === false && !ES_ACCESO.test(t.url || "")) {
+                      return { id: p.id, nombre: p.nombre, postulable: p.postulable,
+                               acceso: p.acceso, sesion: false, abierto: true };
+                    }
                   } catch { /* esa pestaña no tiene content script */ }
                 }
               } catch { /* patrón inválido */ }

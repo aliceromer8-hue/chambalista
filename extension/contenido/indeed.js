@@ -58,9 +58,23 @@
 
   // Sesión: sin ella Indeed muestra el enlace a secure.indeed.com/auth.
   // Verificado contra el sitio real.
+  //
+  // Devuelve true, false o null («no se sabe»). Antes era «sin enlaces a
+  // secure.indeed.com/auth», pero CON sesión también los hay (salir,
+  // cuenta): Indeed no quedaba conectado nunca (Ali, 2026-09-25: «todas
+  // conectaron pero Indeed no»). Ahora: un «Iniciar sesión» visible dice
+  // que no; el menú de cuenta o los mensajes dicen que sí.
   function haySesion() {
-    if (!document.querySelector("footer, #jobsearch, [data-testid], header")) return false;
-    return !document.querySelector("a[href*='secure.indeed.com/auth'], a[href*='account/login']");
+    if (!document.querySelector("footer, #jobsearch, [data-testid], header")) return null;
+    const vis = (e) => Boolean(e && (e.offsetWidth || e.offsetHeight));
+    const entrar = [...document.querySelectorAll("a[href*='secure.indeed.com/auth'], a[href*='account/login']")]
+      .find((a) => vis(a) && !/logout|salir|cerrar/i.test(`${a.href} ${a.innerText}`)
+        && /iniciar sesi|sign in|ingresar|acceder|log in/i.test(a.innerText || a.getAttribute("aria-label") || ""));
+    if (entrar) return false;
+    if (document.querySelector("[data-gnav-element-name='AccountMenu'], [data-gnav-element-name='Messages'], "
+      + "#AccountMenu, a[href*='/conversations'], a[href*='myjobs'], a[href*='/account/view']")) return true;
+    if (/cantidad de no le[ií]dos|mis empleos|my jobs/i.test(document.querySelector("header, nav")?.innerText || "")) return true;
+    return null;
   }
 
   function leerDetalle() {
@@ -136,7 +150,17 @@
       };
     }
     const boton = botonPostular();
-    if (!boton) return { abierto: false, error: "No encontré el botón de postular." };
+    if (!boton) {
+      // Sin botón porque ya se postuló: Indeed pone «Postulado» / «Ya te
+      // postulaste» donde estaba. En la tanda del 2026-09-25 salían como
+      // «No encontré el botón de postular».
+      const t = (document.querySelector("main, #viewJobSSRRoot") || document.body).innerText || "";
+      if (/ya te postulaste|postulaci[oó]n enviada|\bpostulado\b|you applied|\bapplied\b/i.test(t.slice(0, 5000))) {
+        return { abierto: false, yaPostulado: true, error: "Ya habías postulado a esta." };
+      }
+      return { abierto: false, externo: true,
+               error: "Esta vacante se postula en la web de la empresa, no en Indeed." };
+    }
     // Es un enlace: se va a su dirección. Lo sigue buscarFormularioAbierto
     // en el fondo, que espera a que la dirección deje de cambiar.
     if (boton.href && boton.href.includes(HOST_FORM)) {

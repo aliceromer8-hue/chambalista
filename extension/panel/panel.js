@@ -8,6 +8,7 @@ import * as almacen from "../lib/almacen.js";
 import * as datos from "../lib/datos.js";
 import * as ia from "../lib/ia.js";
 import * as coincidencia from "../lib/coincidencia.js";
+import * as cv from "../lib/cv.js";
 import * as sesion from "../lib/sesion.js";
 import { PACK_MAYOR, TOPE_POR_TANDA } from "../lib/verificados.js";
 import { SERVIDOR } from "../lib/servidor.js";
@@ -23,6 +24,9 @@ const estado = {
   conCuenta: false,
   perfil: null, vacantes: [], vacanteAbierta: null, reporte: null,
   respuestasPersona: {}, aprobacion: {},
+  // Las vacantes elegidas con su casilla. Vacío = «todas».
+  elegidas: new Set(),
+  mostrar: 20,
 };
 
 // Estado de sesión de cada portal. Se consulta al arrancar y tras pulsar
@@ -255,6 +259,21 @@ function pintarGuias(etapa) {
 
 
 /**
+ * Dónde estás: cuenta → CV → portales → postular. Lo hecho se rellena,
+ * lo de ahora late. Ali: «que cada persona sepa sin necesidad de decirle
+ * a dónde tiene que ir primero»; y ahora, «más didáctico».
+ */
+function pintarRecorrido(etapa) {
+  const pasos = ["Tu cuenta", "Tu CV", "Portales", "Postular"];
+  const ol = $("#recorrido");
+  if (!ol) return;
+  ol.style.setProperty("--hecho", String(Math.min(etapa, 3) / 3));
+  ol.innerHTML = `<span class="avance" aria-hidden="true"></span>` + pasos.map((p, i) =>
+    `<li class="${i < etapa ? "hecho" : i === etapa ? "ahora" : ""}"${i === etapa ? ' aria-current="step"' : ""}>
+       <span class="bola">${i < etapa ? "✓" : i + 1}</span><span class="rotulo">${p}</span></li>`).join("");
+}
+
+/**
  * El nombre con el que se saluda: el de la CUENTA, nunca el del CV.
  *
  * Antes salía del CV —en mayúsculas, como lo escribe el formato
@@ -336,6 +355,7 @@ function pintarPortada(resumen) {
   const etapa = !estado.conCuenta ? 0 : !estado.perfil ? 1 : !conectados.length ? 2 : 3;
 
   portada.classList.toggle("compacta", etapa === 3);
+  pintarRecorrido(etapa);
 
   // El sello «15 por tanda» solo cuando ya significa algo.
   //
@@ -573,9 +593,8 @@ function tarjetaVacante(v, i) {
     .map((c) => `<span class="etiqueta">${escapar(c)}</span>`).join("");
 
   const retardo = Math.min(i || 0, 8) * 45;
-  return `<article class="vacante marcada" data-id="${escapar(v.id)}" style="animation-delay:${retardo}ms">
+  return `<article class="vacante" data-id="${escapar(v.id)}" style="animation-delay:${retardo}ms">
     <div class="arriba">
-      <input type="checkbox" class="chk-v" checked>
       <div style="flex:1;min-width:0">
         <h3>${escapar(v.titulo)}</h3>
         <div class="meta">${escapar([v.empresa, v.ubicacion].filter(Boolean).join(" · "))}</div>
@@ -593,22 +612,94 @@ function tarjetaVacante(v, i) {
   </article>`;
 }
 
+/**
+ * Una vacante en la lista de Vacantes: una línea.
+ *
+ * Ali, 2026-09-25: «hay muchas, se ve mucho peso cognitivo». Las
+ * tarjetas grandes con etiquetas obligaban a leer 67 cajas; en fila se
+ * recorre con la vista. La casilla es para ELEGIR (sin marcar ninguna,
+ * «Postular» va a todas).
+ */
+function filaVacante(v, i) {
+  const e = v.encaje || {};
+  const clase = e.puntaje == null ? "bajo" : e.puntaje >= 70 ? "alto" : e.puntaje >= 40 ? "" : "bajo";
+  const elegida = estado.elegidas.has(v.id);
+  return `<article class="vacante fila-v${elegida ? " elegida" : ""}" data-id="${escapar(v.id)}"
+             style="animation-delay:${Math.min(i % POR_PAGINA, 12) * 30}ms">
+    <input type="checkbox" class="chk-v" aria-label="Elegir ${escapar(v.titulo)}"${elegida ? " checked" : ""}>
+    <div style="min-width:0">
+      <h3 title="${escapar(v.titulo)}">${escapar(v.titulo)}</h3>
+      <div class="meta"><span class="portal-mini">${escapar(v.portal)}</span> · ${escapar([v.empresa, v.ubicacion].filter(Boolean).join(" · "))}</div>
+    </div>
+    ${e.puntaje == null ? "<span></span>" : `<span class="encaje ${clase}">${e.puntaje}%</span>`}
+    <button class="boton ${v.postulable === false ? "secundario" : "primario"} chico btn-abrir">
+      ${v.postulable === false ? "Abrir" : "Postular"}
+    </button>
+  </article>`;
+}
+
+// De veinte en veinte: 67 filas de golpe son una pared.
+const POR_PAGINA = 20;
+
+function pintarLista() {
+  const lista = $("#lista-vacantes");
+  const visibles = estado.vacantes.slice(0, estado.mostrar);
+  const quedan = estado.vacantes.length - visibles.length;
+  lista.innerHTML = visibles.map(filaVacante).join("")
+    + (quedan > 0 ? `<button class="ver-mas" id="btn-ver-mas">Ver ${Math.min(quedan, POR_PAGINA)} más · quedan ${quedan}</button>` : "");
+  conectarTarjetas(lista);
+  $("#btn-ver-mas")?.addEventListener("click", () => {
+    estado.mostrar += POR_PAGINA;
+    pintarLista();
+  });
+  actualizarCuenta();
+}
+
 function conectarTarjetas(raiz) {
   raiz.querySelectorAll(".vacante").forEach((el) => {
     const v = estado.vacantes.find((x) => x.id === el.dataset.id);
     el.querySelector(".btn-abrir")?.addEventListener("click", () => abrirVacante(v));
     el.querySelector(".chk-v")?.addEventListener("change", (ev) => {
-      el.classList.toggle("marcada", ev.target.checked);
+      if (ev.target.checked) estado.elegidas.add(el.dataset.id);
+      else estado.elegidas.delete(el.dataset.id);
+      el.classList.toggle("elegida", ev.target.checked);
       actualizarCuenta();
     });
   });
 }
 
+/** Saca una vacante de la lista en pantalla (ya enviada o ya postulada). */
+function quitarDeLaLista(vacante) {
+  estado.vacantes = estado.vacantes.filter((x) => x.id !== vacante.id);
+  estado.elegidas.delete(vacante.id);
+  document.querySelectorAll(`.vacante[data-id="${CSS.escape(vacante.id)}"]`).forEach((el) => {
+    el.classList.add("sale");
+    setTimeout(() => el.remove(), 450);
+  });
+  actualizarCuenta();
+}
+
+/** Las que van en la tanda: las elegidas, o todas si no eligió ninguna. */
+function vacantesParaLote() {
+  return estado.elegidas.size
+    ? estado.vacantes.filter((v) => estado.elegidas.has(v.id))
+    : estado.vacantes;
+}
+
 function actualizarCuenta() {
-  const n = $("#lista-vacantes").querySelectorAll(".chk-v:checked").length;
-  $("#cuenta-marcadas").textContent = `${n} marcada(s) de ${estado.vacantes.length}`;
-  $("#btn-lote-auto").textContent = n ? `Postular a las ${n}` : "Postular a todas";
-  $("#acciones-lote").classList.toggle("oculto", !estado.vacantes.length);
+  const n = estado.elegidas.size;
+  const total = estado.vacantes.length;
+  $("#cuenta-marcadas").innerHTML = n
+    ? `${n} elegida${n === 1 ? "" : "s"} · <button class="enlace" id="btn-quitar-sel">quitar</button>`
+    : `${total} vacante${total === 1 ? "" : "s"}`;
+  $("#btn-quitar-sel")?.addEventListener("click", () => {
+    estado.elegidas.clear();
+    pintarLista();
+  });
+  $("#btn-lote-auto").textContent = n
+    ? `Postular a ${n === 1 ? "la elegida" : `las ${n} elegidas`}`
+    : `Postular a ${total === 1 ? "la única" : `las ${total}`}`;
+  $("#acciones-lote").classList.toggle("oculto", !total);
 }
 
 // Enter en cualquiera de los campos lanza la búsqueda.
@@ -630,6 +721,8 @@ $("#btn-buscar").addEventListener("click", async () => {
   boton.textContent = "Buscando…";
   const elegidos = [...document.querySelectorAll(".chk-p:checked")].map((c) => c.value);
   $("#progreso").classList.remove("oculto");
+  $("#en-vivo").classList.add("oculto");
+  $("#consola").classList.remove("oculto");
   consola.limpiar();
   consola.escribir(`Buscando «${puesto}»…`, true);
   elegidos.forEach((id) => {
@@ -662,14 +755,17 @@ $("#btn-buscar").addEventListener("click", async () => {
     // Las que ya postuló con Chamba Lista, fuera. El portal marca las
     // suyas y el fondo ya las descarta, pero no siempre las marca (Indeed
     // y Bumeran no lo hacían nunca); lo que pasó por aquí lo sabemos seguro.
-    const yaPostuladas = [];
-    for (const v of [...todas]) {
-      if (await almacen.tracker.yaPostulado(v.url)) {
-        yaPostuladas.push(v);
-        todas.splice(todas.indexOf(v), 1);
-      }
+    //
+    // Por CLAVE de oferta (almacen.claveOferta), no por URL entera: la
+    // misma oferta vuelve con otros parámetros y se colaba. Y cuentan
+    // también las que el portal dijo «ya postulaste» al abrirlas.
+    const postuladas = await almacen.tracker.clavesPostuladas();
+    const antes = todas.length;
+    for (let k = todas.length - 1; k >= 0; k--) {
+      if (postuladas.has(almacen.claveOferta(todas[k].url))) todas.splice(k, 1);
     }
-    estado.yaPostuladasOcultas = yaPostuladas.length;
+    // + las que el portal tiene en «Mis postulaciones» (el fondo ya las quitó).
+    estado.yaPostuladasOcultas = antes - todas.length + (r.ocultasPortal || 0);
     const delTema = todas.filter((v) => coincidencia.relacionada(v, puesto));
     estado.fueraDeTema = todas.filter((v) => !coincidencia.relacionada(v, puesto));
     // Si el filtro se lo come todo, se enseña todo: mejor ruido que nada.
@@ -684,8 +780,9 @@ $("#btn-buscar").addEventListener("click", async () => {
            quita la ciudad para buscar en todo el país, o revisa que tengas sesión en los portales.</p>
       </div>`;
     } else {
-      $("#lista-vacantes").innerHTML = estado.vacantes.map(tarjetaVacante).join("");
-      conectarTarjetas($("#lista-vacantes"));
+      estado.elegidas.clear();
+      estado.mostrar = POR_PAGINA;
+      pintarLista();
     }
     actualizarCuenta();
 
@@ -719,9 +816,7 @@ $("#btn-buscar").addEventListener("click", async () => {
       ver.addEventListener("click", () => {
         estado.vacantes = [...estado.vacantes, ...estado.fueraDeTema];
         estado.fueraDeTema = [];
-        $("#lista-vacantes").innerHTML = estado.vacantes.map(tarjetaVacante).join("");
-        conectarTarjetas($("#lista-vacantes"));
-        actualizarCuenta();
+        pintarLista();
         ver.remove();
       });
       $("#resumen-busqueda").append(" ", ver);
@@ -748,6 +843,21 @@ async function abrirVacante(vacante) {
 
   estado.reporte = await enviar({ accion: "prepararUna", vacante, respuestasPersona: {} });
 
+  // Lo que el portal ya resolvió se ANOTA: enviada al entrar, «ya
+  // postulaste» o «se postula en la web de la empresa». Sin anotarlo, la
+  // oferta volvía a salir en la siguiente búsqueda (Ali, 2026-09-25:
+  // «acabo de entrar a una y salió que ya había postulado»).
+  const resuelta = estado.reporte || {};
+  const estadoResuelto = resuelta.enviadaDirecto ? "enviada"
+    : resuelta.yaPostulado ? "ya_postulada" : resuelta.externo ? "externa" : null;
+  if (estadoResuelto) {
+    await almacen.tracker.anotar({
+      portal: vacante.portal, empresa: vacante.empresa, puesto: vacante.titulo, url: vacante.url,
+      estado: estadoResuelto, motivo: resuelta.nota || resuelta.error || "",
+    });
+    if (estadoResuelto !== "externa") quitarDeLaLista(vacante);
+  }
+
   // AUTOMÁTICO POR DEFECTO (Ali, 2026-09-24): «todo lo tiene que hacer
   // directamente automático, la persona no debe tocar nada». Si está todo
   // contestado, se envía sin pasar por la pantalla de revisión. Solo se
@@ -766,6 +876,7 @@ async function abrirVacante(vacante) {
     const env = await enviar({
       accion: "enviarUna", vacante, respuestas,
       sinPago: (r.preguntas || []).some((q) => q.sinPagoAceptado),
+      descripcion: r.descripcion, competencias: r.competenciasCV,
     });
     pintarResultadoAuto(vacante, env);
     return;
@@ -804,6 +915,17 @@ function pintarModal() {
   const c = $("#modal-contenido");
   const cab = `<h2>${escapar(v.titulo)}</h2><p class="nota">${escapar([v.empresa, v.ubicacion].filter(Boolean).join(" · "))}</p>`;
 
+  if (r.yaPostulado) {
+    c.innerHTML = cab + `<div class="aviso"><strong>Ya habías postulado a esta.</strong><br>`
+      + `<span class="nota">La quitamos de tu lista y la contamos como enviada.</span></div>`;
+    return;
+  }
+  if (r.externo) {
+    c.innerHTML = cab + `<div class="aviso alerta"><strong>Esta se postula en la web de la empresa.</strong><br>`
+      + `<span class="nota">Ahí no podemos entrar por ti. Te la dejamos en Postulaciones → «Por postular».</span></div>`
+      + `<div class="fila-botones"><a class="boton primario" href="${escapar(v.url)}" target="_blank" rel="noopener">Abrir la oferta</a></div>`;
+    return;
+  }
   if (r.soloLectura || r.error || r.requiereLogin || r.captcha) {
     c.innerHTML = cab + `<div class="aviso alerta">${escapar(r.nota || r.error)}</div>`;
     return;
@@ -1029,7 +1151,8 @@ async function enviarUna() {
   boton.disabled = true;
   boton.textContent = "Enviando…";
   const respuestas = respuestasDelPanel();
-  const r = await enviar({ accion: "enviarUna", vacante: estado.vacanteAbierta, respuestas });
+  const r = await enviar({ accion: "enviarUna", vacante: estado.vacanteAbierta, respuestas,
+                           descripcion: estado.reporte?.descripcion, competencias: estado.reporte?.competenciasCV });
   const est = $("#estado-envio");
   if (r?.enviada) {
     est.textContent = r.mensaje;
@@ -1053,169 +1176,287 @@ $("#modal").addEventListener("click", (e) => { if (e.target.id === "modal") $("#
 // ---------------------------------------------------------------------
 $("#btn-lote-revisar").addEventListener("click", () => arrancarLote("revisado"));
 
-$("#btn-lote-auto").addEventListener("click", async () => {
-  const { casillas } = await enviar({ accion: "consentimiento" });
+// ── Cómo postula: UN interruptor, el mismo en todas partes ──
+//
+// Encendido = postula sola. Apagado = llena todo y avisa antes de enviar.
+// Ali, 2026-09-25: «en la parte donde aceptan o no, que sea como un botón
+// deslizable on/off». Sustituye a las cuatro casillas de riesgo: se
+// siguen diciendo, debajo del interruptor, la primera vez que se enciende.
+async function modoActual() {
+  const prefs = await almacen.preferencias.obtener();
+  return { auto: !prefs.revisarAntes, elegido: Boolean(prefs.modoElegido) };
+}
 
-  // El consentimiento se da UNA vez. Antes se pedían las casillas en cada
-  // tanda: «la persona no debe tocar nada» no casa con cuatro casillas
-  // cada vez. La primera se explican y se aceptan; después, directo.
-  const guardada = await almacen.leer("aprobacionAuto", null);
-  if (guardada && casillas.every((c) => guardada[c.clave] === true)) {
-    estado.aprobacion = guardada;
-    const prefs = await almacen.preferencias.obtener();
-    return arrancarLote(prefs.revisarAntes ? "revisado" : "automatico");
-  }
-  $("#casillas").innerHTML = "";
+async function pintarInterruptores() {
+  const { auto } = await modoActual();
+  document.querySelectorAll(".sw-auto").forEach((i) => {
+    if (i.id !== "sw-elegir") i.checked = auto;
+    i.setAttribute("aria-checked", String(i.checked));
+  });
+}
 
-  // Antes de pedirle que asuma riesgos, decirle qué va a pasar de verdad.
-  //
-  // El lote automático salta los portales que no envían solos —LinkedIn,
-  // porque su §8.2 prohíbe la automatización y lo que se arriesga es la
-  // cuenta de la persona. El fondo lo hace bien y las marca «omitida»,
-  // pero nadie se lo decía ANTES: marcabas las cuatro casillas contando
-  // con enviar diez y salían siete, sin explicación hasta el final.
-  const marcadas = estado.vacantes.filter((v) => v.marcada !== false);
-  const seSaltan = marcadas.filter((v) => {
-    const cfg = LISTA_PORTALES.find((p) => p.id === (v.portalId || "")) || {};
+let casillasConsentimiento = null;
+async function textosConsentimiento() {
+  if (!casillasConsentimiento) casillasConsentimiento = (await enviar({ accion: "consentimiento" }))?.casillas || [];
+  return casillasConsentimiento;
+}
+
+async function queSignifica(auto) {
+  const casillas = await textosConsentimiento();
+  const van = vacantesParaLote();
+  const deLinkedin = van.filter((v) => (v.portalId || "") === "linkedin").length;
+  // Los portales marcados «soloRevisado» (portales.js) no envían solos:
+  // se dice ANTES cuántas quedan preparadas y cuántas se enviarán.
+  const seSaltan = van.filter((v) => {
+    const cfg = LISTA_PORTALES.find((x) => x.id === (v.portalId || "")) || {};
     return cfg.soloRevisado;
   });
-  // LinkedIn envía en automático por decisión de Ali, con el riesgo de
-  // cuenta asumido. Se dice ANTES, junto a las casillas: es información
-  // para decidir, no un susto.
-  const deLinkedin = marcadas.filter((v) => (v.portalId || "") === "linkedin").length;
-  const avisoPrevio = $("#aviso-lote") || (() => {
-    const p = document.createElement("p");
-    p.id = "aviso-lote";
-    p.className = "nota";
-    $("#bloque-riesgo").insertBefore(p, $("#casillas"));
-    return p;
-  })();
-  if (seSaltan.length) {
-    const cuales = [...new Set(seSaltan.map((v) => v.portal))].join(" y ");
-    const iran = marcadas.length - seSaltan.length;
-    avisoPrevio.textContent =
-      `De las ${marcadas.length} marcadas, ${seSaltan.length === 1 ? "una es" : `${seSaltan.length} son`} `
-      + `de ${cuales} y no se ${seSaltan.length === 1 ? "envía sola" : "envían solas"}: `
-      + `${seSaltan.length === 1 ? "queda preparada" : "quedan preparadas"} para que `
-      + `${seSaltan.length === 1 ? "la mandes" : "las mandes"} tú. `
-      + (iran === 0 ? "No se enviará ninguna automáticamente."
-                    : iran === 1 ? "Se enviará una." : `Se enviarán ${iran}.`);
-    avisoPrevio.classList.remove("oculto");
-  } else if (deLinkedin) {
-    avisoPrevio.textContent =
-      `${deLinkedin === 1 ? "Una es" : `${deLinkedin} son`} de LinkedIn. LinkedIn puede limitar `
-      + "las cuentas que postulan en automático.";
-    avisoPrevio.classList.remove("oculto");
-  } else {
-    avisoPrevio.textContent = "";
-    avisoPrevio.classList.add("oculto");
-  }
+  const avisoSaltan = seSaltan.length
+    ? `<p id="aviso-lote" style="margin:8px 0 0">${seSaltan.length === 1 ? "Una" : seSaltan.length} de ${van.length} `
+      + `${seSaltan.length === 1 ? "queda preparada" : "quedan preparadas"} para que la${seSaltan.length === 1 ? "" : "s"} mandes tú. `
+      + `Se enviarán ${van.length - seSaltan.length}.</p>`
+    : "";
+  $("#que-significa").innerHTML = auto
+    ? `Chamba Lista abre cada vacante, llena el formulario, responde sus preguntas y la envía. Al encenderlo confirmas:`
+      + `<ul>${casillas.map((c) => `<li>${escapar(c.texto)}</li>`).join("")}</ul>`
+      + (deLinkedin ? `<p id="aviso-lote" style="margin:8px 0 0">${deLinkedin === 1 ? "Una es" : `${deLinkedin} son`} de LinkedIn: LinkedIn puede limitar las cuentas que postulan en automático.</p>` : "")
+      + avisoSaltan
+      + `Lo cambias cuando quieras, aquí o en Mi perfil.`
+    : `Chamba Lista abre cada vacante, llena el formulario y redacta las respuestas. `
+      + `Tú las miras y pulsas «Enviar» en cada una.`;
+}
 
-  casillas.forEach((c) => {
-    const l = document.createElement("label");
-    const i = document.createElement("input");
-    i.type = "checkbox";
-    i.addEventListener("change", () => {
-      estado.aprobacion[c.clave] = i.checked;
-      $("#btn-confirmar-auto").disabled = !casillas.every((x) => estado.aprobacion[x.clave]);
-    });
-    l.appendChild(i);
-    l.insertAdjacentHTML("beforeend", `<span>${escapar(c.texto)}</span>`);
-    $("#casillas").appendChild(l);
-  });
+async function guardarModo(auto) {
+  const prefs = await almacen.preferencias.obtener();
+  await almacen.preferencias.guardar({ ...prefs, revisarAntes: !auto, modoElegido: true });
+  if (auto) {
+    // El interruptor encendido ES el consentimiento: se guarda con las
+    // mismas claves que el fondo exige para enviar sin revisión.
+    const aprobacion = Object.fromEntries((await textosConsentimiento()).map((c) => [c.clave, true]));
+    await almacen.guardar("aprobacionAuto", aprobacion);
+    estado.aprobacion = aprobacion;
+  }
+  await pintarInterruptores();
+}
+
+function mostrarElegirModo(auto, alSeguir) {
+  estado.trasElegir = alSeguir || null;
+  $("#sw-elegir").checked = auto;
+  queSignifica(auto);
   $("#bloque-riesgo").classList.remove("oculto");
+  $("#bloque-riesgo").scrollIntoView({ behavior: "smooth", block: "center" });
+}
+
+// Los interruptores de la barra y de Mi perfil.
+document.querySelectorAll(".sw-auto:not(#sw-elegir)").forEach((sw) => {
+  sw.addEventListener("change", async () => {
+    // Encender por primera vez es aceptar que se envíe sin revisión: se
+    // enseña qué significa y se confirma con «Empezar».
+    if (sw.checked && !(await almacen.leer("aprobacionAuto", null))) {
+      sw.checked = false;
+      irA("vacantes");
+      mostrarElegirModo(true, null);
+      return;
+    }
+    await guardarModo(sw.checked);
+    avisar(sw.checked ? "Chamba Lista postula sola." : "Te avisaremos antes de cada envío.", "bien");
+  });
+});
+$("#sw-elegir").addEventListener("change", (e) => queSignifica(e.target.checked));
+pintarInterruptores();
+
+$("#btn-lote-auto").addEventListener("click", async () => {
+  const { auto, elegido } = await modoActual();
+  const aprobacion = await almacen.leer("aprobacionAuto", null);
+  // La primera vez se elige el modo (con lo que significa a la vista).
+  // Después, directo: «la persona no debe tocar nada».
+  if (!elegido || (auto && !aprobacion)) {
+    return mostrarElegirModo(true, (siAuto) => arrancarLote(siAuto ? "automatico" : "revisado"));
+  }
+  if (auto) estado.aprobacion = aprobacion;
+  arrancarLote(auto ? "automatico" : "revisado");
 });
 
 $("#btn-cancelar-auto").addEventListener("click", () => {
   $("#bloque-riesgo").classList.add("oculto");
-  estado.aprobacion = {};
-  $("#btn-confirmar-auto").disabled = true;
+  estado.trasElegir = null;
 });
 $("#btn-confirmar-auto").addEventListener("click", async () => {
+  const auto = $("#sw-elegir").checked;
+  await guardarModo(auto);
   $("#bloque-riesgo").classList.add("oculto");
-  await almacen.guardar("aprobacionAuto", { ...estado.aprobacion });
-  arrancarLote("automatico");
+  avisar(auto ? "Chamba Lista postula sola." : "Te avisaremos antes de cada envío.", "bien");
+  const seguir = estado.trasElegir;
+  estado.trasElegir = null;
+  if (seguir) seguir(auto);
 });
 
-// «Revisar cada postulación antes de enviarla»: apagado por defecto. Es
-// para quien lo quiera; el producto va a lo que hace la mayoría: enviar.
-(async () => {
-  const chk = $("#pref-revisar");
-  if (!chk) return;
-  chk.checked = Boolean((await almacen.preferencias.obtener()).revisarAntes);
-  chk.addEventListener("change", async () => {
-    const prefs = await almacen.preferencias.obtener();
-    await almacen.preferencias.guardar({ ...prefs, revisarAntes: chk.checked });
-    avisar(chk.checked ? "Te enseñaremos cada postulación antes de enviarla." : "Se envían solas.", "bien");
-  });
-})();
-
 async function arrancarLote(modo) {
+  const lista = vacantesParaLote();
+  if (!lista.length) return;
   consola.limpiar();
-  const marcadas = [...$("#lista-vacantes").querySelectorAll(".vacante")]
-    .filter((el) => el.querySelector(".chk-v")?.checked)
-    .map((el) => estado.vacantes.find((v) => v.id === el.dataset.id))
-    .filter(Boolean);
-  if (!marcadas.length) return;
-
-  consola.escribir(
-    modo === "automatico"
-      ? `Postulando a ${marcadas.length} vacantes. No tienes que hacer nada.`
-      : `Preparando ${marcadas.length} vacantes. Las revisas antes de enviarlas.`, true);
+  $("#progreso").classList.remove("oculto");
+  $("#consola").classList.add("oculto");
+  $("#en-vivo").classList.remove("oculto");
+  $("#vivo-feed").innerHTML = "";
+  $("#en-vivo").classList.remove("fin");
+  $("#btn-cancelar-lote").classList.remove("oculto");
+  $("#vivo-enviadas").textContent = "0";
+  $("#contador-vivo span").textContent = modo === "automatico" ? "enviadas" : "listas";
+  $("#vivo-portal").textContent = "Empezando";
+  $("#vivo-titulo").textContent = modo === "automatico"
+    ? `Postulando a ${lista.length} vacante${lista.length === 1 ? "" : "s"}`
+    : `Preparando ${lista.length} vacante${lista.length === 1 ? "" : "s"}`;
+  $("#vivo-paso").textContent = "Abriendo la primera oferta";
+  $("#relleno").style.width = "0";
+  $("#acciones-lote").classList.add("oculto");
+  $("#progreso").scrollIntoView({ behavior: "smooth", block: "start" });
   await enviar({
-    accion: "lotePreparar", vacantes: marcadas, modo,
+    accion: "lotePreparar", vacantes: lista, modo,
     aprobacion: estado.aprobacion, respuestasPersona: estado.respuestasPersona,
   });
-  $("#progreso").classList.remove("oculto");
   seguirLote();
+}
+
+const DESENLACE = {
+  enviada: "Enviada", preparada: "Lista", omitida: "Saltada", fallida: "No se pudo",
+  ya_postulada: "Ya la tenías", externa: "En su web",
+};
+
+/** Cada envío se celebra: el contador late, el avión sale y cae confeti. */
+function celebrar() {
+  const c = $("#contador-vivo");
+  c.classList.remove("late");
+  void c.offsetWidth;
+  c.classList.add("late");
+  const avion = $("#avion");
+  avion.classList.remove("vuela");
+  void avion.offsetWidth;
+  avion.classList.add("vuela");
+  if (matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+  const r = c.getBoundingClientRect();
+  const colores = ["#D4F249", "#FF6B4A", "#FFC53D", "#34D07F", "#FBFAF6"];
+  for (let k = 0; k < 14; k++) {
+    const s = document.createElement("span");
+    s.className = "confeti";
+    s.style.left = `${r.left + r.width / 2}px`;
+    s.style.top = `${r.top + r.height / 2}px`;
+    s.style.background = colores[k % colores.length];
+    s.style.setProperty("--dx", `${Math.round((Math.random() - .5) * 220)}px`);
+    s.style.setProperty("--dy", `${Math.round(40 + Math.random() * 140)}px`);
+    s.style.setProperty("--giro", `${Math.round((Math.random() - .5) * 720)}deg`);
+    document.body.appendChild(s);
+    setTimeout(() => s.remove(), 1200);
+  }
 }
 
 let temporizador = null;
 function seguirLote() {
   clearInterval(temporizador);
+  let vistas = 0;
+  let exitosAntes = 0;
   temporizador = setInterval(async () => {
     const s = await enviar({ accion: "loteEstado" });
     if (!s) return;
     $("#texto-progreso").textContent = `${s.hechas} de ${s.total}`;
     $("#relleno").style.width = s.total ? `${Math.round((s.hechas / s.total) * 100)}%` : "0";
 
-    // Se narra cada vacante conforme se resuelve, con su desenlace.
-    const hechos = (s.items || []).filter((i) => i.estado !== "pendiente");
-    hechos.slice(consola.lineas.length ? undefined : 0).forEach(() => {});
-    const yaContadas = consola.lineas.filter((l) => l.contada).length;
-    hechos.slice(yaContadas).forEach((i) => {
-      const desenlace = {
-        enviada: "enviada ✓", preparada: "lista para revisar",
-        omitida: "omitida", fallida: "no se pudo",
-      }[i.estado] || i.estado;
-      consola.escribir(`${i.empresa || i.titulo} — ${desenlace}`, true);
-      if (consola.lineas.at(-1)) consola.lineas.at(-1).contada = true;
+    if (s.actual) {
+      $("#vivo-portal").textContent = s.actual.portal || "";
+      $("#vivo-titulo").textContent = [s.actual.titulo, s.actual.empresa].filter(Boolean).join(" · ");
+      $("#vivo-paso").textContent = s.actual.paso || "";
+    }
+
+    // Solo las ya resueltas: una «preparada» en automático aún se está enviando.
+    const hechos = (s.items || []).slice(0, s.hechas);
+    hechos.slice(vistas).forEach((i) => {
+      $("#vivo-feed").insertAdjacentHTML("afterbegin",
+        `<li><span class="chip ${escapar(i.estado)}">${escapar(DESENLACE[i.estado] || i.estado)}</span>`
+        + `<span class="que">${escapar([i.titulo, i.empresa].filter(Boolean).join(" · "))}</span>`
+        + (i.motivo && i.estado !== "enviada" ? `<span class="por-que" title="${escapar(i.motivo)}">${escapar(i.motivo)}</span>` : "")
+        + `</li>`);
     });
+    vistas = hechos.length;
+
+    const exitos = hechos.filter((i) => i.estado === (s.modo === "automatico" ? "enviada" : "preparada")).length;
+    if (exitos > exitosAntes) celebrar();
+    exitosAntes = exitos;
+    $("#vivo-enviadas").textContent = exitos;
+
     if (s.fase === "listo" || s.fase === "terminado") {
       clearInterval(temporizador);
-      $("#progreso").classList.add("oculto");
+      $("#en-vivo").classList.add("fin");
+      $("#btn-cancelar-lote").classList.add("oculto");
+      $("#vivo-portal").textContent = "Terminado";
+      $("#vivo-titulo").textContent = exitos
+        ? (s.modo === "automatico" ? "¡Listo! Postulaciones enviadas" : "¡Listas para revisar!")
+        : "Tanda terminada";
+      $("#vivo-paso").textContent = s.mensaje || "";
       pintarResultadoLote(s);
       pintarInicio();
     }
-  }, 1500);
+  }, 1200);
+}
+
+/**
+ * El CV adaptado a UNA vacante, generado al pedirlo.
+ *
+ * Ali, 2026-09-25: «no genera CV por cada vacante». Computrabajo,
+ * Bumeran, LinkedIn y el paso de CV de Indeed usan el CV guardado en tu
+ * perfil del portal: ahí no hay dónde poner otro. Donde el formulario
+ * acepta un archivo, se adjunta solo. Y para todas, aquí queda el de esa
+ * vacante —el de la entrevista—, hecho en el momento para no llenar el
+ * navegador de archivos ni gastar la IA en cien a la vez.
+ */
+async function descargarCVAdaptado(reg, boton) {
+  const perfil = estado.perfil || await almacen.perfil.obtener();
+  if (!perfil) { avisar("Carga tu CV en Mi perfil primero.", "mal"); return; }
+  const texto = boton.textContent;
+  boton.disabled = true;
+  boton.textContent = "Adaptando…";
+  const vacante = { titulo: reg.puesto || reg.titulo || "", empresa: reg.empresa || "", descripcion: reg.descripcion || "" };
+  let resumen = null;
+  try {
+    const ad = await ia.adaptarAVacante(perfil, vacante);
+    if (ad?.resumen?.length) resumen = ad.resumen;
+  } catch { /* sin IA, el CV se adapta igual con lo que pide la vacante */ }
+  const doc = await cv.docxAdaptado(perfil, vacante, { resumen, competenciasExtra: reg.competencias || [] });
+  boton.disabled = false;
+  boton.textContent = texto;
+  if (!doc || doc.error) { avisar(doc?.error || "No se pudo generar el CV.", "mal"); return; }
+  const bytes = Uint8Array.from(atob(doc.base64), (ch) => ch.charCodeAt(0));
+  const url = URL.createObjectURL(new Blob([bytes],
+    { type: "application/vnd.openxmlformats-officedocument.wordprocessingml.document" }));
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = doc.nombre || "CV.docx";
+  a.click();
+  setTimeout(() => URL.revokeObjectURL(url), 4000);
+  avisar("CV adaptado descargado.", "bien");
 }
 
 function pintarResultadoLote(s) {
-  const iconos = { enviada: "✅", omitida: "⏭️", fallida: "❌", preparada: "📝", pendiente: "⏳" };
-  $("#lista-vacantes").innerHTML = s.items.map((i) =>
-    `<article class="vacante" data-id="${escapar(i.id)}">
-      <div class="arriba"><div style="flex:1;min-width:0">
-        <h3>${iconos[i.estado] || ""} ${escapar(i.titulo)}</h3>
-        <div class="meta">${escapar(i.empresa || "")}</div>
-      </div></div>
-      ${i.motivo ? `<p class="nota" style="color:var(--ambar)">${escapar(i.motivo)}</p>` : ""}
+  $("#lista-vacantes").innerHTML = s.items.map((i, k) =>
+    `<article class="vacante fila-v" data-id="${escapar(i.id)}" style="animation-delay:${Math.min(k, 12) * 30}ms">
+      <span class="chip-estado ${escapar(i.estado)}">${escapar(DESENLACE[i.estado] || i.estado)}</span>
+      <div style="min-width:0">
+        <h3 title="${escapar(i.titulo)}">${escapar(i.titulo)}</h3>
+        <div class="meta"><span class="portal-mini">${escapar(i.portal || "")}</span> · ${escapar(i.empresa || "")}`
+          + `${i.motivo && i.estado !== "enviada" ? ` · ${escapar(i.motivo)}` : ""}</div>
+      </div>
+      ${["enviada", "preparada"].includes(i.estado)
+        ? `<button class="boton secundario chico btn-cv">CV adaptado</button>` : "<span></span>"}
       ${s.modo === "revisado" && i.estado === "preparada"
-        ? `<div class="pie"><button class="boton secundario chico btn-abrir" style="margin-left:auto">Revisar y enviar</button></div>` : ""}
+        ? `<button class="boton primario chico btn-abrir">Revisar y enviar</button>`
+        : i.estado === "externa"
+          ? `<a class="boton secundario chico" href="${escapar(i.url)}" target="_blank" rel="noopener">Abrir en su web</a>`
+          : "<span></span>"}
     </article>`).join("");
 
   $("#lista-vacantes").querySelectorAll(".vacante").forEach((el) => {
     const i = s.items.find((x) => x.id === el.dataset.id);
     el.querySelector(".btn-abrir")?.addEventListener("click", () => abrirVacante(i));
+    el.querySelector(".btn-cv")?.addEventListener("click", (ev) => descargarCVAdaptado(i, ev.currentTarget));
   });
   $("#resumen-busqueda").textContent = s.mensaje;
   $("#acciones-lote").classList.add("oculto");
@@ -1238,6 +1479,9 @@ async function pintarPipeline() {
           <strong>${escapar(p.puesto || "—")}</strong>
           <div class="sub">${escapar([p.empresa, f].filter(Boolean).join(" · "))}</div>
           ${p.motivo ? `<div class="motivo">${escapar(p.motivo)}</div>` : ""}
+          ${p.estado === "externa" && p.url
+            ? `<a class="enlace" href="${escapar(p.url)}" target="_blank" rel="noopener">Abrir en su web</a> ` : ""}
+          <button class="enlace boton-cv" data-cv="${escapar(p.id)}">CV adaptado</button>
           <select class="mover">
             ${almacen.ETAPAS.map((x) =>
               `<option value="${x.id}"${x.id === e.id ? " selected" : ""}>${x.nombre}</option>`).join("")}
@@ -1248,6 +1492,10 @@ async function pintarPipeline() {
   }).join("");
 
   conectarArrastre();
+  document.querySelectorAll(".boton-cv[data-cv]").forEach((b) => b.addEventListener("click", () => {
+    const reg = lista.find((x) => x.id === b.dataset.cv);
+    if (reg) descargarCVAdaptado(reg, b);
+  }));
 }
 
 function conectarArrastre() {
@@ -1636,6 +1884,10 @@ chrome.runtime.onMessage.addListener((msg) => {
     const p = sesionesCache.find((x) => x.id === msg.portal);
     avisar(p ? `${p.nombre}: conectado.` : "Portal conectado.", "bien");
     pintarInicio();
+    setTimeout(() => {
+      document.querySelector(`[data-portada-acceso="${CSS.escape(msg.portal)}"]`)
+        ?.closest(".portal-tarjeta")?.classList.add("recien");
+    }, 60);
   });
 });
 

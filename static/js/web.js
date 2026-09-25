@@ -127,10 +127,14 @@ $("#procesar").addEventListener("click", async () => {
     // antes de eso no significa nada y sería una interrupción.
     $("#zona-3").classList.remove("oculto");
 
-    // Lo que sobra una vez que ya convirtió: la cadena de cuatro pasos y
-    // «Qué pasa con tu CV» son argumentos para decidirse a subirlo. Ya lo
-    // subió. Dejarlos ahí es hacerle leer el anuncio después de comprar.
-    for (const s of ["#cadena", "#rotulo-subir", "#privacidad"]) {
+    // Lo que sobra una vez que ya convirtió: «Qué pasa con tu CV» es un
+    // argumento para decidirse a subirlo, y ya lo subió.
+    //
+    // La cadena de pasos NO se oculta (Ali, 2026-09-25: «la animación
+    // carga pero luego se va, es raro»). Al volver con un CV guardado se
+    // animaba y desaparecía en el mismo segundo. Es el mapa de lo que
+    // hace el producto: se queda.
+    for (const s of ["#rotulo-subir", "#privacidad"]) {
       $(s).classList.add("oculto");
     }
 
@@ -271,7 +275,7 @@ async function repintarResultado() {
   $("#zona-1").classList.add("oculto");
   $("#zona-2").classList.remove("oculto");
   $("#zona-3").classList.remove("oculto");
-  for (const sel of ["#cadena", "#rotulo-subir", "#privacidad"]) {
+  for (const sel of ["#rotulo-subir", "#privacidad"]) {
     $(sel).classList.add("oculto");
   }
 }

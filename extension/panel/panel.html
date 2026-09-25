@@ -51,9 +51,11 @@
         <h1 id="portada-titulo">Un clic.<br>Cien postulaciones.</h1>
         <p class="bajada" id="portada-bajada">
           Sube tu CV, elige dónde buscar y postula a todo lo que encaje contigo.
-          Tú das el último clic, siempre.
         </p>
         <div class="portada-acciones" id="portada-acciones"></div>
+        <!-- Dónde estás: cuenta → CV → portales → postular. Lo pinta
+             pintarRecorrido() según la etapa. -->
+        <ol class="recorrido" id="recorrido" aria-label="Tu avance"></ol>
       </div>
       <div class="portada-arte" aria-hidden="true">
         <div class="hoja-flotante">
@@ -130,28 +132,71 @@
          y estaba entre el buscador y la lista, en rojo de peligro, sin que
          pareciera una opción. -->
     <div class="barra-acciones barra-lote oculto" id="acciones-lote">
-      <span class="nota" id="cuenta-marcadas"></span>
-      <button class="boton secundario" id="btn-lote-revisar">Revisarlas una a una</button>
-      <button class="boton primario" id="btn-lote-auto">Postular a todas</button>
+        <label class="interruptor">
+          <input type="checkbox" class="sw-auto" role="switch" checked>
+          <span class="riel-sw" aria-hidden="true"></span>
+          <span class="sw-texto">
+            <span class="si"><b>Chamba Lista postula sola</b><small>Llena cada formulario y lo envía</small></span>
+            <span class="no"><b>Te avisa antes de enviar</b><small>Completa todo y tú das el visto bueno</small></span>
+          </span>
+        </label>
+      <div class="acciones-derecha">
+        <span class="cuenta-sel" id="cuenta-marcadas"></span>
+        <button class="boton secundario" id="btn-lote-revisar">Una por una</button>
+        <button class="boton primario" id="btn-lote-auto">Postular a todas</button>
+      </div>
     </div>
 
-    <div class="riesgo oculto" id="bloque-riesgo">
-      <p><strong>Se envían solas, sin pasar por tu revisión.</strong> Marca cada punto para seguir: solo te lo pedimos esta vez.</p>
-      <div id="casillas"></div>
+    <!-- Ali, 2026-09-25: «en la parte donde aceptan o no, que sea un botón
+         deslizable on/off». Una decisión, con lo que significa escrito
+         debajo; se elige una vez y se cambia cuando quieras. -->
+    <div class="elegir-modo oculto" id="bloque-riesgo">
+      <h3>¿Cómo quieres que postule?</h3>
+        <label class="interruptor grande">
+          <input type="checkbox" class="sw-auto" role="switch" id="sw-elegir" checked>
+          <span class="riel-sw" aria-hidden="true"></span>
+          <span class="sw-texto">
+            <span class="si"><b>Chamba Lista postula sola</b><small>Llena cada formulario y lo envía</small></span>
+            <span class="no"><b>Te avisa antes de enviar</b><small>Completa todo y tú das el visto bueno</small></span>
+          </span>
+        </label>
+      <div class="que-significa" id="que-significa"></div>
       <div class="fila-botones">
-        <button class="boton secundario" id="btn-cancelar-auto">Mejor no</button>
-        <button class="boton peligro" id="btn-confirmar-auto" disabled>Entiendo los riesgos, postular</button>
+        <button class="boton secundario" id="btn-cancelar-auto">Ahora no</button>
+        <button class="boton primario" id="btn-confirmar-auto">Empezar</button>
       </div>
     </div>
 
     <div class="oculto" id="progreso">
+      <!-- La tanda, en vivo: cuántas van, cuál está ahora y qué le hace. -->
+      <div class="en-vivo oculto" id="en-vivo">
+        <div class="en-vivo-cabeza">
+          <div class="contador-vivo" id="contador-vivo"><b id="vivo-enviadas">0</b><span>enviadas</span></div>
+          <div class="vivo-actual" role="status" aria-live="polite">
+            <span class="vivo-portal" id="vivo-portal">Empezando</span>
+            <b id="vivo-titulo">Preparando la tanda…</b>
+            <span class="vivo-paso" id="vivo-paso">Abriendo la primera oferta</span>
+          </div>
+          <svg class="avion" id="avion" viewBox="0 0 48 48" fill="none" aria-hidden="true">
+            <path d="M5 23 43 7 33 41 22 29 5 23Z" stroke="currentColor" stroke-width="2.5" stroke-linejoin="round" fill="#D4F249"/>
+            <path d="M43 7 22 29v10l5-6" stroke="currentColor" stroke-width="2.5" stroke-linejoin="round"/>
+          </svg>
+        </div>
+        <ol class="vivo-feed" id="vivo-feed"></ol>
+      </div>
       <div class="consola" id="consola" role="status" aria-live="polite"></div>
       <div class="barra"><div id="relleno"></div></div>
       <p class="nota" id="texto-progreso"></p>
       <button class="enlace" id="btn-cancelar-lote">Cancelar tanda</button>
     </div>
 
-    <div class="rejilla-vacantes" id="lista-vacantes"></div>
+    <div class="rejilla-vacantes" id="lista-vacantes">
+      <div class="como-va">
+        <div><span class="ico" aria-hidden="true">🔎</span><b>Escribes el puesto</b><span>Una vez. Buscamos en los portales que conectaste.</span></div>
+        <div><span class="ico" aria-hidden="true">🗂️</span><b>Juntamos las que encajan</b><span>Ordenadas por tu CV, sin las que ya postulaste.</span></div>
+        <div><span class="ico" aria-hidden="true">🚀</span><b>Postulas a todas</b><span>Llena cada formulario, responde sus preguntas y la envía.</span></div>
+      </div>
+    </div>
   </section>
 
   <!-- ══════════ PIPELINE ══════════ -->
@@ -199,9 +244,16 @@
 
       <article class="tarjeta">
         <h2>Cómo postula</h2>
-        <label class="confirmar"><input type="checkbox" id="pref-revisar">
-          <span>Revisar cada postulación antes de enviarla</span></label>
-        <p class="nota">Apagado, Chamba Lista postula sola.</p>
+        <div style="margin:12px 0 4px">
+        <label class="interruptor">
+          <input type="checkbox" class="sw-auto" role="switch" checked>
+          <span class="riel-sw" aria-hidden="true"></span>
+          <span class="sw-texto">
+            <span class="si"><b>Chamba Lista postula sola</b><small>Llena cada formulario y lo envía</small></span>
+            <span class="no"><b>Te avisa antes de enviar</b><small>Completa todo y tú das el visto bueno</small></span>
+          </span>
+        </label>
+        </div>
 
         <h2 style="margin-top:22px">Portales</h2>
         <p class="nota">Entras tú en la web de cada portal, una sola vez, y queda conectado.</p>

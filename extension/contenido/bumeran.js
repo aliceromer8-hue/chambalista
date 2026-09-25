@@ -67,9 +67,14 @@
   // Verificado contra el sitio real. La detección es por ausencia, así
   // que primero hay que confirmar que la página cargó de verdad; si no,
   // una página en blanco diría «sesión abierta» en falso.
+  //
+  // Solo cuenta un «Ingresar» VISIBLE: el enlace a /login puede existir
+  // escondido (menús, «Empresas») aunque haya sesión, y eso borraba la
+  // conexión recordada.
   function haySesion() {
-    if (!document.querySelector("footer, a[href*='/empleos'], header")) return false;
-    return !document.querySelector("a[href='/login'], a[href*='/login?']");
+    if (!document.querySelector("footer, a[href*='/empleos'], header")) return null;
+    const vis = (e) => Boolean(e && (e.offsetWidth || e.offsetHeight));
+    return ![...document.querySelectorAll("a[href='/login'], a[href*='/login?']")].some(vis);
   }
 
   function leerDetalle() {
@@ -148,7 +153,13 @@
 
   async function abrirFormulario() {
     const boton = botonPostular();
-    if (!boton) return { abierto: false, error: "No encontré el botón de postular." };
+    if (!boton) {
+      const t = (document.querySelector("main") || document.body).innerText || "";
+      if (/ya te postulaste|postulado|ya postulaste/i.test(t.slice(0, 5000))) {
+        return { abierto: false, yaPostulado: true, error: "Ya habías postulado a esta." };
+      }
+      return { abierto: false, error: "No encontré el botón de postular." };
+    }
     if (!haySesion()) {
       return { abierto: false, error: "Inicia sesión en Bumeran antes de postular." };
     }

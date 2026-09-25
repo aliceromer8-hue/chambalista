@@ -30,7 +30,10 @@
     if (!document.querySelector("footer, #prof-cat-search-input, article.box_offer, form")) {
       return false;
     }
-    return !document.querySelector(SEL.sinSesion);
+    // Solo el «Acceder» que se VE. En la ficha de una oferta puede haber
+    // uno escondido aunque haya sesión: en la tanda de Ali del 2026-09-25
+    // dos ofertas se saltaron con «Necesitas iniciar sesión» estando dentro.
+    return ![...document.querySelectorAll(SEL.sinSesion)].some((a) => a.offsetWidth || a.offsetHeight);
   }
 
   // ---------- listado de vacantes ----------
@@ -64,6 +67,27 @@
     };
   }
 
+  // ---------- «Mis postulaciones» ----------
+  //
+  // Medido en el sitio real (2026-09-25): la marca «Postulado» de las
+  // tarjetas del listado EXISTE pero Computrabajo la deja oculta (.hide)
+  // aunque ya hayas postulado —TALENTEA salía como nueva estando
+  // postulada—. La lista fiable es candidate/match/: cada entrada es un
+  // div[data-match] con el puesto en un h1 y la empresa en el primer
+  // p.fs16. Sus identificadores NO son los de la oferta, así que se
+  // compara por puesto + empresa.
+  function leerPostuladas() {
+    // textContent y no innerText: las entradas fuera de pantalla no se
+    // pintan y su innerText sale vacío (medido: 5 de 10 sin empresa).
+    const limpio = (e) => (e?.textContent || "").replace(/\s+/g, " ").trim();
+    const postuladas = [...document.querySelectorAll("[data-match]")].map((d) => ({
+      titulo: limpio(d.querySelector("h1, h2, h3")),
+      empresa: limpio(d.querySelector("p.fs16")),
+    })).filter((x) => x.titulo);
+    const sig = document.querySelector("span[title='Siguiente'][data-path]");
+    return { postuladas, siguiente: sig ? sig.getAttribute("data-path") : null };
+  }
+
   // ---------- postulación ----------
   function botonPostular() {
     return [...document.querySelectorAll("a, button, span")].find(
@@ -80,6 +104,10 @@
     if (location.host.startsWith("candidato.")) {
       return { abierto: true, enFlujo: true };
     }
+    // La cabecera con la cuenta a veces llega un momento después: se
+    // mira hasta 3 s antes de concluir que no hay sesión. En la tanda del
+    // 2026-09-25 dos ofertas se saltaron así estando dentro.
+    for (let i = 0; i < 6 && !haySesion(); i++) await new Promise((r) => setTimeout(r, 500));
     if (!haySesion()) {
       return { requiereLogin: true, nota: "Inicia sesión en Computrabajo en esta pestaña." };
     }
@@ -87,6 +115,7 @@
     if (!boton) {
       const yaEsta = document.querySelector(SEL.yaPostulado);
       return {
+        yaPostulado: Boolean(yaEsta || /ya (te )?postulaste|postulado/i.test(C.texto(document, "main") || "")),
         error: yaEsta
           ? "Ya postulaste a esta oferta."
           : "No se encontró el botón «Postularme». Puede que la oferta haya expirado.",
@@ -288,9 +317,13 @@
       return "El portal marcó la oferta como «Postulado».";
     }
     const t = (document.body.innerText || "").toLowerCase();
+    // «Ya te postulaste a esta oferta» es lo que enseña /match/ cuando la
+    // postulación ya entró; «ya postulaste» a secas no lo reconocía. Y el
+    // título de esa página dice «Postulación enviada de …».
     const frases = ["tu postulación fue enviada", "postulación enviada", "ya postulaste",
-                    "hemos enviado tu postulación", "gracias por postular"];
-    const hit = frases.find((f) => t.includes(f));
+                    "ya te postulaste", "hemos enviado tu postulación", "gracias por postular"];
+    const hit = frases.find((f) => t.includes(f))
+      || (/^postulaci[oó]n enviada/i.test(document.title || "") ? "postulación enviada" : null);
     return hit ? `Mensaje del portal: «${hit}»` : null;
   }
 
@@ -354,6 +387,7 @@
           case "sesion":        return responder({ sesion: haySesion() });
           case "ofertas":       return responder({ ofertas: leerOfertas(), sesion: haySesion() });
           case "detalle":       return responder(leerDetalle());
+          case "postuladas":    return responder(leerPostuladas());
           case "abrirFormulario": return responder(await abrirFormulario());
           // `conArchivo`: si hay dónde subir un CV. Si no, el fondo ni
           // adapta el CV ni genera el Word: la página de preguntas usa el

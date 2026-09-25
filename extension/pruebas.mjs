@@ -1436,7 +1436,8 @@ titulo("LA PESTAÑA SIN CONTENT SCRIPT — el fallo mas probable del primer inte
   check("«Postular a todas» es el botón principal, no uno de peligro",
     /class="boton primario" id="btn-lote-auto"/.test(ph));
   check("y la barra se queda fija abajo", /\.barra-lote\s*\{[^}]*position:\s*sticky/.test(pc));
-  check("dice a cuántas va a postular", /Postular a las \$\{n\}/.test(pj));
+  // Sin elegir ninguna van todas; eligiendo, solo esas. Y lo dice.
+  check("dice a cuántas va a postular", /las \$\{n\} elegidas/.test(pj) && /las \$\{total\}/.test(pj));
   check("con un portal conectado, se ofrecen los demás en Inicio",
     /Conectar más portales/.test(pj) && /sinConectar\.map\(filaPortal\)/.test(pj));
   check("la tarjeta de portal es UNA función, usada en los dos sitios",
@@ -1498,8 +1499,8 @@ titulo("LA PESTAÑA SIN CONTENT SCRIPT — el fallo mas probable del primer inte
       !/yaPostulado:\s*false/.test(src) && /postulad\[oa\]/.test(src));
   }
   const pj = await fspy.readFile(new URL("panel/panel.js", BASE), "utf8");
-  check("el panel quita las que ya postuló con Chamba Lista",
-    /almacen\.tracker\.yaPostulado\(v\.url\)/.test(pj));
+  check("el panel quita las que ya postuló con Chamba Lista (por clave de oferta)",
+    /almacen\.tracker\.clavesPostuladas\(\)/.test(pj) && /almacen\.claveOferta\(todas\[k\]\.url\)/.test(pj));
   check("y lo dice", /Ocultamos \$\{estado\.yaPostuladasOcultas\}/.test(pj));
   // Al conectar un portal el panel se repinta; el desplegable se cerraba
   // y parecía que todo se reiniciaba.
@@ -1679,8 +1680,11 @@ titulo("LA PESTAÑA SIN CONTENT SCRIPT — el fallo mas probable del primer inte
     /accion: "enviarUna"/.test(av) && /!prefs\.revisarAntes && !noSigue && !faltaAlgo/.test(av));
   check("solo se para si falta un dato obligatorio o algo impide seguir",
     /n\) => !n\.respondido/.test(av));
-  check("revisar antes es una opción de Mi perfil", /id="pref-revisar"/.test(ph));
-  check("y viene apagada", !/id="pref-revisar"[^>]*checked/.test(ph));
+  // Desde 2026-09-25 es un interruptor (Ali: «un botón deslizable on/off»),
+  // el mismo en la barra de la tanda y en Mi perfil.
+  check("postula sola / te avisa antes es un interruptor, en la tanda y en Mi perfil",
+    (ph.match(/class="sw-auto"/g) || []).length >= 3);
+  check("y viene encendido: postula sola", /class="sw-auto" role="switch" checked/.test(ph));
   check("el consentimiento del lote se da una sola vez",
     /almacen\.leer\("aprobacionAuto"/.test(pj) && /almacen\.guardar\("aprobacionAuto"/.test(pj));
   check("la tarjeta dice «Postular», no «Ver y postular»", !/"Ver y postular"/.test(pj));
@@ -1742,6 +1746,107 @@ titulo("LA PESTAÑA SIN CONTENT SCRIPT — el fallo mas probable del primer inte
   check("«2 500» y «1.500» son miles", soloCifra("2 500") === "2500" && soloCifra("S/ 1.500") === "1500");
   check("«1200.50» se queda en 1200", soloCifra("1200.50") === "1200");
   check("enviar espera la confirmación, no mira una sola vez", /i < 16; i\+\+/.test(src));
+}
+
+// ══════════════════════════════════════════════════════════════════════
+// RONDA 2026-09-25 — lo que falló en la tanda real de Ali
+// ══════════════════════════════════════════════════════════════════════
+// Eventos de Supabase de su tanda (15:21–15:22): en Computrabajo 0
+// preguntas leídas, «port moved into back/forward cache», «Necesitas
+// iniciar sesión» estando dentro, y «No se encontró el botón» en ofertas
+// que ya estaban enviadas. Indeed salía como «no conectado» siempre.
+{
+  titulo("TANDA REAL — Computrabajo sigue la página hasta el formulario");
+  const fs = await import("node:fs/promises");
+  const fo = await fs.readFile(new URL("background.js", BASE), "utf8");
+  check("/match/ es una página de paso: no se lee ahí", /DE_PASO = \/computrabajo/.test(fo));
+  check("y se pide la dirección quieta tres veces, no dos", /estable < 3/.test(fo));
+  check("una lectura que pilla la página navegando se repite",
+    /SE_PUEDE_REPETIR = new Set\(\["ping", "sesion", "ofertas", "detalle", "preguntas"\]\)/.test(fo)
+    && /SE_FUE_LA_PAGINA\.test/.test(fo));
+  check("pulsar (abrir, siguiente, enviar) NUNCA se repite solo",
+    !/SE_PUEDE_REPETIR = new Set\([^)]*(abrirFormulario|siguiente|enviar)/.test(fo));
+  check("si no se pueden leer las preguntas, se dice (no «0 preguntas»)",
+    /No se pudo leer el formulario/.test(fo) && !/accion: "preguntas" \}\)\.catch\(\(\) => \(\{\}\)\)/.test(fo));
+  check("enviada al entrar cuenta como ENVIADA en la tanda", /if \(r\.enviadaDirecto\) \{ item\.estado = "enviada"/.test(fo));
+  check("ya postulada y externa tienen su propio estado",
+    /item\.estado = "ya_postulada"/.test(fo) && /item\.estado = "externa"/.test(fo));
+  check("el panel ve qué hace la tanda ahora mismo", /lote\.actual = \{/.test(fo));
+}
+
+{
+  titulo("YA POSTULADAS — no vuelven a salir, venga de donde venga");
+  const al = await import(`${BASE}lib/almacen.js`);
+  const k = al.claveOferta;
+  check("Computrabajo con #lc= y ?x= es la misma oferta",
+    k("https://pe.computrabajo.com/ofertas-de-trabajo/oferta-ABC#lc=Score-3")
+      === k("https://pe.computrabajo.com/ofertas-de-trabajo/oferta-ABC?x=1"));
+  check("Indeed: solo cuenta jk", k("https://pe.indeed.com/viewjob?jk=abc&from=serp") === k("https://pe.indeed.com/viewjob?jk=abc"));
+  check("LinkedIn: solo cuenta el id", k("https://www.linkedin.com/jobs/view/123/?trk=x") === k("https://linkedin.com/jobs/view/123"));
+  check("dos ofertas distintas no se confunden",
+    k("https://pe.indeed.com/viewjob?jk=a") !== k("https://pe.indeed.com/viewjob?jk=b"));
+  const fs = await import("node:fs/promises");
+  const pj = await fs.readFile(new URL("panel/panel.js", BASE), "utf8");
+  check("lo que el portal ya resolvió al abrirla se anota", /estadoResuelto/.test(pj) && /quitarDeLaLista\(vacante\)/.test(pj));
+  for (const portal of ["computrabajo", "indeed", "linkedin", "bumeran"]) {
+    const src = await fs.readFile(new URL(`contenido/${portal}.js`, BASE), "utf8");
+    check(`${portal} dice «ya postulaste» en vez de «no hay botón»`, /yaPostulado: (true|Boolean)/.test(src));
+  }
+}
+
+{
+  titulo("CONECTAR — se queda conectado, e Indeed también");
+  const fs = await import("node:fs/promises");
+  const fo = await fs.readFile(new URL("background.js", BASE), "utf8");
+  const ind = await fs.readFile(new URL("contenido/indeed.js", BASE), "utf8");
+  const por = await fs.readFile(new URL("lib/portales.js", BASE), "utf8");
+  check("«sin sesión» en la página de acceso no borra la conexión", /!ES_ACCESO\.test\(t\.url/.test(fo));
+  check("una página que no lo deja claro (null) no cuenta como «sin sesión»", /r\?\.sesion === true\) return/.test(fo));
+  check("Indeed no se da por desconectado por tener enlaces a su cuenta",
+    !/return !document\.querySelector\("a\[href\*='secure\.indeed\.com\/auth'\]/.test(ind) && /AccountMenu/.test(ind));
+  check("el acceso a Indeed vuelve a pe.indeed.com", /continue=https%3A%2F%2Fpe\.indeed\.com/.test(por));
+  check("y si se queda en secure.indeed.com, se le lleva", /u\.hostname === "secure\.indeed\.com"/.test(fo));
+  check("conectado un portal, se vuelve al panel para el siguiente", /await volverAlPanel\(\)/.test(fo));
+  const ver = await fs.readFile(new URL("lib/verificados.js", BASE), "utf8");
+  const lista = (s, re) => JSON.stringify((s.match(re) || [])[1]?.match(/"[a-z]+"/g) || []);
+  check("portales.js y verificados.js dicen lo mismo de qué está verificado",
+    lista(por, /const VERIFICADOS = \[([^\]]*)\]/) === lista(ver, /POSTULACION_VERIFICADA = \[([^\]]*)\]/));
+}
+
+{
+  titulo("PANEL — claro, interruptor, elegir, en vivo, CV de cada una");
+  const fs = await import("node:fs/promises");
+  const pc = await fs.readFile(new URL("panel/panel.css", BASE), "utf8");
+  const ph = await fs.readFile(new URL("panel/panel.html", BASE), "utf8");
+  const pj = await fs.readFile(new URL("panel/panel.js", BASE), "utf8");
+  check("siempre claro: ni un bloque oscuro", !/prefers-color-scheme:\s*dark/.test(pc) && /color-scheme: light/.test(pc));
+  check("las variables que usa el JS existen", ["--acento", "--tinta-3", "--ambar"].every((v) => pc.includes(`${v}:`)));
+  check("el modo se elige con un interruptor, no con cuatro casillas",
+    /id="sw-elegir"/.test(ph) && !/id="casillas"/.test(ph));
+  check("encender el interruptor ES el consentimiento que pide el fondo",
+    /almacen\.guardar\("aprobacionAuto", aprobacion\)/.test(pj));
+  check("la lista va en filas y de veinte en veinte", /function filaVacante/.test(pj) && /const POR_PAGINA = 20/.test(pj));
+  check("sin elegir ninguna van todas; eligiendo, solo esas", /estado\.elegidas\.size\s*\?/.test(pj));
+  check("la tanda se ve en vivo y cada envío se celebra", /id="en-vivo"/.test(ph) && /function celebrar/.test(pj));
+  check("cada postulación tiene su CV adaptado", /function descargarCVAdaptado/.test(pj) && /boton-cv/.test(pj));
+  check("el recorrido cuenta → CV → portales → postular", /function pintarRecorrido/.test(pj) && /id="recorrido"/.test(ph));
+  check("todo lo que se mueve respeta «reducir movimiento»", /prefers-reduced-motion: reduce\)\s*\{\s*\.hoja-flotante/.test(pc));
+}
+
+{
+  titulo("COMPUTRABAJO — «Mis postulaciones» manda, no la marca escondida");
+  const fs = await import("node:fs/promises");
+  const ct = await fs.readFile(new URL("contenido/computrabajo.js", BASE), "utf8");
+  const fo = await fs.readFile(new URL("background.js", BASE), "utf8");
+  check("se leen tus postulaciones de candidate/match/", /URL_POSTULADAS = \{ computrabajo: "https:\/\/candidato\.pe\.computrabajo\.com\/candidate\/match\/"/.test(fo)
+    && /case "postuladas":/.test(ct));
+  check("con textContent: las de fuera de pantalla no se pintan", /e\?\.textContent/.test(ct.slice(ct.indexOf("function leerPostuladas"))));
+  check("y se quitan de la búsqueda por puesto + empresa", /yaEnPortal\.has\(clavePuesto\(v\.titulo, v\.empresa\)\)/.test(fo));
+  check("el panel cuenta también esas", /r\.ocultasPortal/.test(await fs.readFile(new URL("panel/panel.js", BASE), "utf8")));
+  check("«Ya te postulaste» (lo que dice /match/) cuenta como enviada", /"ya te postulaste"/.test(ct));
+  check("sin sesión se espera a que la cabecera cargue antes de rendirse", /i < 6 && !haySesion\(\)/.test(ct));
+  check("un «Enviar» que hace navegar se comprueba en la página nueva",
+    /dudosa: true/.test(fo) && /if \(ping\?\.enviada\) return \{ enviada: true/.test(fo));
 }
 
 console.log(`

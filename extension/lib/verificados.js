@@ -13,11 +13,14 @@
 // La regla que esto impone, y que las pruebas hacen cumplir: la página
 // solo puede decir que postula en los portales de esta lista. Ampliarla
 // se hace DESPUÉS de ver una postulación entrar, nunca antes.
-export const POSTULACION_VERIFICADA = ["computrabajo"];
+// Indeed entró el 2026-09-25: en la tanda de Ali, dos envíos que el
+// propio Indeed confirmó (eventos 178 y 179 de Supabase), con el
+// SmartApply medido el día anterior.
+export const POSTULACION_VERIFICADA = ["computrabajo", "indeed"];
 
 // Escrito y con selectores medidos, pendiente de una postulación real.
 // LinkedIn pasa aquí: ya envía, y el envío no se ha probado en LinkedIn real.
-export const POSTULACION_SIN_PROBAR = ["bumeran", "indeed", "linkedin"];
+export const POSTULACION_SIN_PROBAR = ["bumeran", "linkedin"];
 
 // LinkedIn aparte: aquí no falta probarlo, es que NO va a enviar nunca.
 //

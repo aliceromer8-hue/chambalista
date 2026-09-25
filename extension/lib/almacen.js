@@ -63,10 +63,30 @@ export const ETAPAS = [
 // porque eso es lo que son — algo que la persona todavía puede retomar.
 const ETAPA_DE_ESTADO = {
   enviada: "enviada",
+  // «Ya postulaste» lo dijo el portal: está enviada, aunque no por aquí.
+  ya_postulada: "enviada",
+  // Se postula en la web de la empresa: queda pendiente, con su enlace.
+  externa: "por_postular",
   omitida: "por_postular",
   fallida: "por_postular",
   preparada: "por_postular",
 };
+
+/**
+ * La misma oferta con otra dirección sigue siendo la misma: Computrabajo
+ * añade «#lc=…» y parámetros de seguimiento, Indeed cambia todo menos
+ * `jk`. Comparar URLs enteras dejaba pasar ofertas ya postuladas.
+ */
+export function claveOferta(url) {
+  try {
+    const u = new URL(url);
+    const jk = u.searchParams.get("jk") || u.searchParams.get("currentJobId");
+    const id = jk || (u.pathname.match(/\/jobs\/view\/(\d+)/) || [])[1];
+    return `${u.hostname.replace(/^www\./, "")}${id ? `#${id}` : u.pathname.replace(/\/$/, "")}`.toLowerCase();
+  } catch {
+    return String(url || "").split(/[?#]/)[0].toLowerCase();
+  }
+}
 
 export const tracker = {
   async listar() {
@@ -133,7 +153,13 @@ export const tracker = {
   },
   async yaPostulado(url) {
     const lista = await leer(CLAVES.tracker, []);
-    return lista.some((r) => r.url === url && r.estado === "enviada");
+    const k = claveOferta(url);
+    return lista.some((r) => claveOferta(r.url) === k && ["enviada", "ya_postulada"].includes(r.estado));
+  },
+  /** Las claves de todas las ofertas ya enviadas, para filtrar una lista de una vez. */
+  async clavesPostuladas() {
+    const lista = await leer(CLAVES.tracker, []);
+    return new Set(lista.filter((r) => ["enviada", "ya_postulada"].includes(r.estado)).map((r) => claveOferta(r.url)));
   },
   borrar: () => chrome.storage.local.remove(CLAVES.tracker),
 };

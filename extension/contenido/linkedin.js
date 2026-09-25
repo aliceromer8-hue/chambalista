@@ -169,6 +169,12 @@
     }
     if (enFormulario()) return { abierto: true, revisionObligatoria: true };
     const boton = botonPostular();
+    // «Solicitado hace 2 días»: sin botón porque YA se postuló. Antes se
+    // leía como «se postula en la web de la empresa».
+    const cabecera = (document.querySelector("main") || document.body).innerText || "";
+    if (!boton && /\b(solicitado|applied)\b|ver solicitud|see application|solicitud enviada/i.test(cabecera.slice(0, 4000))) {
+      return { abierto: false, yaPostulado: true, error: "Ya habías postulado a esta." };
+    }
     if (!boton) {
       return { abierto: false, externo: true,
                error: "Esta vacante no tiene Solicitud Sencilla: se postula en la web de la empresa." };

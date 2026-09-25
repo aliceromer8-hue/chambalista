@@ -126,7 +126,10 @@ export const PORTALES = {
     postulable: true,
 
     base: "https://pe.indeed.com",
-    acceso: "https://secure.indeed.com/auth?hl=es_PE&co=PE",
+    // Con `continue`, al entrar Indeed vuelve a pe.indeed.com, donde sí
+    // corre nuestro script y se ve la sesión. Sin él se quedaba en
+    // secure.indeed.com, que no es nuestro, y nunca se marcaba conectado.
+    acceso: "https://secure.indeed.com/auth?hl=es_PE&co=PE&continue=https%3A%2F%2Fpe.indeed.com%2F",
     url(termino, ciudad, pagina = 1) {
       const p = new URLSearchParams({ q: termino });
       if (ciudad) p.set("l", ciudad);
@@ -176,4 +179,4 @@ export function queHace(portal) {
 
 // Se copia aquí en vez de importar verificados.js para no arrastrar otro
 // módulo a los content scripts, que cargan portales.js.
-const VERIFICADOS = ["computrabajo"];
+const VERIFICADOS = ["computrabajo", "indeed"];

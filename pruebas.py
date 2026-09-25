@@ -795,8 +795,10 @@ for _pieza, _que in [
     ("Buscas", "empieza por lo que hace la persona"),
     ("Barre", "sigue con lo que hace la máquina"),
     ("Llena", "y con lo que de verdad nos distingue"),
-    ("Apruebas", "y acaba en quien decide"),
-    ("nada sale sin tu clic", "dejando claro que no envía sola"),
+    # Desde 2026-09-24 envía sola por defecto (decisión de Ali), con la
+    # opción de que avise antes. El camino dice las dos cosas.
+    ("Envía", "y acaba en el envío"),
+    ("te avisa antes", "dejando claro que puedes revisar antes"),
 ]:
     check(f"{_que}", _pieza in _camino, _pieza)
 
@@ -833,7 +835,7 @@ for _negacion in ["no pide cuenta", "sin cuenta", "sin registro"]:
 # Las paradas son palabras clave, no frases. Si alguien vuelve a meter un
 # párrafo aquí, esto lo canta.
 _titulos = _re.findall(r"<b>([^<]+)</b>", _camino)
-_paradas = [t for t in _titulos if t in ("Buscas", "Barre", "Llena", "Apruebas")]
+_paradas = [t for t in _titulos if t in ("Buscas", "Barre", "Llena", "Envía")]
 check("cada parada es una sola palabra",
       len(_paradas) == 4 and all(len(t.split()) == 1 for t in _paradas), str(_paradas))
 
@@ -991,8 +993,10 @@ check("los cuatro portales saben buscar",
 
 # Y lo que sí se puede afirmar, porque está en el código: nada se envía
 # sin que la persona lo apruebe.
-check("se sigue prometiendo el último clic", "último clic" in _pag)
-check("y el camino lo repite donde se ve", "nada sale sin tu clic" in _pag)
+# Desde 2026-09-24 Chamba Lista envía sola; revisar antes es opcional.
+# Prometer «el último clic» sería prometer algo que ya no pasa.
+check("ya no promete un último clic que no existe", "último clic" not in _pag)
+check("y dice que puede avisar antes de enviar", "te avisa antes" in _pag)
 
 # El modelo de la extensión y el del servidor tienen que ser el mismo.
 # Se separaron una vez —el servidor se arregló y la extensión se quedó
