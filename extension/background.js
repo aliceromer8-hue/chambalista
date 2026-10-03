@@ -741,8 +741,14 @@ const consentimientoCompleto = (a) => CONSENTIMIENTO.every((c) => a?.[c.clave] =
  * seguidas del mismo portal: las esperas de uno se solapan con el trabajo
  * en los otros, y ningún portal ve una ráfaga.
  */
-/** Si enviar esta vacante pasaría un tope del día, por qué. Si no, null. */
+/** Si enviar esta vacante pasaría un tope del día (o el saldo), por qué. Si no, null. */
 async function topeAlcanzado(vacante) {
+  // Sin saldo no se envía. Solo cuenta si el servidor está cobrando
+  // (COBRAR=1); mientras se prueba, no limita nada.
+  const s = await sesion.saldo().catch(() => null);
+  if (s?.cobrando && s.disponibles != null && s.disponibles <= 0) {
+    return "Se te acabaron las postulaciones. Recarga un pack en la web y seguimos.";
+  }
   const hoy = await almacen.tracker.enviadasHoy();
   if (hoy.total >= TOPE_DIARIO) return `Llegaste a ${TOPE_DIARIO} hoy, el máximo seguro. Mañana seguimos.`;
   const pid = String(vacante?.portalId || vacante?.portal || "").toLowerCase();
@@ -799,6 +805,12 @@ async function correrLote({ vacantes, modo, aprobacion, respuestasPersona }) {
 
     // Topes del día: el total y el del portal. Se para ANTES de abrir.
     if (modo === "automatico") {
+      const sinSaldo = await topeAlcanzado(item);
+      if (sinSaldo && /acabaron las postulaciones/.test(sinSaldo)) {
+        for (const resto of lote.items.slice(i)) { resto.estado = "tope"; resto.motivo = sinSaldo; }
+        lote.hechas = cola.length;
+        break;
+      }
       const hoy = await almacen.tracker.enviadasHoy();
       const tope = LIMITES_PORTAL[pid]?.dia;
       if (hoy.total >= TOPE_DIARIO) {
@@ -922,6 +934,8 @@ async function correrLote({ vacantes, modo, aprobacion, respuestasPersona }) {
 
     // Cuánto tardó DE VERDAD (Ali: «quiero saber cuánto tiempo te toma»).
     item.segundos = Math.round((Date.now() - t0) / 1000);
+    // Se descuenta solo lo que SALIÓ: un fallo no cuesta una postulación.
+    if (item.estado === "enviada") sesion.usarSaldo().catch(() => {});
     if (["enviada", "fallida"].includes(item.estado)) {
       const [min, max] = LIMITES_PORTAL[pid]?.espera || [3, 6];
       libreDesde[pid] = Date.now() + (min + Math.random() * (max - min)) * 1000;
@@ -977,6 +991,7 @@ async function enviarAprobadas(ids) {
       const env = await escribirYEnviar(aprobadas);
       item.estado = env?.enviada ? "enviada" : "fallida";
       item.motivo = env?.mensaje || env?.error || "";
+      if (env?.enviada) sesion.usarSaldo().catch(() => {});
     } catch (e) {
       if (!e?.yaResuelta) {
         item.estado = "fallida";
@@ -1139,6 +1154,7 @@ chrome.runtime.onMessage.addListener((msg, _e, responder) => {
           if (tope) return responder({ enviada: false, tope: true, error: tope });
           const t0 = Date.now();
           const r = await escribirYEnviar(msg.respuestas);
+          if (r?.enviada) sesion.usarSaldo().catch(() => {});
           await almacen.tracker.anotar({
             portal: msg.vacante?.portal, empresa: msg.vacante?.empresa,
             puesto: msg.vacante?.titulo, url: msg.vacante?.url,

@@ -317,8 +317,8 @@ def _gemini_una_vez(prompt, clave, modelo):
     return " ".join(p.get("text", "") for p in partes if not p.get("thought")).strip()
 
 
-def _con_groq(prompt, clave):
-    modelo = os.environ.get("GROQ_MODEL", "llama-3.3-70b-versatile")
+def _con_groq(prompt, clave, modelo=None):
+    modelo = modelo or os.environ.get("GROQ_MODEL", "llama-3.3-70b-versatile")
     r = _pedir(
         "https://api.groq.com/openai/v1/chat/completions",
         {
@@ -328,7 +328,8 @@ def _con_groq(prompt, clave):
                 {"role": "user", "content": prompt},
             ],
             "temperature": 0.3,
-            "max_tokens": 300,
+            # Antes 300 fijo: leer un CV devuelve un JSON largo y se cortaba.
+            "max_tokens": TOPE_SALIDA,
         },
         {"Authorization": f"Bearer {clave}"},
     )
@@ -338,16 +339,74 @@ def _con_groq(prompt, clave):
         return ""
 
 
-def proveedor():
-    """Devuelve (nombre, detalle) del proveedor disponible, o (None, motivo)."""
+def _facturada():
+    return os.environ.get("GEMINI_FACTURACION", "").lower() in ("1", "true", "si", "sí")
+
+
+def cadena():
+    """Los proveedores, EN ORDEN, todos gratuitos (Ali, 2026-10-02: «todas
+    las soluciones posibles sin costo económico»).
+
+      1. Ollama           local: gratis y nada sale del equipo
+      2. Gemini           solo si tiene facturación (entonces no entrena)
+      3. Groq 70B         gratis, sin tarjeta, y por contrato NO entrena
+                          con lo que recibe ni lo guarda: el mejor sitio
+                          gratuito para mandar un CV (~1 000 al día)
+      4. Gemini gratis    respaldo: buena calidad, pero en la capa gratuita
+                          Google puede usar lo enviado para mejorar
+      5. Groq 8B          último respaldo: 14 400 al día
+
+    Si uno falla o se queda sin cuota, se prueba el siguiente: quedarse sin
+    un proveedor ya no deja a nadie sin respuestas.
+    """
+    c = []
     modelo = _ollama_modelo()
     if modelo:
-        return "ollama", modelo
-    if os.environ.get("GEMINI_API_KEY"):
-        return "gemini", _modelos_gemini()[0]
-    if os.environ.get("GROQ_API_KEY"):
-        return "groq", os.environ.get("GROQ_MODEL", "llama-3.3-70b-versatile")
-    return None, "sin proveedor configurado"
+        c.append(("ollama", modelo))
+    gemini, groq = os.environ.get("GEMINI_API_KEY"), os.environ.get("GROQ_API_KEY")
+    if gemini and _facturada():
+        c.append(("gemini", _modelos_gemini()[0]))
+    if groq:
+        c.append(("groq", os.environ.get("GROQ_MODEL", "llama-3.3-70b-versatile")))
+    if gemini and not _facturada():
+        c.append(("gemini", _modelos_gemini()[0]))
+    if groq:
+        c.append(("groq", os.environ.get("GROQ_MODEL_RESPALDO", "llama-3.1-8b-instant")))
+    return c
+
+
+def proveedor():
+    """Devuelve (nombre, detalle) del primer proveedor, o (None, motivo)."""
+    c = cadena()
+    return c[0] if c else (None, "sin proveedor configurado")
+
+
+def privada():
+    """¿El primer proveedor guarda en privado lo que recibe? (Para la política.)"""
+    nombre = proveedor()[0]
+    return nombre in ("ollama", "groq") or (nombre == "gemini" and _facturada())
+
+
+def _uno(nombre, detalle, prompt):
+    if nombre == "ollama":
+        return _con_ollama(prompt, detalle)
+    if nombre == "gemini":
+        return _con_gemini(prompt, os.environ["GEMINI_API_KEY"])
+    return _con_groq(prompt, os.environ["GROQ_API_KEY"], detalle)
+
+
+def _primero_que_responda(prompt):
+    """Prueba la cadena en orden. Devuelve (texto, proveedor) o (None, None)."""
+    for nombre, detalle in cadena():
+        try:
+            salida = _uno(nombre, detalle, prompt)
+            if salida and salida.strip():
+                return salida, nombre
+            log.warning("%s (%s) devolvió vacío; se prueba el siguiente", nombre, detalle)
+        except (urllib.error.URLError, urllib.error.HTTPError, TimeoutError, OSError, ValueError) as e:
+            log.warning("%s (%s) no respondió (%s): %s; se prueba el siguiente",
+                        nombre, detalle, type(e).__name__, str(e)[:160])
+    return None, None
 
 
 def disponible():
@@ -554,17 +613,9 @@ def _llamar(prompt, instrucciones, tope=2000, tiempo=None, reintentos=None):
     if reintentos:
         IA_REINTENTOS = reintentos
     try:
-        if nombre == "ollama":
-            return _con_ollama(prompt, detalle)
-        if nombre == "gemini":
-            return _con_gemini(prompt, os.environ["GEMINI_API_KEY"])
-        return _con_groq(prompt, os.environ["GROQ_API_KEY"])
-    except (urllib.error.URLError, urllib.error.HTTPError, TimeoutError, OSError, ValueError) as e:
-        # Se sigue devolviendo None —el respaldo por reglas es lo que hace
-        # que perder el modelo no rompa el producto— pero ahora queda
-        # anotado por qué, que es lo que faltaba.
-        log.warning("%s no respondió (%s): %s", nombre, type(e).__name__, str(e)[:200])
-        return None
+        # La cadena entera: si uno falla, el siguiente. None solo si
+        # fallan todos (y entonces entra el respaldo por reglas).
+        return _primero_que_responda(prompt)[0]
     finally:
         INSTRUCCIONES, TOPE_SALIDA = previas, tope_previo
         TIEMPO_LIMITE, IA_REINTENTOS = tiempo_previo, reint_previo
@@ -780,15 +831,7 @@ def redactar(enunciado, perfil, extras=None):
         "Redacta la respuesta siguiendo las reglas."
     )
 
-    try:
-        if nombre == "ollama":
-            salida = _con_ollama(prompt, detalle)
-        elif nombre == "gemini":
-            salida = _con_gemini(prompt, os.environ["GEMINI_API_KEY"])
-        else:
-            salida = _con_groq(prompt, os.environ["GROQ_API_KEY"])
-    except (urllib.error.URLError, urllib.error.HTTPError, TimeoutError, OSError, ValueError):
-        return None, None
+    salida = _primero_que_responda(prompt)[0]
 
     salida = _limpiar_respuesta(salida)
     if not salida:

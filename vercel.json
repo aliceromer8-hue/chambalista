@@ -5,11 +5,26 @@
       "src": "api/index.py",
       "use": "@vercel/python",
       "config": {
-        "includeFiles": ["*.py", "templates/**", "static/**", "extension/**", "supabase/**"]
+        "includeFiles": [
+          "*.py",
+          "templates/**",
+          "static/**",
+          "extension/**",
+          "supabase/**"
+        ]
       }
     }
   ],
   "routes": [
-    { "src": "/(.*)", "dest": "api/index.py" }
+    {
+      "src": "/(.*)",
+      "dest": "api/index.py"
+    }
+  ],
+  "crons": [
+    {
+      "path": "/api/mantener",
+      "schedule": "0 13 * * *"
+    }
   ]
 }

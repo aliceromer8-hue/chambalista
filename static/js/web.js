@@ -54,6 +54,8 @@ async function pintarPrivacidadIA() {
     const e = await (await fetch("/api/estado")).json();
     if (!e.ia_activa) {
       li.textContent = "Tu CV se lee aquí, sin enviarlo a nadie más.";
+    } else if (e.ia_privada) {
+      li.textContent = "Para leer tu CV, su texto se procesa con un modelo de IA que no lo guarda ni entrena con él.";
     } else if (e.ia_facturada) {
       li.textContent = "Para leer tu CV, su texto se procesa con Google.";
     } else {

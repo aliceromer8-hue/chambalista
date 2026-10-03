@@ -9,6 +9,10 @@
       if (!e.ia_activa) {
         el.textContent = "Actualmente esta función está desactivada, por lo que tu CV "
           + "no se transmite a terceros.";
+      } else if (e.ia_privada && !e.ia_facturada) {
+        el.textContent = "Lo procesamos primero con Groq, que no guarda ni usa para entrenar "
+          + "lo que recibe. Solo si no responde usamos Gemini de Google en su modalidad gratuita, "
+          + "en la que Google puede utilizar el contenido para mejorar sus servicios.";
       } else if (e.ia_facturada) {
         el.textContent = "Operamos bajo su modalidad de pago, en la que Google no "
           + "utiliza el contenido enviado para entrenar sus modelos.";

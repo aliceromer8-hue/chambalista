@@ -210,6 +210,14 @@ def _version_extension():
         return None
 
 
+def _ia_privada():
+    try:
+        import redactor_ia
+        return redactor_ia.privada()
+    except Exception:                                             # noqa: BLE001
+        return False
+
+
 @app.get("/api/estado")
 def estado():
     # Si la clave de Gemini tiene facturación activada.
@@ -226,7 +234,10 @@ def estado():
         "modo": "web",
         "ia_del_usuario": True,
         "ia_facturada": os.environ.get("GEMINI_FACTURACION", "").lower() in ("1", "true", "si", "sí"),
-        "ia_activa": bool(os.environ.get("GEMINI_API_KEY")),
+        # ¿Lo que se envía al modelo se queda privado? Con Groq primero (no
+        # entrena ni guarda, por contrato) sí, sin pagar nada.
+        "ia_privada": _ia_privada(),
+        "ia_activa": bool(os.environ.get("GEMINI_API_KEY") or os.environ.get("GROQ_API_KEY")),
         # La versión publicada de la extensión. El panel la compara con
         # la que tiene cargada y avisa si va atrasado: sin eso, Ali probó
         # arreglos que su Chrome no había cargado y parecía que no
@@ -681,6 +692,15 @@ def cv_docx():
         return jsonify({"error": f"No se pudo generar el .docx: {e}"}), 500
 
     contenido = buffer.getvalue() if hasattr(buffer, "getvalue") else buffer.read()
+    # El mismo CV en PDF (Bumeran solo acepta PDF). Gratis: fpdf2 lo dibuja
+    # aquí mismo, sin Word ni LibreOffice. Mismo nombre, otra extensión.
+    if datos.get("formato") == "pdf":
+        try:
+            from harvard_pdf import pdf_en_bytes
+            contenido = pdf_en_bytes(adaptado)
+            nombre = nombre.rsplit(".", 1)[0] + ".pdf"
+        except Exception as e:
+            return jsonify({"error": f"No se pudo generar el PDF: {e}"}), 500
     return jsonify({
         "nombre": nombre,
         "bytes": len(contenido),
@@ -738,6 +758,84 @@ def operacion_ia(operacion):
     if error:
         return jsonify({"error": error}), codigo
     return jsonify(resultado)
+
+
+# ---------------------------------------------------------------------------
+# Saldo y packs (sin pasarela: Yape/Plin y acreditación manual en /admin)
+# ---------------------------------------------------------------------------
+
+@app.get("/api/saldo")
+@con_sesion
+def ver_saldo():
+    import saldo
+    return jsonify({"disponibles": saldo.disponibles(g.usuario["id"]), "cobrando": saldo.cobrando()})
+
+
+@app.post("/api/saldo/usar")
+@con_sesion
+def usar_saldo():
+    import saldo
+    n = max(1, min(5, int((request.get_json(silent=True) or {}).get("n") or 1)))
+    ok, quedan = saldo.usar(g.usuario["id"], n)
+    if not ok:
+        return jsonify({"error": "Se te acabaron las postulaciones. Recarga un pack.", "disponibles": quedan}), 402
+    return jsonify({"disponibles": quedan, "cobrando": saldo.cobrando()})
+
+
+def _es_admin():
+    """La clave de administración (ADMIN_CLAVE en Vercel), comparada sin
+    filtrar por tiempos. Sin ADMIN_CLAVE puesta, /admin no hace nada."""
+    import hmac
+    clave = os.environ.get("ADMIN_CLAVE", "")
+    dada = request.headers.get("X-Admin", "")
+    return bool(clave) and len(clave) >= 12 and hmac.compare_digest(clave, dada)
+
+
+@app.get("/admin")
+def admin():
+    return render_template("admin.html")
+
+
+@app.post("/api/admin/acreditar")
+def admin_acreditar():
+    # Mismo límite que las contraseñas: adivinar la clave a fuerza bruta no sale gratis.
+    if not _pasa_cuenta():
+        return jsonify({"error": "Demasiados intentos. Espera unos minutos."}), 429
+    if not _es_admin():
+        return jsonify({"error": "Clave de administración incorrecta."}), 401
+    import saldo
+    d = request.get_json(silent=True) or {}
+    try:
+        cuantas = int(d.get("postulaciones") or 0)
+    except (TypeError, ValueError):
+        cuantas = 0
+    if not (0 < cuantas <= 1000) or "@" not in str(d.get("correo") or ""):
+        return jsonify({"error": "Pon un correo y un número de postulaciones válido."}), 400
+    ok, mensaje, total = saldo.acreditar(d.get("correo"), cuantas, d.get("soles") or 0, d.get("nota") or "")
+    return (jsonify({"mensaje": mensaje, "total": total}), 200) if ok else (jsonify({"error": mensaje}), 400)
+
+
+@app.get("/api/mantener")
+def mantener():
+    """Lo llama el cron diario de Vercel (vercel.json). Gratis y necesario.
+
+    El plan gratuito de Supabase PAUSA el proyecto tras 7 días sin
+    actividad, y pausado se cae todo (cuentas, historial) hasta que alguien
+    lo reactiva a mano. Una consulta al día lo mantiene despierto. De paso
+    se borra la cuota de IA vieja, que no sirve para nada.
+
+    Con CRON_SECRET puesto en Vercel, solo el cron puede llamarlo.
+    """
+    secreto = os.environ.get("CRON_SECRET", "")
+    if secreto and request.headers.get("Authorization", "") != f"Bearer {secreto}":
+        return jsonify({"error": "No autorizado."}), 401
+    import nube
+    if not nube.activa():
+        return jsonify({"ok": False, "motivo": "sin base"}), 200
+    vivo = nube._pedir("GET", "eventos?select=id&limit=1") is not None
+    hace3 = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime(time.time() - 3 * 86400))
+    nube._pedir("DELETE", f"uso_ia?creado=lt.{hace3}", None, {"Prefer": "return=minimal"})
+    return jsonify({"ok": vivo})
 
 
 @app.errorhandler(413)

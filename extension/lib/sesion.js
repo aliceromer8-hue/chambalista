@@ -200,6 +200,30 @@ export async function bajarPostulaciones() {
 }
 
 
+// ---------------------------------------------------------------------
+// Saldo de postulaciones (packs por Yape/Plin, ver saldo.py)
+// ---------------------------------------------------------------------
+
+/** { disponibles, cobrando } o null si no se pudo leer. */
+export async function saldo() {
+  if (!(await hayCuenta())) return null;
+  try {
+    const r = await conCuenta("/api/saldo");
+    return r.ok ? await r.json() : null;
+  } catch { return null; }
+}
+
+/** Descuenta UNA postulación enviada. Solo se llama si salió de verdad. */
+export async function usarSaldo() {
+  if (!(await hayCuenta())) return null;
+  try {
+    const r = await conCuenta("/api/saldo/usar", {
+      method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ n: 1 }),
+    });
+    return await r.json().catch(() => null);
+  } catch { return null; }
+}
+
 /** El usuario de la cuenta tal como está guardado: id, correo, nombre. */
 export async function usuario() {
   return (await obtener())?.usuario || null;

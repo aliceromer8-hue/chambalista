@@ -38,7 +38,7 @@ function sufijoDe(vacante) {
  * Devolver null es una respuesta válida: significa "postula con el CV
  * que el portal ya tiene", que es lo que pasaba siempre hasta ahora.
  */
-export async function docxAdaptado(perfil, vacante, { resumen, competenciasExtra } = {}) {
+export async function docxAdaptado(perfil, vacante, { resumen, competenciasExtra, formato } = {}) {
   if (!perfil) return null;
   try {
     // Por conCuenta y no por fetch pelado: /api/cv/docx pide sesión, y
@@ -56,6 +56,7 @@ export async function docxAdaptado(perfil, vacante, { resumen, competenciasExtra
         // El puesto sí puede salir en el nombre —«CV Alice Romero -
         // Marketing» lo escribe mucha gente—; la empresa, no.
         puesto: vacante?.titulo || null,
+        formato: formato === "pdf" ? "pdf" : "docx",
       }),
     });
     if (!r.ok) return { error: `El servidor respondió ${r.status}` };

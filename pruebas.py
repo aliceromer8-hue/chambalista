@@ -1470,5 +1470,69 @@ _claves = _sp.run(["git", "grep", "-nE", r"AIza[0-9A-Za-z_-]{30,}|sb_secret_[0-9
                   capture_output=True, text=True).stdout.strip()
 check("ninguna clave escrita en el repositorio", not _claves, _claves[:120])
 
+
+# ---------------------------------------------------------------------
+titulo("SIN COSTO — IA en cadena, PDF, mantenimiento, saldo")
+# ---------------------------------------------------------------------
+# Ali, 2026-10-02: «todas las soluciones posibles sin costo económico».
+import os as _os
+import unittest.mock as _mk9
+import redactor_ia as _ri
+
+with _mk9.patch.dict(_os.environ, {"GEMINI_API_KEY": "g", "GROQ_API_KEY": "q", "GEMINI_FACTURACION": ""}, clear=False), \
+     _mk9.patch.object(_ri, "_ollama_modelo", lambda: None):
+    _orden = [n for n, _ in _ri.cadena()]
+    check("sin facturación, Groq (privado y gratis) va antes que Gemini gratis",
+          _orden[:2] == ["groq", "gemini"] and _orden[-1] == "groq", str(_orden))
+    check("y la IA cuenta como privada", _ri.privada() is True)
+    _llamadas = []
+    def _falla(*a, **k):
+        _llamadas.append("groq70")
+        raise _ri.urllib.error.URLError("429")
+    def _gem(*a, **k):
+        _llamadas.append("gemini")
+        return "respuesta de gemini"
+    with _mk9.patch.object(_ri, "_con_groq", _falla), _mk9.patch.object(_ri, "_con_gemini", _gem):
+        _txt, _quien = _ri._primero_que_responda("hola")
+    check("si Groq se agota, responde el siguiente", _txt == "respuesta de gemini" and _quien == "gemini", str(_llamadas))
+
+with _mk9.patch.dict(_os.environ, {"GEMINI_API_KEY": "g", "GROQ_API_KEY": "q", "GEMINI_FACTURACION": "1"}, clear=False), \
+     _mk9.patch.object(_ri, "_ollama_modelo", lambda: None):
+    check("con facturación, Gemini (que entonces no entrena) va primero", _ri.cadena()[0][0] == "gemini")
+
+import harvard_pdf as _hp
+_pdf = _hp.pdf_en_bytes({"nombre": "Ana Pérez Núñez", "contacto": {"email": "a@b.pe"},
+                         "perfil": ["Estudiante de 10.º ciclo — busco prácticas “de verdad”."],
+                         "experiencia": [{"organizacion": "Empresa", "lugar": "Lima", "cargo": "Practicante",
+                                          "fechas": "2025 – 2026", "logros": ["Logré algo • medible"]}]})
+check("el CV en PDF se genera gratis, con tildes y signos raros", _pdf[:5] == b"%PDF-" and len(_pdf) > 800)
+check("y está en las dependencias de Vercel", "fpdf2" in pathlib.Path("requirements-web.txt").read_text(encoding="utf-8"))
+
+_c9 = app_web.app.test_client()
+_vj = json.loads(pathlib.Path("vercel.json").read_text(encoding="utf-8"))
+check("un cron diario mantiene despierta la base (Supabase pausa a los 7 días)",
+      any(c.get("path") == "/api/mantener" for c in _vj.get("crons", [])))
+with _mk9.patch.dict(_os.environ, {"CRON_SECRET": "secreto-del-cron"}, clear=False):
+    check("solo el cron puede llamarlo", _c9.get("/api/mantener").status_code == 401)
+
+import saldo as _sal
+with _mk9.patch.dict(_os.environ, {"COBRAR": ""}, clear=False):
+    check("mientras no se cobra, el saldo no frena a nadie", _sal.usar("11111111-2222-3333-4444-555555555555")[0] is True)
+with _mk9.patch.dict(_os.environ, {"COBRAR": "1"}, clear=False), \
+     _mk9.patch.object(_sal, "disponibles", lambda u: 0):
+    check("cobrando y sin saldo, no se envía", _sal.usar("11111111-2222-3333-4444-555555555555")[0] is False)
+check("un id raro no llega a la base", _sal.disponibles("1' or 1=1") is None)
+with _mk9.patch.dict(_os.environ, {"ADMIN_CLAVE": "una-clave-larga-de-prueba"}, clear=False):
+    check("/admin rechaza una clave equivocada",
+          _c9.post("/api/admin/acreditar", json={"correo": "a@b.pe", "postulaciones": 100},
+                   headers={"X-Admin": "otra"}).status_code == 401)
+with _mk9.patch.dict(_os.environ, {"ADMIN_CLAVE": ""}, clear=False):
+    check("sin ADMIN_CLAVE puesta, /admin no acredita nada",
+          _c9.post("/api/admin/acreditar", json={"correo": "a@b.pe", "postulaciones": 100},
+                   headers={"X-Admin": ""}).status_code in (401, 429))
+check("la página de admin no se indexa ni lleva scripts en línea",
+      "noindex" in (_adm := pathlib.Path("templates/admin.html").read_text(encoding="utf-8")) and "<script>" not in _adm)
+check("hay migración para saldos y pagos", pathlib.Path("supabase/006-saldos.sql").exists())
+
 print(f"\n{'TODO OK' if fallos == 0 else f'{fallos} FALLO(S)'}")
 sys.exit(1 if fallos else 0)

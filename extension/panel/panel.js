@@ -2238,10 +2238,9 @@ $("#archivo-cv").addEventListener("change", async (e) => {
 // ── Ver tu CV en formato Harvard ──
 // Antes era un enlace a una dirección vieja que ya no existe: «no me lleva
 // a ningún lado» (Ali, 2026-09-25). Ahora se ve aquí y se descarga.
-async function bajarDocx(doc) {
+async function bajarDocx(doc, tipo = "application/vnd.openxmlformats-officedocument.wordprocessingml.document") {
   const bytes = Uint8Array.from(atob(doc.base64), (ch) => ch.charCodeAt(0));
-  const url = URL.createObjectURL(new Blob([bytes],
-    { type: "application/vnd.openxmlformats-officedocument.wordprocessingml.document" }));
+  const url = URL.createObjectURL(new Blob([bytes], { type: tipo }));
   const a = document.createElement("a");
   a.href = url;
   a.download = doc.nombre || "CV.docx";
@@ -2264,7 +2263,17 @@ $("#btn-ver-harvard")?.addEventListener("click", async () => {
   } catch { /* se dice abajo */ }
   $("#modal-contenido").innerHTML = `<h2>Tu CV en formato Harvard</h2>
     ${html ? `<div class="hoja-harvard">${html}</div>` : `<p class="aviso alerta">No se pudo generar la vista previa ahora. Prueba en un momento.</p>`}
-    <div class="fila-botones vista-acciones"><button class="boton primario" id="bajar-harvard">Descargar en Word</button></div>`;
+    <div class="fila-botones vista-acciones"><button class="boton primario" id="bajar-harvard">Descargar en Word</button>
+      <button class="boton secundario" id="bajar-harvard-pdf">Descargar en PDF</button></div>`;
+  $("#bajar-harvard-pdf").addEventListener("click", async (ev) => {
+    const b = ev.currentTarget;
+    b.disabled = true; b.textContent = "Generando…";
+    const doc = await cv.docxAdaptado(perfil, null, { formato: "pdf" });
+    b.disabled = false; b.textContent = "Descargar en PDF";
+    if (!doc || doc.error) { avisar(doc?.error || "No se pudo generar el PDF.", "mal"); return; }
+    await bajarDocx(doc, "application/pdf");
+    avisar("CV en PDF descargado", "bien");
+  });
   $("#bajar-harvard").addEventListener("click", async (ev) => {
     const b = ev.currentTarget;
     b.disabled = true; b.textContent = "Generando…";
@@ -2562,8 +2571,27 @@ function preguntarCV(alSeguir) {
 
 const NOMBRE_CV = { portal: "el de cada portal", harvard: "el de Chamba Lista", adaptado: "uno adaptado a cada vacante" };
 
+/** Cuántas postulaciones te quedan (solo si se está cobrando). */
+async function pintarSaldo() {
+  const s = await sesion.saldo().catch(() => null);
+  let el = $("#saldo-barra");
+  if (!s?.cobrando || s.disponibles == null) { el?.remove(); return; }
+  if (!el) {
+    el = document.createElement("a");
+    el.id = "saldo-barra";
+    el.className = "saldo-barra";
+    el.target = "_blank";
+    el.rel = "noopener";
+    el.href = `${SERVIDOR}/#precios`;
+    $("#acciones-lote .acciones-derecha")?.prepend(el);
+  }
+  el.classList.toggle("agotado", s.disponibles <= 0);
+  el.textContent = s.disponibles > 0 ? `Te quedan ${s.disponibles}` : "Sin saldo · recargar";
+}
+
 /** Con qué CV se va a postular, a la vista junto al botón de postular. */
 async function pintarCVBarra() {
+  pintarSaldo();
   const b = $("#cv-elegido");
   if (!b) return;
   const e = await cvElegido();

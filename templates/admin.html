@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>Chamba Lista — Acreditar packs</title>
+<link rel="stylesheet" href="/static/css/web.css">
+</head>
+<body>
+<main style="max-width:520px;margin:40px auto;padding:0 16px">
+  <p class="titulo-seccion">Solo para Chamba Lista</p>
+  <h1 style="font-size:1.8rem">Acreditar un pack</h1>
+  <p class="nota">Cuando llegue un Yape o Plin con su captura: pon el correo de la cuenta que aparece en el mensaje del pago y el pack. Se suma a lo que ya tenga.</p>
+  <form id="form-acreditar" class="campo" autocomplete="off">
+    <label class="campo">Clave de administración
+      <input type="password" id="adm-clave" required minlength="12" autocomplete="off">
+    </label>
+    <label class="campo">Correo de la cuenta
+      <input type="email" id="adm-correo" required>
+    </label>
+    <label class="campo">Pack
+      <select id="adm-pack" style="display:block;width:100%;margin-top:6px;padding:11px 13px;border:2px solid #131316;border-radius:9px;font:inherit">
+        <option value="100|29">100 postulaciones · S/ 29</option>
+        <option value="30|15">30 postulaciones · S/ 15</option>
+        <option value="5|0">5 de regalo · S/ 0</option>
+      </select>
+    </label>
+    <label class="campo">Nota (opcional, p. ej. número de operación)
+      <input type="text" id="adm-nota" maxlength="200">
+    </label>
+    <div class="acciones-cuenta"><button class="boton primario" type="submit" id="adm-enviar">Acreditar</button></div>
+    <p class="nota" id="adm-estado" role="status"></p>
+  </form>
+</main>
+<script src="/static/js/admin.js"></script>
+</body>
+</html>

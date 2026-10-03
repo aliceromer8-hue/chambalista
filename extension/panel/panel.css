@@ -1799,3 +1799,10 @@ main { max-width: 1120px; }
 @media (max-width: 560px) {
   .fila-v h3 { white-space: normal; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
 }
+
+/* Saldo de postulaciones, junto a «Postular» (solo cuando se cobra). */
+.saldo-barra {
+  font-size: 11.5px; font-weight: 800; text-decoration: none; color: var(--tinta);
+  background: var(--menta-suave); border: 1.5px solid var(--menta); border-radius: 99px; padding: 4px 10px;
+}
+.saldo-barra.agotado { background: var(--sol-suave); border-color: var(--sol); }
