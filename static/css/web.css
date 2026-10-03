@@ -602,7 +602,63 @@ dialog#dlg-pago h2 { font-size: 1.35rem; margin: 0 0 4px; }
 .pago-precio { font-size: 2.2rem; font-weight: 900; letter-spacing: -.03em; margin: 0 0 10px; }
 .pago-pasos { padding-left: 20px; display: grid; gap: 10px; font-size: 14px; line-height: 1.5; }
 
-.frase-precios { font-size: 17px; font-weight: 600; margin: 0 0 18px; max-width: 52ch; }
-.plan-ancla { font-size: 12px; font-weight: 800; margin: -4px 0 8px; color: var(--tinta-2); }
-.plan-prueba { background: var(--papel); border-style: dashed; }
-@media (min-width: 900px) { .rejilla-planes { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
+/* ══════════ precios (psicología de precios con datos verdaderos) ══════════ */
+.gratis-banda {
+  display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 14px;
+  border: 2px dashed var(--linea); border-radius: var(--r); background: var(--menta-suave);
+  padding: 16px 20px; margin: 0 0 16px;
+}
+.gratis-cifra { margin: 0; font-size: 15px; font-weight: 700; }
+.gratis-cifra b { font-size: 2.3rem; letter-spacing: -.04em; margin-right: 4px; vertical-align: -4px; }
+.gratis-texto { margin: 2px 0 0; font-size: 14px; color: var(--tinta-2); }
+.frase-precios { font-size: 16px; font-weight: 600; margin: 0 0 16px; max-width: 52ch; }
+.rejilla-planes { grid-template-columns: 1fr; align-items: stretch; }
+.plan-web .boton { margin-top: auto; }
+.plan-precio small { font-size: .42em; font-weight: 700; margin-right: 3px; vertical-align: .9em; letter-spacing: 0; }
+.plan-unidad b { color: var(--tinta); }
+.plan-web.elegido .plan-unidad b { color: #131316; }
+.plan-ahorro {
+  margin: 0; align-self: flex-start; font-size: 11.5px; font-weight: 800; background: #131316; color: var(--lima);
+  border-radius: 99px; padding: 3px 9px;
+}
+.plan-cinta {
+  margin: -32px 0 0; align-self: center; font-family: var(--mono); font-size: 10.5px; font-weight: 800;
+  letter-spacing: .14em; text-transform: uppercase; background: #131316; color: var(--lima);
+  border-radius: 99px; padding: 5px 12px;
+}
+.plan-web.elegido { position: relative; overflow: hidden; }
+/* Un brillo que cruza el recomendado al aparecer y al pasar el ratón. */
+.plan-web.elegido::after {
+  content: ""; position: absolute; inset: -40% auto -40% -60%; width: 40%; transform: rotate(18deg);
+  background: linear-gradient(90deg, transparent, rgba(255,255,255,.55), transparent);
+  animation: brillo 1.4s .6s ease-out both; pointer-events: none;
+}
+.plan-web.elegido:hover::after { animation: brillo 1.1s ease-out; }
+@keyframes brillo { from { left: -60%; } to { left: 130%; } }
+.plan-web { transition: transform .18s ease, box-shadow .18s ease; }
+.plan-web:hover { transform: translateY(-3px); }
+.incluye { margin: 16px 0 0; font-size: 14px; max-width: 70ch; }
+/* En el móvil, el recomendado primero; en pantalla ancha, al centro y más alto. */
+.plan-web.elegido { order: -1; overflow: visible; }
+.plan-web.elegido::after { display: none; }
+@media (min-width: 760px) {
+  .rejilla-planes { grid-template-columns: minmax(0, 1fr) minmax(0, 1.12fr) minmax(0, 1fr); align-items: center; padding-top: 14px; }
+  .plan-web.elegido { order: 0; padding-top: 30px; padding-bottom: 30px; overflow: hidden; }
+  .plan-web.elegido::after { display: block; }
+  .plan-cinta { margin: -16px 0 2px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .plan-web.elegido::after { animation: none; display: none; }
+  .plan-web, .plan-web:hover { transition: none; transform: none; }
+}
+.pago-precio small { font-size: .45em; margin-right: 3px; vertical-align: .8em; }
+.pago-op { margin-top: 10px; font-size: 13px; }
+
+/* /admin */
+.admin { max-width: 640px; margin: 40px auto; padding: 0 16px; }
+.admin h1 { font-size: 1.8rem; }
+.admin h2 { font-size: 1.2rem; margin-top: 34px; }
+.admin select { display: block; width: 100%; margin-top: 6px; padding: 11px 13px; border: 2px solid var(--linea); border-radius: 9px; font: inherit; }
+.admin-avisos { list-style: none; padding: 0; display: grid; gap: 8px; }
+.admin-avisos li { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; justify-content: space-between;
+  border: 2px solid var(--linea); border-radius: 10px; padding: 10px 12px; background: var(--papel-2); font-size: 13.5px; }

@@ -205,9 +205,10 @@ export async function bajarPostulaciones() {
 // ---------------------------------------------------------------------
 
 /**
- * { disponibles, cobrando, postulaciones, pase_activo, dias_pase, prueba,
- *   codigo, bono_referido } o null si no se pudo leer. `disponibles` es
- * "pase" mientras dura la prueba gratis o un pase; si no, un número.
+ * { plan: gratis|pack|pase|agotado, disponibles, cobrando, postulaciones,
+ *   regaladas, compradas, usadas, pase_activo, pase_hasta, dias_pase, codigo,
+ *   bono_referido, en_revision } o null si no se pudo leer. `disponibles`
+ * es "pase" mientras dura un pase; si no, un número.
  */
 export async function saldo() {
   if (!(await hayCuenta())) return null;
@@ -215,6 +216,18 @@ export async function saldo() {
     const r = await conCuenta("/api/saldo");
     return r.ok ? await r.json() : null;
   } catch { return null; }
+}
+
+/** «Ya yapeé»: deja el aviso para que se compruebe y se active. */
+export async function avisarPago(plan, operacion = "") {
+  if (!(await hayCuenta())) return { error: "Entra a tu cuenta primero." };
+  try {
+    const r = await conCuenta("/api/pago/aviso", {
+      method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ plan, operacion }),
+    });
+    const j = await r.json().catch(() => ({}));
+    return r.ok ? j : { error: j.error || "No se pudo avisar." };
+  } catch { return { error: "Sin conexión. Inténtalo otra vez." }; }
 }
 
 /** Descuenta UNA postulación enviada. Solo se llama si salió de verdad. */

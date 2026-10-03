@@ -2056,26 +2056,44 @@ titulo("LA PESTAÑA SIN CONTENT SCRIPT — el fallo mas probable del primer inte
 }
 
 {
-  titulo("SALDO — prueba gratis, pase, sin «recarga» y cómo seguir");
+  titulo("PLANES — 18 gratis, packs, pase, «Ya yapeé» y cómo cambia el panel");
   const fs = await import("node:fs/promises");
   const fondo = await fs.readFile(new URL("background.js", BASE), "utf8");
   const pjs = await fs.readFile(new URL("panel/panel.js", BASE), "utf8");
   const phtml = await fs.readFile(new URL("panel/panel.html", BASE), "utf8");
+  const css = await fs.readFile(new URL("panel/panel.css", BASE), "utf8");
+  const ses = await fs.readFile(new URL("lib/sesion.js", BASE), "utf8");
   check("ningún texto visible dice «recarga»",
     !/"[^"\n]*recarg[^"\n]*"|`[^`]*recarg[^`]*`/i.test((fondo + pjs).replace(/\/\*[\s\S]*?\*\//g, "").replace(/\s\/\/.*$/gm, "")) &&!/recarg/i.test(phtml.replace(/<!--[\s\S]*?-->/g, "")));
-  check("el aviso de sin saldo es una sola constante y el lote la reconoce",
-    /const SIN_SALDO = "Se terminó tu saldo/.test(fondo) && /sinSaldo === SIN_SALDO/.test(fondo));
-  check("sin saldo NO se marca «Mañana»: tiene su propio estado",
-    /estado = "sin_saldo"/.test(fondo) && /sin_saldo: "Sin saldo"/.test(pjs));
-  check("con pase o prueba el saldo muestra los días, no «Sin saldo»",
-    /disponibles === "pase"/.test(pjs) && /Prueba gratis · quedan/.test(pjs));
-  check("al quedarse sin saldo se abre «Seguir postulando» con el plan en la URL",
-    /momentoDeValor\(sinSaldo, exitos\)/.test(pjs) && /\?plan=100#precios/.test(pjs) && /\?plan=pase/.test(pjs));
-  check("y el aviso solo usa cifras de la tanda (nada de cupos ni relojes)",
-    !/cupos|últimas horas|solo hoy|oferta termina/i.test(pjs.slice(pjs.indexOf("async function momentoDeValor"), pjs.indexOf("async function copiarInvitacion"))));
+  check("el aviso de sin postulaciones es una sola constante y el lote la reconoce",
+    /const SIN_SALDO = "Se terminaron tus postulaciones/.test(fondo) && /sinSaldo === SIN_SALDO/.test(fondo));
+  check("las frenadas por saldo quedan «En espera», no «Mañana»",
+    /estado = "sin_saldo"/.test(fondo) && /sin_saldo: "En espera"/.test(pjs));
+  check("cada etapa tiene su forma: gratis «12 de 18», pack, pase en días, agotado",
+    /Gratis · \$\{n\} de \$\{s\.regaladas\}/.test(pjs) && /Pase · \$\{dias\}/.test(pjs)
+    && /s\.plan === "pase"/.test(pjs) && /s\.plan === "gratis"/.test(pjs) && /s\.plan === "pack"/.test(pjs));
+  check("la píldora avisa en ámbar cuando quedan pocas (sin modales ni presión)", /poco: n <= 3/.test(pjs) && /\.saldo-barra\.poco/.test(css));
+  check("la píldora abre los planes dentro del panel", /el\.addEventListener\("click", \(\) => abrirPlanes\(\)\)/.test(pjs));
+  check("al quedarse sin postulaciones a media tanda, aviso con los planes",
+    /momentoDeValor\(sinSaldo, exitos\)/.test(pjs) && /function momentoDeValor[\s\S]{0,1500}abrirPlanes\(/.test(pjs));
+  check("si el pago se activó durante la tanda, no se vuelve a vender: se ofrece seguir",
+    /s\.plan !== "agotado"\) \{[\s\S]{0,700}Ya tienes postulaciones para seguir/.test(pjs) && /pintarSaldo\(\)\.then\(/.test(pjs));
+  check("se paga sin salir del panel: Yape, copiar número y «Ya yapeé»",
+    /async function pagarPlan/.test(pjs) && /Ya yapeé/.test(pjs) && /sesion\.avisarPago\(/.test(pjs)
+    && /export async function avisarPago/.test(ses));
+  check("con el pago en revisión se mira cada minuto si ya se activó", /setInterval\(pintarSaldo, 60000\)/.test(pjs));
+  check("al activarse se celebra y se ofrece seguir con las que quedaron en espera",
+    /function detectarActivacion/.test(pjs) && /btn-seguir-espera/.test(pjs) && /\$\("#btn-reanudar-lote"\)\.click\(\)/.test(pjs));
+  check("sin postulaciones, la tanda ni empieza: se abren los planes", /s\.plan === "agotado"\) \{\s*abrirPlanes/.test(pjs));
+  check("con pocas, primero las que mejor encajan", /sort\(\(a, b\) => \(b\.encaje\?\.puntaje/.test(pjs));
+  check("los planes del panel cuadran con los de la web (29, 39, 15)",
+    /"100": \{[^}]*soles: 29/.test(pjs) && /pase: \{[^}]*soles: 39/.test(pjs) && /"30": \{[^}]*soles: 15/.test(pjs));
+  check("los textos de planes no usan cupos, relojes ni «el más vendido»",
+    !/cupos|últimas horas|solo hoy|oferta termina|más vendido|más elegido/i.test(pjs.slice(pjs.indexOf("const PLANES_EXT"), pjs.indexOf("let _relojPago"))));
   check("lo que dice el aviso es cierto: las frenadas por saldo se pueden reanudar",
     /\["pendiente", "sin_saldo"\]\.includes\(i\.estado\)/.test(pjs));
-  check("Mi perfil trae tu enlace para invitar", /id="invitar"/.test(phtml) && /\?ref=\$\{encodeURIComponent/.test(pjs));
+  check("Mi perfil trae «Tu plan» con tu enlace para invitar",
+    /id="tu-plan"/.test(phtml) && /id="invitar"/.test(phtml) && /\?ref=\$\{encodeURIComponent/.test(pjs));
 }
 
 {

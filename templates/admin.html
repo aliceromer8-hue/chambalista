@@ -8,29 +8,37 @@
 <link rel="stylesheet" href="/static/css/web.css">
 </head>
 <body>
-<main style="max-width:520px;margin:40px auto;padding:0 16px">
+<main class="admin">
   <p class="titulo-seccion">Solo para Chamba Lista</p>
-  <h1 style="font-size:1.8rem">Acreditar un pack</h1>
-  <p class="nota">Cuando llegue un Yape o Plin con su captura: pon el correo de la cuenta que aparece en el mensaje del pago y el pack. Se suma a lo que ya tenga.</p>
-  <form id="form-acreditar" class="campo" autocomplete="off">
-    <label class="campo">Clave de administración
-      <input type="password" id="adm-clave" required minlength="12" autocomplete="off">
-    </label>
+  <h1>Pagos por activar</h1>
+  <p class="nota">Cada fila es alguien que pulsó «Ya yapeé». <b>Compruébalo en tu Yape</b> (monto y nombre)
+    antes de activar: el aviso no prueba nada por sí solo.</p>
+
+  <label class="campo">Clave de administración
+    <input type="password" id="adm-clave" required minlength="12" autocomplete="off">
+  </label>
+  <div class="acciones-cuenta"><button class="boton secundario" type="button" id="adm-ver">Ver avisos</button></div>
+  <ul class="admin-avisos" id="adm-avisos" aria-live="polite"></ul>
+
+  <h2>Activar a mano</h2>
+  <p class="nota">Si alguien pagó sin pulsar «Ya yapeé»: su correo y el plan.</p>
+  <form id="form-acreditar" autocomplete="off">
+    <input type="hidden" id="adm-aviso">
     <label class="campo">Correo de la cuenta
       <input type="email" id="adm-correo" required>
     </label>
-    <label class="campo">Pack
-      <select id="adm-pack" style="display:block;width:100%;margin-top:6px;padding:11px 13px;border:2px solid #131316;border-radius:9px;font:inherit">
+    <label class="campo">Plan
+      <select id="adm-pack">
         <option value="100|29|0">Pack de 100 postulaciones · S/ 29</option>
-        <option value="30|15|0">Pack de 30 postulaciones · S/ 15</option>
         <option value="0|39|30">Pase de 30 días · S/ 39</option>
+        <option value="30|15|0">Pack de 30 postulaciones · S/ 15</option>
         <option value="10|0|0">Regalo: 10 postulaciones · S/ 0</option>
       </select>
     </label>
     <label class="campo">Nota (opcional, p. ej. número de operación)
       <input type="text" id="adm-nota" maxlength="200">
     </label>
-    <div class="acciones-cuenta"><button class="boton primario" type="submit" id="adm-enviar">Acreditar</button></div>
+    <div class="acciones-cuenta"><button class="boton primario" type="submit" id="adm-enviar">Activar</button></div>
     <p class="nota" id="adm-estado" role="status"></p>
   </form>
 </main>

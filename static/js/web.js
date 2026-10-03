@@ -522,6 +522,7 @@ $("#form-cuenta").addEventListener("submit", async (ev) => {
     pintarCuenta();
     canjearReferido();
     $("#dlg-cuenta").close();
+    planPendiente();
     $("#contrasena").value = "";
     // Si ya venía trabajando sin cuenta, ese CV es el bueno y se sube.
     // Si llega en blanco, se baja el que tuviera guardado. Así entrar
@@ -682,45 +683,90 @@ restaurarTrabajo();
 
 
 // ---------- pagar un pack o el pase ----------
-// Yape o Plin: una transferencia entre personas, sin comisión. El número
-// lo da el servidor (PAGO_YAPE); si aún no está, se pide escribir al correo.
-async function abrirPago(b) {
-  const dlg = document.querySelector("#dlg-pago");
-  const pase = b.dataset.pase;
-  document.querySelector("#pago-que").textContent = pase
-    ? `Pase de ${pase} días` : `Pack de ${b.dataset.pack} postulaciones`;
-  document.querySelector("#pago-soles").textContent = b.dataset.soles;
-  document.querySelectorAll(".pago-soles2").forEach((s) => { s.textContent = b.dataset.soles; });
-  document.querySelector("#pago-pie").textContent = pase
-    ? "Empieza el día que lo activamos. No se renueva solo."
+// Yape o Plin: una transferencia entre personas, sin comisión. Los planes y
+// el número los da el servidor (/api/estado). «Ya yapeé» deja un aviso que
+// Ali comprueba en su Yape y activa con un clic; la extensión avisa sola.
+const PLANES_POR_DEFECTO = {
+  "100": { nombre: "Pack de 100 postulaciones", postulaciones: 100, dias: 0, soles: 29 },
+  pase: { nombre: "Pase de 30 días", postulaciones: 0, dias: 30, soles: 39 },
+  "30": { nombre: "Pack de 30 postulaciones", postulaciones: 30, dias: 0, soles: 15 },
+};
+let planElegido = null;
+
+async function abrirPago(plan) {
+  let info = {};
+  try { info = await (await fetch("/api/estado")).json(); } catch { /* sin red */ }
+  const planes = info.planes || PLANES_POR_DEFECTO;
+  const p = planes[plan] || PLANES_POR_DEFECTO[plan];
+  if (!p) return;
+  planElegido = plan;
+  const pago = info.pago || {};
+  $("#pago-que").textContent = p.nombre;
+  $("#pago-soles").textContent = p.soles;
+  document.querySelectorAll(".pago-soles2").forEach((s) => { s.textContent = p.soles; });
+  $("#pago-pie").textContent = p.dias
+    ? "Empieza el día que lo activamos. Termina a los 30 días y no se renueva solo."
     : "No caducan y no se renuevan solos: pagas una vez.";
-  let pago = {};
-  try { pago = (await (await fetch("/api/estado")).json()).pago || {}; } catch { /* sin red */ }
-  const destino = document.querySelector("#pago-destino");
-  const copiar = document.querySelector("#pago-copiar");
-  destino.textContent = pago.yape
-    ? `al ${pago.yape}${pago.titular ? ` (${pago.titular})` : ""}`
-    : "— escríbenos al correo de abajo y te mandamos el número";
+  $("#pago-destino").textContent = pago.yape
+    ? `al ${pago.yape}${pago.titular ? ` (${pago.titular})` : ""}.`
+    : "— escríbenos al correo de abajo y te pasamos el número.";
+  const copiar = $("#pago-copiar");
+  copiar.textContent = "Copiar número";
   copiar.classList.toggle("oculto", !pago.yape);
   copiar.onclick = async () => {
     try { await navigator.clipboard.writeText(pago.yape); copiar.textContent = "¡Copiado!"; }
     catch { copiar.textContent = pago.yape; }
   };
-  const asunto = encodeURIComponent(pase ? `Pase de ${pase} días` : `Pack de ${b.dataset.pack} postulaciones`);
-  document.querySelector("#pago-correo").href = `mailto:${pago.correo || "chambalistaperu@gmail.com"}?subject=${asunto}`;
-  dlg.showModal();
+  $("#pago-estado").textContent = "";
+  $("#pago-listo").disabled = false;
+  // Sin número de Yape aún no hay qué avisar: solo el correo.
+  $("#pago-listo").classList.toggle("oculto", !pago.yape);
+  $(".pago-op").classList.toggle("oculto", !pago.yape);
+  $("#pago-correo").href = `mailto:${pago.correo || "chambalistaperu@gmail.com"}?subject=${encodeURIComponent(p.nombre)}`;
+  $("#dlg-pago").showModal();
 }
-document.querySelectorAll(".btn-pack").forEach((b) => b.addEventListener("click", () => abrirPago(b)));
-document.querySelector("#pago-cerrar")?.addEventListener("click", () => document.querySelector("#dlg-pago").close());
 
-// La extensión manda aquí con ?plan=100 / ?plan=pase cuando se termina el
-// saldo: se abre directo el pago de ese plan.
-(() => {
-  const plan = new URLSearchParams(location.search).get("plan");
-  if (!plan) return;
-  const b = document.querySelector(plan === "pase" ? ".btn-pack[data-pase]" : `.btn-pack[data-pack="${CSS.escape(plan)}"]`);
-  if (b) setTimeout(() => abrirPago(b), 400);
-})();
+$("#pago-listo")?.addEventListener("click", async () => {
+  const boton = $("#pago-listo");
+  if (!sesion()) {
+    // El aviso va a TU cuenta: primero entrar, luego se vuelve aquí.
+    $("#dlg-pago").close();
+    try { sessionStorage.setItem("chamba_plan", planElegido); } catch { /* privado */ }
+    abrirCuenta(false);
+    return;
+  }
+  boton.disabled = true;
+  $("#pago-estado").textContent = "Avisando…";
+  try {
+    const r = await conCuenta("/api/pago/aviso", {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ plan: planElegido, operacion: $("#pago-operacion").value.trim() }),
+    });
+    const j = await r.json().catch(() => ({}));
+    $("#pago-estado").textContent = j.mensaje || j.error || "No se pudo avisar. Escríbenos al correo de abajo.";
+    if (r.ok) boton.classList.add("oculto"); else boton.disabled = false;
+  } catch {
+    $("#pago-estado").textContent = "Sin conexión. Inténtalo otra vez o escríbenos al correo de abajo.";
+    boton.disabled = false;
+  }
+});
+document.querySelectorAll(".btn-pack").forEach((b) => b.addEventListener("click", () => abrirPago(b.dataset.plan)));
+$("#pago-cerrar")?.addEventListener("click", () => $("#dlg-pago").close());
+$("#btn-gratis")?.addEventListener("click", () => {
+  if (sesion()) { $("#zona-1")?.scrollIntoView({ behavior: "smooth" }); return; }
+  abrirCuenta(true);
+});
+
+// La extensión manda aquí con ?plan=100|pase|30: se abre directo ese pago.
+// Si hubo que entrar a la cuenta a medio pago, se reabre al volver.
+function planPendiente() {
+  let plan = new URLSearchParams(location.search).get("plan");
+  if (!plan) { try { plan = sessionStorage.getItem("chamba_plan"); } catch { /* privado */ } }
+  if (!plan || !PLANES_POR_DEFECTO[plan]) return;
+  try { sessionStorage.removeItem("chamba_plan"); } catch { /* privado */ }
+  setTimeout(() => abrirPago(plan), 400);
+}
+planPendiente();
 
 // ---------- invitaciones ----------
 // ?ref=CODIGO se guarda al llegar y se canjea en cuanto haya sesión:

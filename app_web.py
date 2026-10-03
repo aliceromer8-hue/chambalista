@@ -251,6 +251,9 @@ def estado():
             "titular": os.environ.get("PAGO_TITULAR", "").strip(),
             "correo": "chambalistaperu@gmail.com",
         },
+        # Los planes salen de saldo.PLANES: web, extensión y /admin dicen
+        # lo mismo sin copiar precios a mano en tres sitios.
+        "planes": _planes(),
         "limite": LIMITE_PETICIONES,
         "ventana_horas": round(VENTANA_SEGUNDOS / 3600, 1),
         "max_mb": 6,
@@ -764,12 +767,31 @@ def operacion_ia(operacion):
 # Saldo y packs (sin pasarela: Yape/Plin y acreditación manual en /admin)
 # ---------------------------------------------------------------------------
 
+def _planes():
+    import saldo
+    return {"gratis": saldo.GRATIS, "bono_referido": saldo.BONO_REFERIDO, **saldo.PLANES}
+
+
 @app.get("/api/saldo")
 @con_sesion
 def ver_saldo():
     import saldo
     e = saldo.estado(g.usuario["id"]) or {}
-    return jsonify({**e, "disponibles": saldo.disponibles(g.usuario["id"]), "cobrando": saldo.cobrando()})
+    disponibles = ("pase" if e.get("pase_activo") else e.get("postulaciones")) if e else None
+    return jsonify({**e, "disponibles": disponibles, "cobrando": saldo.cobrando(),
+                    "en_revision": saldo.aviso_pendiente(g.usuario["id"])})
+
+
+@app.post("/api/pago/aviso")
+@con_sesion
+def aviso_pago():
+    """«Ya yapeé». Solo deja el aviso para que Ali lo compruebe y acredite."""
+    import saldo
+    if not _pasa_cuenta():
+        return jsonify({"error": "Demasiados intentos. Espera unos minutos."}), 429
+    d = request.get_json(silent=True) or {}
+    ok, mensaje = saldo.avisar_pago(g.usuario.get("correo"), d.get("plan"), g.usuario["id"], d.get("operacion"))
+    return (jsonify({"mensaje": mensaje}), 200) if ok else (jsonify({"error": mensaje}), 400)
 
 
 @app.post("/api/saldo/referido")
@@ -790,7 +812,7 @@ def usar_saldo():
     n = max(1, min(5, int((request.get_json(silent=True) or {}).get("n") or 1)))
     ok, e = saldo.usar(g.usuario["id"], n)
     if not ok:
-        return jsonify({"error": "Se terminó tu saldo. Elige un pack o el pase y seguimos.", **(e or {})}), 402
+        return jsonify({"error": "Se terminaron tus postulaciones. Elige un pack o el pase y seguimos.", **(e or {})}), 402
     return jsonify({**(e or {}), "cobrando": saldo.cobrando()})
 
 
@@ -806,6 +828,17 @@ def _es_admin():
 @app.get("/admin")
 def admin():
     return render_template("admin.html")
+
+
+@app.get("/api/admin/avisos")
+def admin_avisos():
+    """Los «Ya yapeé» por comprobar. Con la misma clave que acreditar."""
+    if not _pasa_cuenta():
+        return jsonify({"error": "Demasiados intentos. Espera unos minutos."}), 429
+    if not _es_admin():
+        return jsonify({"error": "Clave de administración incorrecta."}), 401
+    import saldo
+    return jsonify({"avisos": saldo.avisos_pendientes(), "planes": saldo.PLANES})
 
 
 @app.post("/api/admin/acreditar")
@@ -824,7 +857,8 @@ def admin_acreditar():
         cuantas, dias = 0, 0
     if not (0 <= cuantas <= 1000 and 0 <= dias <= 365 and (cuantas or dias)) or "@" not in str(d.get("correo") or ""):
         return jsonify({"error": "Pon un correo y un pack o pase válido."}), 400
-    ok, mensaje, e = saldo.acreditar(d.get("correo"), cuantas, d.get("soles") or 0, d.get("nota") or "", dias)
+    ok, mensaje, e = saldo.acreditar(d.get("correo"), cuantas, d.get("soles") or 0, d.get("nota") or "", dias,
+                                     aviso=d.get("aviso"))
     return (jsonify({"mensaje": mensaje, "estado": e}), 200) if ok else (jsonify({"error": mensaje}), 400)
 
 

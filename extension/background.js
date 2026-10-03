@@ -741,7 +741,7 @@ const consentimientoCompleto = (a) => CONSENTIMIENTO.every((c) => a?.[c.clave] =
  * seguidas del mismo portal: las esperas de uno se solapan con el trabajo
  * en los otros, y ningún portal ve una ráfaga.
  */
-const SIN_SALDO = "Se terminó tu saldo. Elige un pack o el pase en la web y seguimos.";
+const SIN_SALDO = "Se terminaron tus postulaciones. Elige un plan y seguimos con estas.";
 
 /** Si enviar esta vacante pasaría un tope del día (o el saldo), por qué. Si no, null. */
 async function topeAlcanzado(vacante) {

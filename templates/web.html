@@ -99,65 +99,65 @@
        postulación es honesto: un señuelo que no cumple es otra cosa. -->
   <section class="precios entra entra-2" id="precios">
     <p class="titulo-seccion">Lo que cuesta</p>
-    <!-- Lo que se siente, dicho con verdad: cada día sin postular, esas
-         prácticas se las lleva otra persona. Sin contadores ni cupos
-         inventados (INDECOPI los sanciona y la gente los huele). -->
-    <p class="frase-precios">Cada día que no postulas, esa práctica se la lleva otra persona.
-      <b>Empieza hoy, gratis.</b></p>
+    <!-- Psicología de precios, siempre con datos verdaderos:
+         · lo gratis primero y como algo que YA es tuyo (efecto dotación);
+         · el pase a la izquierda: el primer precio que se ve hace de ancla;
+         · el pack de 100 en el centro y destacado (efecto centro);
+         · el de 30 hace de señuelo: 50 céntimos frente a 29 por postulación;
+         · el «S/» pequeño y el precio por unidad en céntimos y por día
+           (menos «dolor de pagar» sin esconder nada);
+         · todos traen lo mismo: solo se elige cuánto, no qué.
+         Nada de cupos, relojes, «el más vendido» ni reseñas inventadas. -->
+    <div class="gratis-banda">
+      <div>
+        <p class="gratis-cifra"><b>18</b> postulaciones</p>
+        <p class="gratis-texto">Tus primeras 18 van por nuestra cuenta. Con todo incluido.</p>
+      </div>
+      <button class="boton principal" type="button" id="btn-gratis">Empezar gratis</button>
+    </div>
+    <p class="frase-precios">Cada día que no postulas, esa práctica se la lleva otra persona.</p>
+
     <div class="rejilla-planes">
-      <div class="plan-web plan-prueba">
-        <p class="plan-rotulo">Para empezar</p>
-        <p class="plan-precio">Gratis</p>
-        <p class="plan-unidad">18 días, sin tarjeta</p>
+      <div class="plan-web plan-pase">
+        <p class="plan-rotulo">Para buscar a tope</p>
+        <p class="plan-precio"><small>S/</small>39</p>
+        <p class="plan-unidad">Pase de 30 días · <b>S/ 1.30 al día</b></p>
         <ul>
-          <li>Tu CV al formato que leen los portales</li>
-          <li><b>Postula gratis 18 días</b>, con el tope diario seguro</li>
-          <li>Buscar en los cuatro portales</li>
-          <li>Invita a alguien y ganan 10 postulaciones cada uno</li>
+          <li><b>Postula sin contar</b>, hasta 50 al día</li>
+          <li>Si te quedan postulaciones de un pack, se guardan</li>
+          <li>Termina a los 30 días. No se renueva solo</li>
         </ul>
+        <button class="boton secundario btn-pack" type="button" data-plan="pase">Elegir el pase</button>
       </div>
 
       <div class="plan-web elegido">
-        <p class="plan-rotulo">Recomendado</p>
-        <p class="plan-precio">S/ 29</p>
-        <p class="plan-unidad">100 postulaciones · S/ 0.29 cada una</p>
-        <p class="plan-ancla">≈ 25 horas de tu tiempo</p>
+        <p class="plan-cinta">Recomendado</p>
+        <p class="plan-rotulo">100 postulaciones</p>
+        <p class="plan-precio"><small>S/</small>29</p>
+        <p class="plan-unidad"><b>29 céntimos</b> por postulación</p>
+        <p class="plan-ahorro">42% menos por postulación que el pack de 30</p>
         <ul>
-          <li><b>100 postulaciones</b></li>
-          <li>Tu CV adaptado a cada vacante</li>
-          <li>Historial y seguimiento</li>
+          <li><b>≈ 25 horas</b> que no pasas llenando formularios</li>
+          <li>No caducan: úsalas a tu ritmo</li>
         </ul>
-        <p class="plan-pie">No caducan. Pagas una vez.</p>
-        <button class="boton primario btn-pack" type="button" data-pack="100" data-soles="29">Elegir este pack</button>
+        <button class="boton primario btn-pack" type="button" data-plan="100">Elegir 100</button>
       </div>
 
-      <div class="plan-web">
-        <p class="plan-rotulo">Para buscar a tope</p>
-        <p class="plan-precio">S/ 39</p>
-        <p class="plan-unidad">Pase de 30 días</p>
-        <p class="plan-ancla">hasta 50 postulaciones al día</p>
+      <div class="plan-web plan-chico">
+        <p class="plan-rotulo">30 postulaciones</p>
+        <p class="plan-precio"><small>S/</small>15</p>
+        <p class="plan-unidad">50 céntimos por postulación</p>
         <ul>
-          <li><b>Postula sin contar</b> durante 30 días</li>
-          <li>Tu CV adaptado a cada vacante</li>
-          <li>Con el tope diario que cuida tus cuentas</li>
+          <li>Para una búsqueda puntual</li>
+          <li>No caducan</li>
         </ul>
-        <button class="boton secundario btn-pack" type="button" data-pase="30" data-soles="39">Elegir el pase</button>
-      </div>
-
-      <div class="plan-web">
-        <p class="plan-rotulo">Pack chico</p>
-        <p class="plan-precio">S/ 15</p>
-        <p class="plan-unidad">30 postulaciones · S/ 0.50 cada una</p>
-        <ul>
-          <li><b>30 postulaciones</b></li>
-          <li>Tu CV adaptado a cada vacante</li>
-        </ul>
-        <button class="boton secundario btn-pack" type="button" data-pack="30" data-soles="15">Elegir este pack</button>
+        <button class="boton secundario btn-pack" type="button" data-plan="30">Elegir 30</button>
       </div>
     </div>
+    <p class="incluye">Cada postulación trae lo mismo, en todos los planes: <b>tu CV adaptado a la vacante,
+      sus preguntas respondidas y el seguimiento</b>. Pagas con Yape o Plin, una sola vez, sin suscripción.</p>
     <p class="comparacion">Una postulación a mano son quince o veinte minutos entre
-      buscarla, ajustar el CV y contestar sus preguntas. <b>Cien son más de veinticinco
-      horas.</b></p>
+      buscarla, ajustar el CV y contestar sus preguntas. <b>Cien son más de veinticinco horas.</b></p>
   </section>
 
   <!-- 1. Subir -->
@@ -304,17 +304,25 @@
 </footer>
 
 <!-- Pagar un pack: Yape o Plin, que es como se paga aquí. -->
-<dialog id="dlg-pago" aria-labelledby="pago-titulo">
-  <h2 id="pago-titulo"><span id="pago-que">Pack de 100 postulaciones</span></h2>
-  <p class="pago-precio">S/ <span id="pago-soles">29</span></p>
+<dialog id="dlg-pago" aria-labelledby="pago-que">
+  <p class="titulo-seccion" style="margin:0">Tu plan</p>
+  <h2 id="pago-que">Pack de 100 postulaciones</h2>
+  <p class="pago-precio"><small>S/</small><span id="pago-soles">29</span></p>
   <ol class="pago-pasos">
-    <li id="pago-paso-1">Yapea o plinea <b>S/ <span class="pago-soles2">29</span></b> <span id="pago-destino"></span>.
+    <li>Yapea o plinea <b>S/ <span class="pago-soles2">29</span></b> <span id="pago-destino"></span>
       <button class="enlace oculto" type="button" id="pago-copiar">Copiar número</button></li>
-    <li>En el mensaje del pago escribe el <b>correo de tu cuenta</b> de Chamba Lista.</li>
-    <li>Envía la captura a <a id="pago-correo" href="mailto:chambalistaperu@gmail.com">chambalistaperu@gmail.com</a>. Activamos tu pack en menos de 24 horas.</li>
+    <li>Pulsa <b>Ya yapeé</b>. Lo comprobamos y lo activamos en tu cuenta; la extensión te avisa.</li>
   </ol>
-  <p class="nota" id="pago-pie">No caduca y no se renueva solo: pagas una vez.</p>
-  <div class="acciones-cuenta"><button class="boton secundario" type="button" id="pago-cerrar">Cerrar</button></div>
+  <label class="campo pago-op">Número de operación (opcional, ayuda a encontrarlo)
+    <input type="text" id="pago-operacion" maxlength="30" inputmode="numeric" autocomplete="off">
+  </label>
+  <p class="nota" id="pago-estado" role="status"></p>
+  <p class="nota" id="pago-pie">No caducan y no se renuevan solos: pagas una vez.</p>
+  <div class="acciones-cuenta">
+    <button class="boton primario" type="button" id="pago-listo">Ya yapeé</button>
+    <button class="boton secundario" type="button" id="pago-cerrar">Cerrar</button>
+  </div>
+  <p class="nota">¿Algún problema? <a id="pago-correo" href="mailto:chambalistaperu@gmail.com">chambalistaperu@gmail.com</a></p>
 </dialog>
 
 <script src="/static/js/web.js"></script>

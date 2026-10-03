@@ -1779,8 +1779,20 @@ $("#btn-confirmar-auto").addEventListener("click", async () => {
 });
 
 async function arrancarLote(modo) {
-  const lista = vacantesParaLote();
+  let lista = vacantesParaLote();
   if (!lista.length) return;
+  const s = modo === "automatico" ? await sesion.saldo().catch(() => null) : null;
+  if (s?.cobrando && s.plan === "agotado") {
+    abrirPlanes({ eyebrow: `Tienes ${lista.length} vacante${lista.length === 1 ? "" : "s"} lista${lista.length === 1 ? "" : "s"}`,
+                  titulo: "Elige cómo seguir postulando",
+                  sub: "Se terminaron tus postulaciones. En cuanto se active tu plan, postulamos a estas." });
+    return;
+  }
+  if (s?.cobrando && typeof s.disponibles === "number" && s.disponibles < lista.length) {
+    // Las que alcanzan van a las que mejor encajan; el resto queda en espera.
+    lista = [...lista].sort((a, b) => (b.encaje?.puntaje ?? -1) - (a.encaje?.puntaje ?? -1));
+    avisar(`Te quedan ${s.disponibles}: empezamos por las que mejor encajan contigo.`, "bien");
+  }
   consola.limpiar();
   $("#progreso").classList.remove("oculto");
   $("#consola").classList.add("oculto");
@@ -1813,7 +1825,7 @@ async function arrancarLote(modo) {
 
 const DESENLACE = {
   enviada: "Enviada", preparada: "Lista", omitida: "Saltada", fallida: "No se pudo",
-  ya_postulada: "Ya la tenías", externa: "En su web", tope: "Mañana", sin_saldo: "Sin saldo",
+  ya_postulada: "Ya la tenías", externa: "En su web", tope: "Mañana", sin_saldo: "En espera",
 };
 
 /** Cada envío se celebra: el contador late, el avión sale y cae confeti. */
@@ -1900,56 +1912,252 @@ function seguirLote() {
         .filter(Boolean).join(" · ");
       pintarResultadoLote(s);
       pintarInicio();
+      // Primero el saldo: si un pago se activó durante la tanda, se celebra
+      // y se ofrece seguir; no se le vuelve a vender lo que ya compró.
       const sinSaldo = (s.items || []).filter((i) => i.estado === "sin_saldo").length;
-      if (sinSaldo) momentoDeValor(sinSaldo, exitos);
+      pintarSaldo().then(() => {
+        if (sinSaldo && $("#modal").classList.contains("oculto")) momentoDeValor(sinSaldo, exitos);
+      });
     }
   }, 1200);
 }
 
-/**
- * Se terminó el saldo a media tanda: justo cuando se ve que funciona.
- * Solo datos verdaderos de ESTA tanda (cuántas salieron, cuántas quedaron
- * esperando); nada de cupos ni relojes inventados.
- */
-async function momentoDeValor(quedan, enviadas) {
+// ---------------------------------------------------------------------
+// Planes: cómo se ve la extensión según lo que tengas
+// ---------------------------------------------------------------------
+//
+// Recorrido (Ali, 2026-10-02):
+//   gratis  → 18 postulaciones al crear la cuenta, con todo incluido.
+//             «Gratis · 12 de 18» junto a Postular; ámbar cuando quedan 3.
+//   agotado → la tanda se para ANTES de abrir la siguiente; lo que faltaba
+//             queda «En espera» y se abre «Quedan N vacantes que encajan
+//             contigo» con los planes. Elegir uno → Yape → «Ya yapeé».
+//   revisión→ «Pago en revisión» y el panel mira cada minuto si ya se activó.
+//   pack    → al activarse: «¡Listo! Sumamos 100» y, si había vacantes en
+//             espera, «Seguir con las N». «Te quedan 94».
+//   pase    → «Pase · 23 días»; las del pack se guardan para después;
+//             ámbar los últimos 3 días. Al terminar vuelve a pack o agotado.
+//
+// Todo con datos verdaderos: nada de cupos, relojes ni «el más vendido».
+
+const PLANES_EXT = {
+  "100": { nombre: "Pack de 100 postulaciones", corto: "100 postulaciones", soles: 29, unidad: "29 céntimos por postulación",
+           extra: "≈ 25 horas que no pasas llenando formularios · No caducan", cinta: "Recomendado" },
+  pase: { nombre: "Pase de 30 días", corto: "Pase de 30 días", soles: 39, unidad: "S/ 1.30 al día",
+          extra: "Postula sin contar, hasta 50 al día · No se renueva solo" },
+  "30": { nombre: "Pack de 30 postulaciones", corto: "30 postulaciones", soles: 15, unidad: "50 céntimos por postulación",
+          extra: "Para una búsqueda puntual · No caducan" },
+};
+
+let _infoPago = null;
+async function infoPago() {
+  if (_infoPago) return _infoPago;
+  try { _infoPago = await (await fetch(`${SERVIDOR}/api/estado`)).json(); } catch { _infoPago = {}; }
+  return _infoPago;
+}
+
+/** Los planes en el modal. `contexto` dice por qué se abre (lo que se enseña arriba). */
+async function abrirPlanes(contexto = {}) {
   const s = await sesion.saldo().catch(() => null);
   const invitar = s?.codigo ? `${SERVIDOR}/?ref=${encodeURIComponent(s.codigo)}` : "";
+  const tarjeta = (id) => {
+    const p = PLANES_EXT[id];
+    return `<button class="pe-plan${p.cinta ? " pe-elegido" : ""}" type="button" data-plan="${id}">
+        ${p.cinta ? `<span class="pe-cinta">${p.cinta}</span>` : ""}
+        <span class="pe-nombre">${p.corto}</span>
+        <span class="pe-precio"><small>S/</small>${p.soles}</span>
+        <span class="pe-unidad">${p.unidad}</span>
+        <span class="pe-extra">${p.extra}</span>
+      </button>`;
+  };
   $("#modal-contenido").innerHTML = `
     <div class="valor">
-      <p class="valor-eyebrow">${enviadas ? `Ya enviaste ${enviadas} en esta tanda` : "Tu tanda está lista"}</p>
-      <h2>Quedan ${quedan} vacante${quedan === 1 ? "" : "s"} que encajan contigo</h2>
-      <p class="nota">Se terminó tu saldo. Elige cómo seguir y Chamba Lista retoma donde se quedó:
-        estas mismas vacantes siguen aquí.</p>
-      <div class="valor-planes">
-        <a class="boton primario" target="_blank" rel="noopener" href="${SERVIDOR}/?plan=100#precios">Seguir postulando · 100 por S/ 29</a>
-        <a class="boton secundario" target="_blank" rel="noopener" href="${SERVIDOR}/?plan=pase#precios">Pase de 30 días · S/ 39</a>
-        <a class="enlace" target="_blank" rel="noopener" href="${SERVIDOR}/?plan=30#precios">o 30 por S/ 15</a>
-      </div>
-      ${invitar ? `<p class="nota valor-invita">¿Sin pagar ahora? Invita a alguien: ganan ${s.bono_referido || 10} postulaciones cada uno.
+      ${contexto.eyebrow ? `<p class="valor-eyebrow">${escapar(contexto.eyebrow)}</p>` : ""}
+      <h2>${escapar(contexto.titulo || "Elige cómo seguir postulando")}</h2>
+      ${contexto.sub ? `<p class="nota">${escapar(contexto.sub)}</p>` : ""}
+      <div class="pe-lista">${["100", "pase", "30"].map(tarjeta).join("")}</div>
+      <p class="nota">Cada postulación trae lo mismo en todos los planes: tu CV adaptado, sus preguntas
+        respondidas y el seguimiento. Pagas con Yape o Plin, una vez, sin suscripción.</p>
+      ${invitar ? `<p class="nota valor-invita">¿Sin pagar ahora? Invita a alguien: al entrar gana ${s.bono_referido || 10},
+        y tú otras ${s.bono_referido || 10} cuando envíe su primera.
         <button class="enlace" type="button" id="btn-copiar-invita">Copiar mi enlace</button></p>` : ""}
     </div>`;
   $("#btn-copiar-invita")?.addEventListener("click", (ev) => copiarInvitacion(invitar, ev.currentTarget));
+  document.querySelectorAll("#modal-contenido .pe-plan").forEach((b) =>
+    b.addEventListener("click", () => pagarPlan(b.dataset.plan, contexto)));
   $("#modal").classList.remove("oculto");
 }
 
-async function copiarInvitacion(enlace, boton) {
-  try { await navigator.clipboard.writeText(enlace); boton.textContent = "¡Copiado!"; }
-  catch { boton.textContent = enlace; }
+/** Paso 2 del modal: cómo pagar el plan elegido, sin salir del panel. */
+async function pagarPlan(id, contexto) {
+  const p = PLANES_EXT[id];
+  const pago = (await infoPago()).pago || {};
+  $("#modal-contenido").innerHTML = `
+    <div class="valor pe-pago">
+      <button class="enlace pe-volver" type="button" id="pe-volver">← Otros planes</button>
+      <p class="valor-eyebrow">Tu plan</p>
+      <h2>${p.nombre}</h2>
+      <p class="pe-precio grande"><small>S/</small>${p.soles}</p>
+      ${pago.yape ? `
+      <ol class="pe-pasos">
+        <li>Yapea o plinea <b>S/ ${p.soles}</b> al <b>${escapar(pago.yape)}</b>${pago.titular ? ` (${escapar(pago.titular)})` : ""}.
+          <button class="enlace" type="button" id="pe-copiar">Copiar número</button></li>
+        <li>Pulsa <b>Ya yapeé</b>. Lo comprobamos y lo activamos; aquí te avisamos.</li>
+      </ol>
+      <label class="pe-op">Número de operación (opcional)
+        <input type="text" id="pe-operacion" maxlength="30" inputmode="numeric" autocomplete="off"></label>
+      <button class="boton primario" type="button" id="pe-listo">Ya yapeé</button>`
+      : `<p class="nota">Escríbenos a <a href="mailto:${escapar(pago.correo || "chambalistaperu@gmail.com")}?subject=${encodeURIComponent(p.nombre)}">${escapar(pago.correo || "chambalistaperu@gmail.com")}</a>
+          y te pasamos el número de Yape.</p>`}
+      <p class="nota" id="pe-estado" role="status"></p>
+      <p class="nota">${p.soles === 39 ? "Empieza el día que lo activamos. Termina a los 30 días y no se renueva solo." : "No caducan y no se renuevan solos: pagas una vez."}</p>
+    </div>`;
+  $("#pe-volver").addEventListener("click", () => abrirPlanes(contexto));
+  $("#pe-copiar")?.addEventListener("click", (ev) => copiarInvitacion(pago.yape, ev.currentTarget));
+  $("#pe-listo")?.addEventListener("click", async (ev) => {
+    const b = ev.currentTarget;
+    b.disabled = true;
+    $("#pe-estado").textContent = "Avisando…";
+    const r = await sesion.avisarPago(id, $("#pe-operacion")?.value.trim() || "");
+    $("#pe-estado").textContent = r.mensaje || r.error;
+    if (r.error) { b.disabled = false; return; }
+    b.remove();
+    pintarSaldo();
+  });
 }
 
-/** Tu código para invitar, en Mi perfil. Solo si hay cuenta y saldo legible. */
-async function pintarInvitar() {
-  const caja = $("#invitar");
-  if (!caja) return;
+/**
+ * Se acabaron las postulaciones a media tanda: justo cuando se ve que
+ * funciona. Solo datos verdaderos de ESTA tanda.
+ */
+async function momentoDeValor(quedan, enviadas) {
   const s = await sesion.saldo().catch(() => null);
-  caja.classList.toggle("oculto", !s?.codigo);
-  if (!s?.codigo) return;
-  const enlace = `${SERVIDOR}/?ref=${encodeURIComponent(s.codigo)}`;
-  $("#invitar-bono").textContent = s.bono_referido || 10;
-  $("#invitar-enlace").value = enlace;
-  $("#btn-copiar-enlace").onclick = (ev) => copiarInvitacion(enlace, ev.currentTarget);
+  if (s?.plan && s.plan !== "agotado") {
+    // Ya tiene con qué seguir (se activó un pago o un bono): solo seguir.
+    $("#modal-contenido").innerHTML = `
+      <div class="valor activado">
+        <p class="valor-eyebrow">${enviadas ? `Ya enviaste ${enviadas} en esta tanda` : "Tu tanda está lista"}</p>
+        <h2>Ya tienes postulaciones para seguir</h2>
+        <button class="boton primario" type="button" id="btn-seguir-espera">Seguir con ${quedan === 1 ? "la que quedó" : `las ${quedan}`}</button>
+      </div>`;
+    $("#btn-seguir-espera").addEventListener("click", () => { $("#modal").classList.add("oculto"); $("#btn-reanudar-lote").click(); });
+    $("#modal").classList.remove("oculto");
+    return;
+  }
+  abrirPlanes({
+    eyebrow: enviadas ? `Ya enviaste ${enviadas} en esta tanda` : "Tu tanda está lista",
+    titulo: `Quedan ${quedan} vacante${quedan === 1 ? "" : "s"} que encajan contigo`,
+    sub: "Se terminaron tus postulaciones. Elige un plan y, en cuanto se active, seguimos con estas mismas.",
+  });
 }
 
+async function copiarInvitacion(texto, boton) {
+  try { await navigator.clipboard.writeText(texto); boton.textContent = "¡Copiado!"; }
+  catch { boton.textContent = texto; }
+}
+
+/**
+ * Si desde la última vez se activó un pack, un pase o llegó un bono, se
+ * celebra; y si había vacantes en espera, se ofrece seguir con ellas.
+ */
+function detectarActivacion(s) {
+  let antes = null;
+  try { antes = JSON.parse(localStorage.getItem("chamba_saldo_visto") || "null"); } catch { /* sin almacén */ }
+  const ahora = { compradas: s.compradas || 0, regaladas: s.regaladas || 0, pase_hasta: s.pase_hasta || null };
+  try { localStorage.setItem("chamba_saldo_visto", JSON.stringify(ahora)); } catch { /* sin almacén */ }
+  if (!antes) return;
+  let que = "";
+  if (ahora.pase_hasta && ahora.pase_hasta !== antes.pase_hasta && s.pase_activo) que = `Se activó tu pase: ${s.dias_pase} días postulando sin contar.`;
+  else if (ahora.compradas > antes.compradas) que = `Sumamos ${ahora.compradas - antes.compradas} postulaciones. Te quedan ${s.postulaciones}.`;
+  else if (ahora.regaladas > antes.regaladas) que = `Ganaste ${ahora.regaladas - antes.regaladas} postulaciones por invitar. Te quedan ${s.postulaciones}.`;
+  if (!que) return;
+  const espera = (estado.pendientesLote || []).length;
+  $("#modal-contenido").innerHTML = `
+    <div class="valor activado">
+      <p class="valor-eyebrow">¡Listo!</p>
+      <h2>${escapar(que)}</h2>
+      ${espera ? `<p class="nota">Tienes ${espera} vacante${espera === 1 ? "" : "s"} en espera de tu última tanda.</p>
+        <button class="boton primario" type="button" id="btn-seguir-espera">Seguir con ${espera === 1 ? "la que quedó" : `las ${espera}`}</button>` : ""}
+    </div>`;
+  $("#btn-seguir-espera")?.addEventListener("click", () => {
+    $("#modal").classList.add("oculto");
+    $("#btn-reanudar-lote").click();
+  });
+  $("#modal").classList.remove("oculto");
+  if (!matchMedia("(prefers-reduced-motion: reduce)").matches) lluviaDeConfeti();
+}
+
+function lluviaDeConfeti() {
+  const colores = ["#D4F249", "#FF6B4A", "#FFC53D", "#34D07F"];
+  for (let k = 0; k < 24; k++) {
+    const c = document.createElement("span");
+    c.className = "confeti";
+    c.style.left = `${10 + Math.random() * 80}vw`;
+    c.style.top = "30vh";
+    c.style.background = colores[k % colores.length];
+    c.style.setProperty("--dx", `${Math.round((Math.random() - .5) * 160)}px`);
+    c.style.setProperty("--dy", `${Math.round(60 + Math.random() * 220)}px`);
+    c.style.setProperty("--giro", `${Math.round((Math.random() - .5) * 720)}deg`);
+    document.body.appendChild(c);
+    setTimeout(() => c.remove(), 1300);
+  }
+}
+
+/** «Tu plan» en Mi perfil: cuántas, una barra, cómo seguir e invitar. */
+function pintarTuPlan(s) {
+  const caja = $("#tu-plan");
+  if (!caja) return;
+  caja.classList.toggle("oculto", !s);
+  if (!s) return;
+  const inv = $("#invitar");
+  inv.classList.toggle("oculto", !s.codigo);
+  if (s.codigo) {
+    const enlace = `${SERVIDOR}/?ref=${encodeURIComponent(s.codigo)}`;
+    document.querySelectorAll(".invitar-bono").forEach((e) => { e.textContent = s.bono_referido || 10; });
+    $("#invitar-enlace").value = enlace;
+    $("#btn-copiar-enlace").onclick = (ev) => copiarInvitacion(enlace, ev.currentTarget);
+  }
+  const ver = (sel, si) => $(sel).classList.toggle("oculto", !si);
+  ver(".tp-cabeza", s.cobrando); ver(".tp-barra", s.cobrando); ver("#tp-detalle", s.cobrando); ver("#tp-acciones", s.cobrando);
+  if (!s.cobrando) return;
+  const v = vistaDelPlan(s);
+  caja.dataset.plan = s.plan;
+  $("#tp-etiqueta").textContent = v.etiqueta;
+  $("#tp-titulo").textContent = v.titulo;
+  $("#tp-relleno").style.width = `${v.barra}%`;
+  $("#tp-detalle").textContent = v.detalle;
+  $("#tp-planes").textContent = s.plan === "agotado" ? "Elegir un plan" : "Ver planes";
+  $("#tp-planes").onclick = () => abrirPlanes();
+}
+
+/** Lo que se dice de cada etapa. Lo usan la píldora y «Tu plan». */
+function vistaDelPlan(s) {
+  const n = s.postulaciones || 0;
+  const dias = `${s.dias_pase} día${s.dias_pase === 1 ? "" : "s"}`;
+  const revision = s.en_revision ? " Tu pago está en revisión: te avisamos aquí apenas se active." : "";
+  if (s.plan === "pase") return {
+    etiqueta: "Pase", titulo: `Te quedan ${dias} de pase`, pildora: `Pase · ${dias}`,
+    barra: Math.round(Math.min(30, s.dias_pase) / 30 * 100), poco: s.dias_pase <= 3,
+    detalle: `Postulas sin contar, hasta 50 al día.${n ? ` Tus ${n} postulaciones del pack te esperan para después.` : ""}${revision}`,
+  };
+  if (s.plan === "gratis") return {
+    etiqueta: "Gratis", titulo: `Te quedan ${n} de ${s.regaladas}`, pildora: `Gratis · ${n} de ${s.regaladas}`,
+    barra: s.regaladas ? Math.round(n / s.regaladas * 100) : 0, poco: n <= 3,
+    detalle: `Con todo incluido: CV adaptado, respuestas y seguimiento. Cuando se acaben, eliges un plan y seguimos.${revision}`,
+  };
+  if (s.plan === "pack") return {
+    etiqueta: "Pack", titulo: `Te quedan ${n}`, pildora: `Te quedan ${n}`,
+    barra: Math.round(Math.min(100, n / Math.max(1, Math.min(100, s.compradas)) * 100)), poco: n <= 5,
+    detalle: `No caducan: úsalas a tu ritmo.${revision}`,
+  };
+  return {
+    etiqueta: "Sin postulaciones", titulo: "Se terminaron tus postulaciones", pildora: s.en_revision ? "Pago en revisión" : "Elegir un plan",
+    barra: 0, poco: true,
+    detalle: s.en_revision ? revision.trim() : "Las vacantes siguen aquí. Elige un plan y seguimos.",
+  };
+}
+
+let _relojPago = null;
 /**
  * El CV adaptado a UNA vacante, generado al pedirlo.
  *
@@ -2618,26 +2826,29 @@ function preguntarCV(alSeguir) {
 
 const NOMBRE_CV = { portal: "el de cada portal", harvard: "el de Chamba Lista", adaptado: "uno adaptado a cada vacante" };
 
-/** Tu saldo: prueba gratis o pase (días) o postulaciones (solo si se cobra). */
+/** La píldora junto a Postular, «Tu plan», y si se activó algo desde la última vez. */
 async function pintarSaldo() {
   const s = await sesion.saldo().catch(() => null);
+  pintarTuPlan(s);
   let el = $("#saldo-barra");
-  if (!s?.cobrando || s.disponibles == null) { el?.remove(); return; }
+  if (!s?.cobrando || !s.plan) { el?.remove(); return; }
+  detectarActivacion(s);
   if (!el) {
-    el = document.createElement("a");
+    el = document.createElement("button");
+    el.type = "button";
     el.id = "saldo-barra";
     el.className = "saldo-barra";
-    el.target = "_blank";
-    el.rel = "noopener";
-    el.href = `${SERVIDOR}/#precios`;
+    el.addEventListener("click", () => abrirPlanes());
     $("#acciones-lote .acciones-derecha")?.prepend(el);
   }
-  const pase = s.disponibles === "pase";
-  const dias = `${s.dias_pase} día${s.dias_pase === 1 ? "" : "s"}`;
-  el.classList.toggle("agotado", !pase && s.disponibles <= 0);
-  el.textContent = pase
-    ? (s.prueba ? `Prueba gratis · quedan ${dias}` : `Pase · quedan ${dias}`)
-    : s.disponibles > 0 ? `Te quedan ${s.disponibles}` : "Sin saldo · ver packs";
+  const v = vistaDelPlan(s);
+  el.dataset.plan = s.plan;
+  el.classList.toggle("poco", v.poco);
+  el.classList.toggle("revision", Boolean(s.en_revision));
+  el.textContent = s.en_revision && s.plan !== "agotado" ? `${v.pildora} · pago en revisión` : v.pildora;
+  // Con un pago en revisión se mira cada minuto si ya se activó.
+  clearInterval(_relojPago);
+  if (s.en_revision) _relojPago = setInterval(pintarSaldo, 60000);
 }
 
 /** Con qué CV se va a postular, a la vista junto al botón de postular. */
@@ -2649,7 +2860,8 @@ async function pintarCVBarra() {
   b.innerHTML = e ? `CV: <b>${NOMBRE_CV[e]}</b> · cambiar` : `CV: <b>elige con cuál postular</b>`;
 }
 $("#cv-elegido")?.addEventListener("click", () => preguntarCV(null));
-document.querySelector('.tab[data-vista="perfil"]')?.addEventListener("click", pintarInvitar);
+document.querySelector('.tab[data-vista="perfil"]')?.addEventListener("click", pintarSaldo);
+document.addEventListener("visibilitychange", () => { if (document.visibilityState === "visible") pintarSaldo(); });
 
 // Tu historial de Computrabajo, aunque no haya pasado por Chamba Lista.
 $("#btn-importar-ct")?.addEventListener("click", async (ev) => {

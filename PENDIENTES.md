@@ -1,6 +1,6 @@
 # Pendientes (todo gratis) — guardado el 2026-10-02
 
-Lo que ya está en el código (0.7.1) necesita estos pasos fuera del código.
+Lo que ya está en el código (0.9.0) necesita estos pasos fuera del código.
 Ninguno cuesta dinero.
 
 1. **Groq** — crear clave en https://console.groq.com (sin tarjeta) y ponerla
@@ -12,7 +12,9 @@ Ninguno cuesta dinero.
    - `COBRAR=1`: SOLO el día que se empiece a vender (antes no limita nada).
    - Luego, redesplegar.
 3. **Supabase → SQL Editor**: ejecutar `supabase/005-uso-ia.sql` y
-   `supabase/006-saldos.sql`.
+   `supabase/006-saldos.sql` (saldos con 18 gratis, pagos y avisos «Ya yapeé»).
+   Cuando alguien pulse «Ya yapeé»: abrir /admin, «Ver avisos», comprobar el
+   monto en tu Yape y pulsar «Ya lo vi en mi Yape: activar».
 4. **Correos de la cuenta**: SMTP gratis (Brevo, 300/día, o Gmail de
    chambalistaperu@gmail.com con contraseña de aplicación) en Supabase →
    Authentication → SMTP Settings.

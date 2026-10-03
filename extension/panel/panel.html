@@ -276,15 +276,27 @@
       <button class="enlace oculto" type="button" id="btn-cambiar-nombre">Cambiar nombre</button>
       <button class="enlace" type="button" id="btn-salir">Cerrar sesión</button>
     </div>
-    <!-- Invitar: quien entra con tu enlace y tú ganan 10 postulaciones cada uno. -->
-    <div class="invitar oculto" id="invitar">
-      <div>
-        <b>Invita a alguien que esté buscando chamba</b>
-        <small>Cuando entre con tu enlace, ganan <span id="invitar-bono">10</span> postulaciones cada uno.</small>
+    <!-- Tu plan: cuántas te quedan, cómo seguir e invitar. -->
+    <section class="tu-plan oculto" id="tu-plan" aria-labelledby="tp-titulo">
+      <div class="tp-cabeza">
+        <span class="tp-etiqueta" id="tp-etiqueta">Gratis</span>
+        <h2 id="tp-titulo">Te quedan 18</h2>
       </div>
-      <input type="text" id="invitar-enlace" readonly aria-label="Tu enlace para invitar">
-      <button class="boton chico primario" type="button" id="btn-copiar-enlace">Copiar enlace</button>
-    </div>
+      <div class="tp-barra" aria-hidden="true"><i id="tp-relleno"></i></div>
+      <p class="nota" id="tp-detalle"></p>
+      <div class="tp-acciones" id="tp-acciones">
+        <button class="boton chico primario" type="button" id="tp-planes">Ver planes</button>
+      </div>
+      <div class="invitar oculto" id="invitar">
+        <div>
+          <b>Invita a alguien que esté buscando chamba</b>
+          <small>Al entrar con tu enlace gana <span class="invitar-bono">10</span> postulaciones, y tú otras
+            <span class="invitar-bono">10</span> cuando envíe su primera.</small>
+        </div>
+        <input type="text" id="invitar-enlace" readonly aria-label="Tu enlace para invitar">
+        <button class="boton chico secundario" type="button" id="btn-copiar-enlace">Copiar enlace</button>
+      </div>
+    </section>
     <div class="rejilla">
       <article class="tarjeta">
         <h2>Tu CV</h2>
