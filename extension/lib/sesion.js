@@ -204,7 +204,11 @@ export async function bajarPostulaciones() {
 // Saldo de postulaciones (packs por Yape/Plin, ver saldo.py)
 // ---------------------------------------------------------------------
 
-/** { disponibles, cobrando } o null si no se pudo leer. */
+/**
+ * { disponibles, cobrando, postulaciones, pase_activo, dias_pase, prueba,
+ *   codigo, bono_referido } o null si no se pudo leer. `disponibles` es
+ * "pase" mientras dura la prueba gratis o un pase; si no, un número.
+ */
 export async function saldo() {
   if (!(await hayCuenta())) return null;
   try {

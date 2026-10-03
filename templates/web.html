@@ -99,16 +99,21 @@
        postulación es honesto: un señuelo que no cumple es otra cosa. -->
   <section class="precios entra entra-2" id="precios">
     <p class="titulo-seccion">Lo que cuesta</p>
+    <!-- Lo que se siente, dicho con verdad: cada día sin postular, esas
+         prácticas se las lleva otra persona. Sin contadores ni cupos
+         inventados (INDECOPI los sanciona y la gente los huele). -->
+    <p class="frase-precios">Cada día que no postulas, esa práctica se la lleva otra persona.
+      <b>Empieza hoy, gratis.</b></p>
     <div class="rejilla-planes">
-      <div class="plan-web">
-        <p class="plan-rotulo">Para probar</p>
+      <div class="plan-web plan-prueba">
+        <p class="plan-rotulo">Para empezar</p>
         <p class="plan-precio">Gratis</p>
-        <p class="plan-unidad">siempre, sin tarjeta</p>
+        <p class="plan-unidad">18 días, sin tarjeta</p>
         <ul>
           <li>Tu CV al formato que leen los portales</li>
-          <li>Puestos sugeridos según lo que sabes hacer</li>
+          <li><b>Postula gratis 18 días</b>, con el tope diario seguro</li>
           <li>Buscar en los cuatro portales</li>
-          <li><b>5 postulaciones</b></li>
+          <li>Invita a alguien y ganan 10 postulaciones cada uno</li>
         </ul>
       </div>
 
@@ -116,14 +121,27 @@
         <p class="plan-rotulo">Recomendado</p>
         <p class="plan-precio">S/ 29</p>
         <p class="plan-unidad">100 postulaciones · S/ 0.29 cada una</p>
+        <p class="plan-ancla">≈ 25 horas de tu tiempo</p>
         <ul>
-          <li>Todo lo de arriba</li>
           <li><b>100 postulaciones</b></li>
           <li>Tu CV adaptado a cada vacante</li>
           <li>Historial y seguimiento</li>
         </ul>
-        <p class="plan-pie">El saldo no caduca y no se renueva solo.</p>
+        <p class="plan-pie">No caducan. Pagas una vez.</p>
         <button class="boton primario btn-pack" type="button" data-pack="100" data-soles="29">Elegir este pack</button>
+      </div>
+
+      <div class="plan-web">
+        <p class="plan-rotulo">Para buscar a tope</p>
+        <p class="plan-precio">S/ 39</p>
+        <p class="plan-unidad">Pase de 30 días</p>
+        <p class="plan-ancla">hasta 50 postulaciones al día</p>
+        <ul>
+          <li><b>Postula sin contar</b> durante 30 días</li>
+          <li>Tu CV adaptado a cada vacante</li>
+          <li>Con el tope diario que cuida tus cuentas</li>
+        </ul>
+        <button class="boton secundario btn-pack" type="button" data-pase="30" data-soles="39">Elegir el pase</button>
       </div>
 
       <div class="plan-web">
@@ -131,7 +149,6 @@
         <p class="plan-precio">S/ 15</p>
         <p class="plan-unidad">30 postulaciones · S/ 0.50 cada una</p>
         <ul>
-          <li>Todo lo de arriba</li>
           <li><b>30 postulaciones</b></li>
           <li>Tu CV adaptado a cada vacante</li>
         </ul>
@@ -288,14 +305,15 @@
 
 <!-- Pagar un pack: Yape o Plin, que es como se paga aquí. -->
 <dialog id="dlg-pago" aria-labelledby="pago-titulo">
-  <h2 id="pago-titulo">Pack de <span id="pago-cuantas">100</span> postulaciones</h2>
+  <h2 id="pago-titulo"><span id="pago-que">Pack de 100 postulaciones</span></h2>
   <p class="pago-precio">S/ <span id="pago-soles">29</span></p>
   <ol class="pago-pasos">
-    <li id="pago-paso-1">Yapea o plinea <b>S/ <span class="pago-soles2">29</span></b> <span id="pago-destino"></span>.</li>
+    <li id="pago-paso-1">Yapea o plinea <b>S/ <span class="pago-soles2">29</span></b> <span id="pago-destino"></span>.
+      <button class="enlace oculto" type="button" id="pago-copiar">Copiar número</button></li>
     <li>En el mensaje del pago escribe el <b>correo de tu cuenta</b> de Chamba Lista.</li>
     <li>Envía la captura a <a id="pago-correo" href="mailto:chambalistaperu@gmail.com">chambalistaperu@gmail.com</a>. Activamos tu pack en menos de 24 horas.</li>
   </ol>
-  <p class="nota">El saldo no caduca y no se renueva solo: pagas una vez.</p>
+  <p class="nota" id="pago-pie">No caduca y no se renueva solo: pagas una vez.</p>
   <div class="acciones-cuenta"><button class="boton secundario" type="button" id="pago-cerrar">Cerrar</button></div>
 </dialog>
 

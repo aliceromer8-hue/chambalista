@@ -741,13 +741,15 @@ const consentimientoCompleto = (a) => CONSENTIMIENTO.every((c) => a?.[c.clave] =
  * seguidas del mismo portal: las esperas de uno se solapan con el trabajo
  * en los otros, y ningún portal ve una ráfaga.
  */
+const SIN_SALDO = "Se terminó tu saldo. Elige un pack o el pase en la web y seguimos.";
+
 /** Si enviar esta vacante pasaría un tope del día (o el saldo), por qué. Si no, null. */
 async function topeAlcanzado(vacante) {
   // Sin saldo no se envía. Solo cuenta si el servidor está cobrando
   // (COBRAR=1); mientras se prueba, no limita nada.
   const s = await sesion.saldo().catch(() => null);
   if (s?.cobrando && s.disponibles != null && s.disponibles <= 0) {
-    return "Se te acabaron las postulaciones. Recarga un pack en la web y seguimos.";
+    return SIN_SALDO;
   }
   const hoy = await almacen.tracker.enviadasHoy();
   if (hoy.total >= TOPE_DIARIO) return `Llegaste a ${TOPE_DIARIO} hoy, el máximo seguro. Mañana seguimos.`;
@@ -806,8 +808,9 @@ async function correrLote({ vacantes, modo, aprobacion, respuestasPersona }) {
     // Topes del día: el total y el del portal. Se para ANTES de abrir.
     if (modo === "automatico") {
       const sinSaldo = await topeAlcanzado(item);
-      if (sinSaldo && /acabaron las postulaciones/.test(sinSaldo)) {
-        for (const resto of lote.items.slice(i)) { resto.estado = "tope"; resto.motivo = sinSaldo; }
+      if (sinSaldo === SIN_SALDO) {
+        // «sin_saldo» y no «tope»: el panel no dice «Mañana» sino cómo seguir.
+        for (const resto of lote.items.slice(i)) { resto.estado = "sin_saldo"; resto.motivo = sinSaldo; }
         lote.hechas = cola.length;
         break;
       }
@@ -976,7 +979,7 @@ async function enviarAprobadas(ids) {
     if (lote.cancelado) break;
     const item = seleccion[n];
     const tope = await topeAlcanzado(item);
-    if (tope) { item.estado = "tope"; item.motivo = tope; lote.hechas = n + 1; continue; }
+    if (tope) { item.estado = tope === SIN_SALDO ? "sin_saldo" : "tope"; item.motivo = tope; lote.hechas = n + 1; continue; }
     try {
       // Se reabre el formulario: entre preparar y revisar, la pestaña ya
       // navegó a otra oferta.

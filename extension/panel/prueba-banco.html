@@ -91,6 +91,12 @@
           let k = 0, paso = 0;
           const reloj = setInterval(() => {
             const L = window.__lote;
+            // ?saldo=N (número): tras N enviadas se acaba el saldo.
+            const lim = /^\d+$/.test(params.get("saldo") || "") ? Number(params.get("saldo")) : Infinity;
+            if (k < items.length && msg.modo === "automatico" && items.filter((i) => i.estado === "enviada").length >= lim) {
+              items.slice(k).forEach((i) => { i.estado = "sin_saldo"; i.motivo = "Se terminó tu saldo. Elige un pack o el pase en la web y seguimos."; });
+              k = items.length; L.hechas = items.length;
+            }
             if (k >= items.length) {
               clearInterval(reloj);
               L.fase = "terminado"; L.actual = null;
@@ -201,6 +207,15 @@
       return new Response(JSON.stringify({ perfil: { ...CV, analizado_con: "ia" } }), { status: 200 });
     }
     if (u.includes("/api/cuenta/salir")) return new Response("{}", { status: 200 });
+    if (u.includes("/api/saldo")) {
+      const q = params.get("saldo");
+      if (!q) return new Response("{}", { status: 404 });
+      const pase = q === "prueba" || q === "pase";
+      return new Response(JSON.stringify({
+        cobrando: true, disponibles: pase ? "pase" : Number(q), postulaciones: pase ? 0 : Number(q),
+        pase_activo: pase, dias_pase: pase ? 12 : 0, prueba: q === "prueba", codigo: "a1b2c3d4", bono_referido: 10,
+      }), { status: 200 });
+    }
     if (u.includes("/api/estado")) return new Response(JSON.stringify({ version_extension: params.get("publicada") || "0.0.0" }), { status: 200 });
     if (u.includes("/api/cuenta/nombre")) {
       const nuevo = JSON.parse(opts?.body || "{}").nombre;
@@ -232,7 +247,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Chamba Lista — Panel</title>
-<link rel="stylesheet" href="panel.css?v=1790358458">
+<link rel="stylesheet" href="panel.css?v=1790988937">
 </head>
 <body>
 
@@ -504,6 +519,15 @@
       <button class="enlace oculto" type="button" id="btn-cambiar-nombre">Cambiar nombre</button>
       <button class="enlace" type="button" id="btn-salir">Cerrar sesión</button>
     </div>
+    <!-- Invitar: quien entra con tu enlace y tú ganan 10 postulaciones cada uno. -->
+    <div class="invitar oculto" id="invitar">
+      <div>
+        <b>Invita a alguien que esté buscando chamba</b>
+        <small>Cuando entre con tu enlace, ganan <span id="invitar-bono">10</span> postulaciones cada uno.</small>
+      </div>
+      <input type="text" id="invitar-enlace" readonly aria-label="Tu enlace para invitar">
+      <button class="boton chico primario" type="button" id="btn-copiar-enlace">Copiar enlace</button>
+    </div>
     <div class="rejilla">
       <article class="tarjeta">
         <h2>Tu CV</h2>
@@ -587,6 +611,6 @@
   </div>
 </div>
 
-<script type="module" src="panel.js?v=1790358458"></script>
+<script type="module" src="panel.js?v=1790988937"></script>
 </body>
 </html>

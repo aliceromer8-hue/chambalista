@@ -1813,7 +1813,7 @@ async function arrancarLote(modo) {
 
 const DESENLACE = {
   enviada: "Enviada", preparada: "Lista", omitida: "Saltada", fallida: "No se pudo",
-  ya_postulada: "Ya la tenías", externa: "En su web", tope: "Mañana",
+  ya_postulada: "Ya la tenías", externa: "En su web", tope: "Mañana", sin_saldo: "Sin saldo",
 };
 
 /** Cada envío se celebra: el contador late, el avión sale y cae confeti. */
@@ -1884,7 +1884,8 @@ function seguirLote() {
       $("#btn-pausar-lote").classList.add("oculto");
       $("#en-vivo").classList.remove("pausa");
       // Si se canceló con vacantes por hacer, se ofrece seguir con esas.
-      estado.pendientesLote = (s.items || []).filter((i) => i.estado === "pendiente");
+      // Las que frenó el saldo también: tras pagar, se retoman con un clic.
+      estado.pendientesLote = (s.items || []).filter((i) => ["pendiente", "sin_saldo"].includes(i.estado));
       $("#btn-reanudar-lote").textContent = `Reanudar las ${estado.pendientesLote.length} que faltan`;
       $("#btn-reanudar-lote").classList.toggle("oculto", !estado.pendientesLote.length);
       $("#vivo-portal").textContent = "Terminado";
@@ -1899,8 +1900,54 @@ function seguirLote() {
         .filter(Boolean).join(" · ");
       pintarResultadoLote(s);
       pintarInicio();
+      const sinSaldo = (s.items || []).filter((i) => i.estado === "sin_saldo").length;
+      if (sinSaldo) momentoDeValor(sinSaldo, exitos);
     }
   }, 1200);
+}
+
+/**
+ * Se terminó el saldo a media tanda: justo cuando se ve que funciona.
+ * Solo datos verdaderos de ESTA tanda (cuántas salieron, cuántas quedaron
+ * esperando); nada de cupos ni relojes inventados.
+ */
+async function momentoDeValor(quedan, enviadas) {
+  const s = await sesion.saldo().catch(() => null);
+  const invitar = s?.codigo ? `${SERVIDOR}/?ref=${encodeURIComponent(s.codigo)}` : "";
+  $("#modal-contenido").innerHTML = `
+    <div class="valor">
+      <p class="valor-eyebrow">${enviadas ? `Ya enviaste ${enviadas} en esta tanda` : "Tu tanda está lista"}</p>
+      <h2>Quedan ${quedan} vacante${quedan === 1 ? "" : "s"} que encajan contigo</h2>
+      <p class="nota">Se terminó tu saldo. Elige cómo seguir y Chamba Lista retoma donde se quedó:
+        estas mismas vacantes siguen aquí.</p>
+      <div class="valor-planes">
+        <a class="boton primario" target="_blank" rel="noopener" href="${SERVIDOR}/?plan=100#precios">Seguir postulando · 100 por S/ 29</a>
+        <a class="boton secundario" target="_blank" rel="noopener" href="${SERVIDOR}/?plan=pase#precios">Pase de 30 días · S/ 39</a>
+        <a class="enlace" target="_blank" rel="noopener" href="${SERVIDOR}/?plan=30#precios">o 30 por S/ 15</a>
+      </div>
+      ${invitar ? `<p class="nota valor-invita">¿Sin pagar ahora? Invita a alguien: ganan ${s.bono_referido || 10} postulaciones cada uno.
+        <button class="enlace" type="button" id="btn-copiar-invita">Copiar mi enlace</button></p>` : ""}
+    </div>`;
+  $("#btn-copiar-invita")?.addEventListener("click", (ev) => copiarInvitacion(invitar, ev.currentTarget));
+  $("#modal").classList.remove("oculto");
+}
+
+async function copiarInvitacion(enlace, boton) {
+  try { await navigator.clipboard.writeText(enlace); boton.textContent = "¡Copiado!"; }
+  catch { boton.textContent = enlace; }
+}
+
+/** Tu código para invitar, en Mi perfil. Solo si hay cuenta y saldo legible. */
+async function pintarInvitar() {
+  const caja = $("#invitar");
+  if (!caja) return;
+  const s = await sesion.saldo().catch(() => null);
+  caja.classList.toggle("oculto", !s?.codigo);
+  if (!s?.codigo) return;
+  const enlace = `${SERVIDOR}/?ref=${encodeURIComponent(s.codigo)}`;
+  $("#invitar-bono").textContent = s.bono_referido || 10;
+  $("#invitar-enlace").value = enlace;
+  $("#btn-copiar-enlace").onclick = (ev) => copiarInvitacion(enlace, ev.currentTarget);
 }
 
 /**
@@ -2571,7 +2618,7 @@ function preguntarCV(alSeguir) {
 
 const NOMBRE_CV = { portal: "el de cada portal", harvard: "el de Chamba Lista", adaptado: "uno adaptado a cada vacante" };
 
-/** Cuántas postulaciones te quedan (solo si se está cobrando). */
+/** Tu saldo: prueba gratis o pase (días) o postulaciones (solo si se cobra). */
 async function pintarSaldo() {
   const s = await sesion.saldo().catch(() => null);
   let el = $("#saldo-barra");
@@ -2585,8 +2632,12 @@ async function pintarSaldo() {
     el.href = `${SERVIDOR}/#precios`;
     $("#acciones-lote .acciones-derecha")?.prepend(el);
   }
-  el.classList.toggle("agotado", s.disponibles <= 0);
-  el.textContent = s.disponibles > 0 ? `Te quedan ${s.disponibles}` : "Sin saldo · recargar";
+  const pase = s.disponibles === "pase";
+  const dias = `${s.dias_pase} día${s.dias_pase === 1 ? "" : "s"}`;
+  el.classList.toggle("agotado", !pase && s.disponibles <= 0);
+  el.textContent = pase
+    ? (s.prueba ? `Prueba gratis · quedan ${dias}` : `Pase · quedan ${dias}`)
+    : s.disponibles > 0 ? `Te quedan ${s.disponibles}` : "Sin saldo · ver packs";
 }
 
 /** Con qué CV se va a postular, a la vista junto al botón de postular. */
@@ -2598,6 +2649,7 @@ async function pintarCVBarra() {
   b.innerHTML = e ? `CV: <b>${NOMBRE_CV[e]}</b> · cambiar` : `CV: <b>elige con cuál postular</b>`;
 }
 $("#cv-elegido")?.addEventListener("click", () => preguntarCV(null));
+document.querySelector('.tab[data-vista="perfil"]')?.addEventListener("click", pintarInvitar);
 
 // Tu historial de Computrabajo, aunque no haya pasado por Chamba Lista.
 $("#btn-importar-ct")?.addEventListener("click", async (ev) => {

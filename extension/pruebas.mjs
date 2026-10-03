@@ -2056,6 +2056,29 @@ titulo("LA PESTAÑA SIN CONTENT SCRIPT — el fallo mas probable del primer inte
 }
 
 {
+  titulo("SALDO — prueba gratis, pase, sin «recarga» y cómo seguir");
+  const fs = await import("node:fs/promises");
+  const fondo = await fs.readFile(new URL("background.js", BASE), "utf8");
+  const pjs = await fs.readFile(new URL("panel/panel.js", BASE), "utf8");
+  const phtml = await fs.readFile(new URL("panel/panel.html", BASE), "utf8");
+  check("ningún texto visible dice «recarga»",
+    !/"[^"\n]*recarg[^"\n]*"|`[^`]*recarg[^`]*`/i.test((fondo + pjs).replace(/\/\*[\s\S]*?\*\//g, "").replace(/\s\/\/.*$/gm, "")) &&!/recarg/i.test(phtml.replace(/<!--[\s\S]*?-->/g, "")));
+  check("el aviso de sin saldo es una sola constante y el lote la reconoce",
+    /const SIN_SALDO = "Se terminó tu saldo/.test(fondo) && /sinSaldo === SIN_SALDO/.test(fondo));
+  check("sin saldo NO se marca «Mañana»: tiene su propio estado",
+    /estado = "sin_saldo"/.test(fondo) && /sin_saldo: "Sin saldo"/.test(pjs));
+  check("con pase o prueba el saldo muestra los días, no «Sin saldo»",
+    /disponibles === "pase"/.test(pjs) && /Prueba gratis · quedan/.test(pjs));
+  check("al quedarse sin saldo se abre «Seguir postulando» con el plan en la URL",
+    /momentoDeValor\(sinSaldo, exitos\)/.test(pjs) && /\?plan=100#precios/.test(pjs) && /\?plan=pase/.test(pjs));
+  check("y el aviso solo usa cifras de la tanda (nada de cupos ni relojes)",
+    !/cupos|últimas horas|solo hoy|oferta termina/i.test(pjs.slice(pjs.indexOf("async function momentoDeValor"), pjs.indexOf("async function copiarInvitacion"))));
+  check("lo que dice el aviso es cierto: las frenadas por saldo se pueden reanudar",
+    /\["pendiente", "sin_saldo"\]\.includes\(i\.estado\)/.test(pjs));
+  check("Mi perfil trae tu enlace para invitar", /id="invitar"/.test(phtml) && /\?ref=\$\{encodeURIComponent/.test(pjs));
+}
+
+{
   titulo("SIN CARACTERES DE CONTROL — en ningún archivo de la extensión");
   const fs = await import("node:fs/promises");
   const archivos = ["background.js", "panel/panel.js", ...["almacen", "datos", "respuestas", "distritos", "sincro", "verificados", "ia", "cv", "portales"].map((f) => `lib/${f}.js`),

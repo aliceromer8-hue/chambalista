@@ -940,7 +940,17 @@ _cifras = _re.findall(r"(\d+)\s+postulaciones", _precios)
 check("los números del bloque de precios son tamaños de pack",
       all(_re.search(r"S/\s*\d+|Gratis", _precios) for _ in _cifras) and len(_cifras) >= 2,
       f"cifras encontradas: {_cifras}")
-check("y cada plan dice su precio", _precios.count("plan-precio") == 3, _precios.count("plan-precio"))
+check("y cada plan dice su precio", _precios.count("plan-precio") == 4, _precios.count("plan-precio"))
+check("la prueba gratis es de 18 días", "18 días" in _precios)
+check("hay pase de 30 días que se paga igual que un pack", 'data-pase="30"' in _precios)
+check("ni rastro de «recarga» en la web", "recarg" not in _visible.lower())
+_webjs = (pathlib.Path("static/js/web.js")).read_text(encoding="utf-8")
+check("el pago trae botón para copiar el número de Yape", "pago-copiar" in _pag and "clipboard" in _webjs)
+check("?plan= abre el pago y ?ref= se guarda para canjear tras entrar",
+      'get("plan")' in _webjs and 'get("ref")' in _webjs and "/api/saldo/referido" in _webjs)
+check("y el código de invitación se valida antes de guardarlo", "[0-9a-f]{8}" in _webjs)
+check("sin cuentas regresivas ni cupos inventados",
+      not _re.search(r"quedan\s+\d+\s+cupos|oferta termina|solo hoy", _visible.lower()))
 
 check("ni promete un tiempo que nadie cronometró",
       "desayuno" not in _re.sub(r"<!--.*?-->", "", _pag, flags=_re.S).lower())
@@ -1518,10 +1528,19 @@ with _mk9.patch.dict(_os.environ, {"CRON_SECRET": "secreto-del-cron"}, clear=Fal
 import saldo as _sal
 with _mk9.patch.dict(_os.environ, {"COBRAR": ""}, clear=False):
     check("mientras no se cobra, el saldo no frena a nadie", _sal.usar("11111111-2222-3333-4444-555555555555")[0] is True)
+_sin = {"postulaciones": 0, "pase_activo": False}
 with _mk9.patch.dict(_os.environ, {"COBRAR": "1"}, clear=False), \
-     _mk9.patch.object(_sal, "disponibles", lambda u: 0):
+     _mk9.patch.object(_sal, "estado", lambda u: dict(_sin)):
     check("cobrando y sin saldo, no se envía", _sal.usar("11111111-2222-3333-4444-555555555555")[0] is False)
+with _mk9.patch.dict(_os.environ, {"COBRAR": "1"}, clear=False), \
+     _mk9.patch.object(_sal, "estado", lambda u: {"postulaciones": 0, "pase_activo": True}):
+    check("con pase (o en la prueba de 18 días) se envía sin descontar",
+          _sal.usar("11111111-2222-3333-4444-555555555555")[0] is True)
 check("un id raro no llega a la base", _sal.disponibles("1' or 1=1") is None)
+check("la prueba gratis dura 18 días", _sal.PRUEBA_DIAS == 18)
+check("un código de invitación no se canjea a uno mismo",
+      _sal.referir("11111111-2222-3333-4444-555555555555", "11111111")[0] is False)
+check("ni un código con forma rara", _sal.referir("11111111-2222-3333-4444-555555555555", "x' or 1=1")[0] is False)
 with _mk9.patch.dict(_os.environ, {"ADMIN_CLAVE": "una-clave-larga-de-prueba"}, clear=False):
     check("/admin rechaza una clave equivocada",
           _c9.post("/api/admin/acreditar", json={"correo": "a@b.pe", "postulaciones": 100},

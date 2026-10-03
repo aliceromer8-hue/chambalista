@@ -1806,3 +1806,22 @@ main { max-width: 1120px; }
   background: var(--menta-suave); border: 1.5px solid var(--menta); border-radius: 99px; padding: 4px 10px;
 }
 .saldo-barra.agotado { background: var(--sol-suave); border-color: var(--sol); }
+
+/* Se terminó el saldo a media tanda: cómo seguir. */
+.valor { display: grid; gap: 10px; }
+.valor-eyebrow { font-size: 11px; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; color: var(--tinta-2, #55555c); margin: 0; }
+.valor h2 { margin: 0; text-wrap: balance; }
+.valor-planes { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-top: 6px; }
+.valor-planes .boton { text-decoration: none; }
+.valor-invita { border-top: 1.5px dashed var(--borde, #d9d7cf); padding-top: 10px; }
+.chip.sin_saldo, .chip-estado.sin_saldo { background: var(--sol-suave); border-color: var(--sol); }
+
+/* Invitar, en Mi perfil. */
+.invitar {
+  display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 260px) auto; gap: 10px; align-items: center;
+  background: var(--menta-suave); border: 1.5px solid var(--menta); border-radius: 14px; padding: 12px 14px; margin: 0 0 16px;
+}
+.invitar.oculto { display: none; }
+.invitar small { display: block; font-size: 12px; margin-top: 2px; }
+.invitar input { min-width: 0; font-size: 12px; padding: 7px 9px; border-radius: 8px; border: 1.5px solid var(--menta); background: #fff; }
+@media (max-width: 640px) { .invitar { grid-template-columns: 1fr; } }

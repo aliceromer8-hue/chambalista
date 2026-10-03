@@ -276,6 +276,15 @@
       <button class="enlace oculto" type="button" id="btn-cambiar-nombre">Cambiar nombre</button>
       <button class="enlace" type="button" id="btn-salir">Cerrar sesión</button>
     </div>
+    <!-- Invitar: quien entra con tu enlace y tú ganan 10 postulaciones cada uno. -->
+    <div class="invitar oculto" id="invitar">
+      <div>
+        <b>Invita a alguien que esté buscando chamba</b>
+        <small>Cuando entre con tu enlace, ganan <span id="invitar-bono">10</span> postulaciones cada uno.</small>
+      </div>
+      <input type="text" id="invitar-enlace" readonly aria-label="Tu enlace para invitar">
+      <button class="boton chico primario" type="button" id="btn-copiar-enlace">Copiar enlace</button>
+    </div>
     <div class="rejilla">
       <article class="tarjeta">
         <h2>Tu CV</h2>

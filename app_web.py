@@ -768,7 +768,19 @@ def operacion_ia(operacion):
 @con_sesion
 def ver_saldo():
     import saldo
-    return jsonify({"disponibles": saldo.disponibles(g.usuario["id"]), "cobrando": saldo.cobrando()})
+    e = saldo.estado(g.usuario["id"]) or {}
+    return jsonify({**e, "disponibles": saldo.disponibles(g.usuario["id"]), "cobrando": saldo.cobrando()})
+
+
+@app.post("/api/saldo/referido")
+@con_sesion
+def canjear_referido():
+    """La cuenta nueva canjea el código de quien la invitó: +10 a las dos."""
+    import saldo
+    if not _pasa_cuenta():
+        return jsonify({"error": "Demasiados intentos. Espera unos minutos."}), 429
+    ok, mensaje = saldo.referir(g.usuario["id"], (request.get_json(silent=True) or {}).get("codigo"))
+    return (jsonify({"mensaje": mensaje}), 200) if ok else (jsonify({"error": mensaje}), 400)
 
 
 @app.post("/api/saldo/usar")
@@ -776,10 +788,10 @@ def ver_saldo():
 def usar_saldo():
     import saldo
     n = max(1, min(5, int((request.get_json(silent=True) or {}).get("n") or 1)))
-    ok, quedan = saldo.usar(g.usuario["id"], n)
+    ok, e = saldo.usar(g.usuario["id"], n)
     if not ok:
-        return jsonify({"error": "Se te acabaron las postulaciones. Recarga un pack.", "disponibles": quedan}), 402
-    return jsonify({"disponibles": quedan, "cobrando": saldo.cobrando()})
+        return jsonify({"error": "Se terminó tu saldo. Elige un pack o el pase y seguimos.", **(e or {})}), 402
+    return jsonify({**(e or {}), "cobrando": saldo.cobrando()})
 
 
 def _es_admin():
@@ -807,12 +819,13 @@ def admin_acreditar():
     d = request.get_json(silent=True) or {}
     try:
         cuantas = int(d.get("postulaciones") or 0)
+        dias = int(d.get("dias") or 0)
     except (TypeError, ValueError):
-        cuantas = 0
-    if not (0 < cuantas <= 1000) or "@" not in str(d.get("correo") or ""):
-        return jsonify({"error": "Pon un correo y un número de postulaciones válido."}), 400
-    ok, mensaje, total = saldo.acreditar(d.get("correo"), cuantas, d.get("soles") or 0, d.get("nota") or "")
-    return (jsonify({"mensaje": mensaje, "total": total}), 200) if ok else (jsonify({"error": mensaje}), 400)
+        cuantas, dias = 0, 0
+    if not (0 <= cuantas <= 1000 and 0 <= dias <= 365 and (cuantas or dias)) or "@" not in str(d.get("correo") or ""):
+        return jsonify({"error": "Pon un correo y un pack o pase válido."}), 400
+    ok, mensaje, e = saldo.acreditar(d.get("correo"), cuantas, d.get("soles") or 0, d.get("nota") or "", dias)
+    return (jsonify({"mensaje": mensaje, "estado": e}), 200) if ok else (jsonify({"error": mensaje}), 400)
 
 
 @app.get("/api/mantener")

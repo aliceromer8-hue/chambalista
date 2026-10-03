@@ -4,7 +4,7 @@ document.querySelector("#form-acreditar").addEventListener("submit", async (ev) 
   ev.preventDefault();
   const estado = document.querySelector("#adm-estado");
   const boton = document.querySelector("#adm-enviar");
-  const [postulaciones, soles] = document.querySelector("#adm-pack").value.split("|").map(Number);
+  const [postulaciones, soles, dias] = document.querySelector("#adm-pack").value.split("|").map(Number);
   boton.disabled = true;
   estado.textContent = "Acreditando…";
   try {
@@ -13,7 +13,7 @@ document.querySelector("#form-acreditar").addEventListener("submit", async (ev) 
       headers: { "Content-Type": "application/json", "X-Admin": document.querySelector("#adm-clave").value },
       body: JSON.stringify({
         correo: document.querySelector("#adm-correo").value.trim(),
-        postulaciones, soles,
+        postulaciones, soles, dias,
         nota: document.querySelector("#adm-nota").value.trim(),
       }),
     });

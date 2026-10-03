@@ -601,3 +601,8 @@ dialog#dlg-pago::backdrop { background: rgba(19, 19, 22, .55); }
 dialog#dlg-pago h2 { font-size: 1.35rem; margin: 0 0 4px; }
 .pago-precio { font-size: 2.2rem; font-weight: 900; letter-spacing: -.03em; margin: 0 0 10px; }
 .pago-pasos { padding-left: 20px; display: grid; gap: 10px; font-size: 14px; line-height: 1.5; }
+
+.frase-precios { font-size: 17px; font-weight: 600; margin: 0 0 18px; max-width: 52ch; }
+.plan-ancla { font-size: 12px; font-weight: 800; margin: -4px 0 8px; color: var(--tinta-2); }
+.plan-prueba { background: var(--papel); border-style: dashed; }
+@media (min-width: 900px) { .rejilla-planes { grid-template-columns: repeat(4, minmax(0, 1fr)); } }

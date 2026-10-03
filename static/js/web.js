@@ -520,6 +520,7 @@ $("#form-cuenta").addEventListener("submit", async (ev) => {
     }
     guardarSesion(j);
     pintarCuenta();
+    canjearReferido();
     $("#dlg-cuenta").close();
     $("#contrasena").value = "";
     // Si ya venía trabajando sin cuenta, ese CV es el bueno y se sube.
@@ -680,23 +681,68 @@ animarRuta();
 restaurarTrabajo();
 
 
-// ---------- pagar un pack ----------
-// Yape o Plin: una transferencia entre personas, que es como se paga
-// aquí. El número lo da el servidor (variable de entorno PAGO_YAPE); si
-// aún no está, se pide escribir al correo y ahí se mandan los datos.
-document.querySelectorAll(".btn-pack").forEach((b) => b.addEventListener("click", async () => {
+// ---------- pagar un pack o el pase ----------
+// Yape o Plin: una transferencia entre personas, sin comisión. El número
+// lo da el servidor (PAGO_YAPE); si aún no está, se pide escribir al correo.
+async function abrirPago(b) {
   const dlg = document.querySelector("#dlg-pago");
-  document.querySelector("#pago-cuantas").textContent = b.dataset.pack;
+  const pase = b.dataset.pase;
+  document.querySelector("#pago-que").textContent = pase
+    ? `Pase de ${pase} días` : `Pack de ${b.dataset.pack} postulaciones`;
   document.querySelector("#pago-soles").textContent = b.dataset.soles;
   document.querySelectorAll(".pago-soles2").forEach((s) => { s.textContent = b.dataset.soles; });
+  document.querySelector("#pago-pie").textContent = pase
+    ? "Empieza el día que lo activamos. No se renueva solo."
+    : "No caducan y no se renuevan solos: pagas una vez.";
   let pago = {};
-  try { pago = (await (await fetch("/api/estado")).json()).pago || {}; } catch { /* sin red: se pide escribir */ }
+  try { pago = (await (await fetch("/api/estado")).json()).pago || {}; } catch { /* sin red */ }
   const destino = document.querySelector("#pago-destino");
+  const copiar = document.querySelector("#pago-copiar");
   destino.textContent = pago.yape
     ? `al ${pago.yape}${pago.titular ? ` (${pago.titular})` : ""}`
     : "— escríbenos al correo de abajo y te mandamos el número";
-  const asunto = encodeURIComponent(`Pack de ${b.dataset.pack} postulaciones`);
+  copiar.classList.toggle("oculto", !pago.yape);
+  copiar.onclick = async () => {
+    try { await navigator.clipboard.writeText(pago.yape); copiar.textContent = "¡Copiado!"; }
+    catch { copiar.textContent = pago.yape; }
+  };
+  const asunto = encodeURIComponent(pase ? `Pase de ${pase} días` : `Pack de ${b.dataset.pack} postulaciones`);
   document.querySelector("#pago-correo").href = `mailto:${pago.correo || "chambalistaperu@gmail.com"}?subject=${asunto}`;
   dlg.showModal();
-}));
+}
+document.querySelectorAll(".btn-pack").forEach((b) => b.addEventListener("click", () => abrirPago(b)));
 document.querySelector("#pago-cerrar")?.addEventListener("click", () => document.querySelector("#dlg-pago").close());
+
+// La extensión manda aquí con ?plan=100 / ?plan=pase cuando se termina el
+// saldo: se abre directo el pago de ese plan.
+(() => {
+  const plan = new URLSearchParams(location.search).get("plan");
+  if (!plan) return;
+  const b = document.querySelector(plan === "pase" ? ".btn-pack[data-pase]" : `.btn-pack[data-pack="${CSS.escape(plan)}"]`);
+  if (b) setTimeout(() => abrirPago(b), 400);
+})();
+
+// ---------- invitaciones ----------
+// ?ref=CODIGO se guarda al llegar y se canjea en cuanto haya sesión:
+// la cuenta nueva y quien la invitó ganan 10 postulaciones cada uno.
+const REF = "chamba_ref";
+(() => {
+  const codigo = new URLSearchParams(location.search).get("ref");
+  if (codigo && /^[0-9a-f]{8}$/i.test(codigo)) {
+    try { localStorage.setItem(REF, codigo.toLowerCase()); } catch { /* navegación privada */ }
+  }
+})();
+async function canjearReferido() {
+  let codigo = null;
+  try { codigo = localStorage.getItem(REF); } catch { return; }
+  if (!codigo || !sesion()) return;
+  try {
+    const r = await conCuenta("/api/saldo/referido", {
+      method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ codigo }),
+    });
+    const j = await r.json().catch(() => ({}));
+    if (r.ok || r.status === 400) localStorage.removeItem(REF);
+    if (r.ok && j.mensaje) alert(j.mensaje);
+  } catch { /* se intenta en la próxima visita */ }
+}
+setTimeout(canjearReferido, 1500);
