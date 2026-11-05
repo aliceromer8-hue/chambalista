@@ -21,7 +21,7 @@ Ninguno cuesta dinero.
 6. **Edge Add-ons**: publicar la extensión gratis en Microsoft Partner Center.
    Chrome Web Store ($5, pago único) cuando haya tarjeta.
 7. **Dominio**: renombrar el proyecto de Vercel a `chambalista` →
-   `chambalista.vercel.app` (gratis).
+   `chamba-lista.vercel.app` (gratis).
 8. **Prueba real**: dar el OK para una tanda real corta (topes, esperas, CV
    adaptado subido) y para probar la subida de CV en Computrabajo.
 
@@ -71,7 +71,7 @@ base de datos viva). Sin claves en el código ni en el historial de git.
 | `COBRAR` | `1` el día que empieces a cobrar |
 | `LOGIN_GOOGLE` | `1` cuando termines el paso C |
 | `EMPRESA_NOMBRE`, `EMPRESA_RUC`, `EMPRESA_DOMICILIO` | titular del servicio (salen en la política y en el Libro de Reclamaciones) |
-| `DOMINIO_PUBLICO` | `https://chambalista.vercel.app` cuando agregues ese dominio |
+| `DOMINIO_PUBLICO` | `https://chamba-lista.vercel.app` cuando agregues ese dominio |
 | `IA_LIBRES` / `IA_LIBRES_PAGO` | opcional: 60 y 400 por defecto |
 | `GEMINI_FACTURACION` | `1` solo si activas facturación en Gemini (lo usarían solo quienes pagan) |
 
@@ -85,18 +85,18 @@ Correr, en orden: `005-uso-ia.sql`, `006-saldos.sql`, `007-reclamos.sql`.
    `https://rjxxrpuxkigfxwqjlvzi.supabase.co/auth/v1/callback`
 3. Supabase → Authentication → Sign In / Providers → Google → pegar Client ID y Client Secret → activar.
 4. Supabase → Authentication → URL Configuration → Redirect URLs: agregar
-   `https://chamba-lista-ali-ab09.vercel.app/**` y `https://chambalista.vercel.app/**`.
+   `https://chamba-lista.vercel.app/**` y `https://chamba-lista.vercel.app/**`.
 5. Vercel: `LOGIN_GOOGLE=1` y redesplegar.
 
 ## D. Correos de registro
 Supabase → Authentication → SMTP Settings → Brevo (gratis) o Gmail con contraseña de aplicación.
 
 ## E. Dominio
-Vercel → Settings → Domains → agregar `chambalista.vercel.app` como producción. Esto quita el
+Vercel → Settings → Domains → agregar `chamba-lista.vercel.app` como producción. Esto quita el
 `noindex` (la web aparece en Google). Avisar para cambiar `extension/lib/servidor.js` ANTES de subir a la tienda.
 
 ## F. Chrome Web Store
-Todo en `tienda/FICHA-CHROME-WEB-STORE.md`. Paquete: `tienda/chamba-lista-1.0.3.zip`.
+Todo en `tienda/FICHA-CHROME-WEB-STORE.md`. Paquete: `tienda/chamba-lista-1.0.4.zip`.
 
 ## G. Google Search Console (gratis)
 search.google.com/search-console → agregar el dominio → enviar `/sitemap.xml`.
@@ -107,7 +107,7 @@ search.google.com/search-console → agregar el dominio → enviar `/sitemap.xml
   del último pack (S/ 0.50 · 0.58 · 0.49 c/u), desde S/ 5.
 - **Yape**: el número ya no es público; solo lo ve quien inició sesión (`/api/pago/datos`).
 - **Alertas al celular (gratis)**: instalar la app **ntfy** (Android/iOS) → suscribirse al tema que
-  está en `NTFY_TEMA`. En Vercel: `NTFY_TEMA` y `SITIO_ADMIN=https://chamba-lista-ali-ab09.vercel.app`.
+  está en `NTFY_TEMA`. En Vercel: `NTFY_TEMA` y `SITIO_ADMIN=https://chamba-lista.vercel.app`.
   Avisa al instante con cada «Ya yapeé» y cada reclamo, y un resumen diario de pendientes
   (con alerta fuerte si un reclamo pasa de 10 días).
 - **SQL**: la 006 tiene dos columnas nuevas al final (`ultimo_plan`, `postulaciones`); si ya

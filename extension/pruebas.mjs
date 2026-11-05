@@ -2103,9 +2103,11 @@ titulo("LA PESTAÑA SIN CONTENT SCRIPT — el fallo mas probable del primer inte
     /\["pendiente", "sin_saldo"\]\.includes\(i\.estado\)/.test(pjs));
   check("una herramienta del catálogo que el CV no tiene se puede marcar una vez en Mi perfil",
     /async function pintarHerramientas/.test(pjs) && /habilidadesConfirmadas/.test(pjs) && /id="tarjeta-herramientas"/.test(phtml));
-  check("«lo estoy aprendiendo» entra como «(en aprendizaje)», no como dominio",
+  check("lo marcado entra tal cual; lo no marcado, no",
     JSON.stringify(huecos.aCompetencias([{ habilidad: "SPSS" }, { habilidad: "SQL" }, { habilidad: "SAP" }],
-      { SPSS: "aprendiendo", SQL: true })) === JSON.stringify(["SPSS (en aprendizaje)", "SQL"]));
+      { SPSS: true })) === JSON.stringify(["SPSS"]));
+  check("la extensión ya no confía en un dominio ajeno (chambalista.vercel.app)",
+    !fs2.readFileSync(new URL("manifest.json", BASE), "utf8").includes("chambalista.vercel.app"));
   check("Bumeran recibe el CV en PDF (solo acepta PDF)",
     /portalId \|\| ""\) === "bumeran" \? "pdf" : "docx"/.test(fondo) && /application\/pdf/.test(fondo));
   check("en LinkedIn e Indeed el CV se adjunta también en pantallas posteriores",

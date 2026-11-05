@@ -209,11 +209,10 @@ export function detectar(vacante, perfil) {
  * que sí; el resto se descarta sin dejar rastro.
  */
 export function aCompetencias(huecos, respuestas) {
-  // true = «lo manejo» → «SPSS». "aprendiendo" → «SPSS (en aprendizaje)»:
-  // los filtros de los portales encuentran la palabra y no es mentira.
+  // Solo lo que la persona marcó como que lo maneja; entra tal cual («SPSS»).
   return (huecos || [])
-    .filter((h) => respuestas?.[h.habilidad] === true || respuestas?.[h.habilidad] === "aprendiendo")
-    .map((h) => (respuestas[h.habilidad] === "aprendiendo" ? `${h.habilidad} (en aprendizaje)` : h.habilidad));
+    .filter((h) => respuestas?.[h.habilidad] === true)
+    .map((h) => h.habilidad);
 }
 
 /** Cuántas de las que pide la oferta sí están respaldadas por el CV. */

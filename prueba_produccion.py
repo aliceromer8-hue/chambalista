@@ -26,7 +26,7 @@ try:
 except ImportError:
     pass
 
-SITIO = os.environ.get("SITIO", "https://chamba-lista-ali-ab09.vercel.app")
+SITIO = os.environ.get("SITIO", "https://chamba-lista.vercel.app")
 CORREO = f"prueba-{uuid.uuid4().hex[:10]}@ejemplo.pe"
 CLAVE = uuid.uuid4().hex
 

@@ -1,16 +1,16 @@
-# Ficha para la Chrome Web Store — Chamba Lista 1.0.3
+# Ficha para la Chrome Web Store — Chamba Lista 1.0.4
 
 Todo listo para copiar y pegar en https://chrome.google.com/webstore/devconsole
 (cuenta de desarrollador: pago único de USD 5 y verificación de identidad).
 
 ## Antes de subir (en este orden)
 
-1. **Dominio**: en Vercel → Settings → Domains, agrega `chambalista.vercel.app`
+1. **Dominio**: en Vercel → Settings → Domains, agrega `chamba-lista.vercel.app`
    y márcalo como dominio de producción. Avísame: cambio una línea
    (`extension/lib/servidor.js`) y regenero el ZIP, así la versión de la
    tienda nace con la dirección definitiva. Si subes antes, cambiarla después
    obliga a otra revisión de Google.
-2. **Paquete**: `tienda/chamba-lista-1.0.3.zip` (sin archivos de prueba).
+2. **Paquete**: `tienda/chamba-lista-1.0.4.zip` (sin archivos de prueba).
 
 ## Ficha de la tienda
 
@@ -50,7 +50,7 @@ Chamba Lista no está afiliada a Computrabajo, Bumeran, LinkedIn ni Indeed.
   vacantes con los colores de encaje, (3) una tanda en vivo con confeti,
   (4) Mi perfil con tu CV en formato Harvard. No muestres datos reales de nadie.
 
-**Sitio web**: https://chamba-lista-ali-ab09.vercel.app (o el dominio nuevo)
+**Sitio web**: https://chamba-lista.vercel.app (o el dominio nuevo)
 **Correo de soporte**: chambalistaperu@gmail.com
 
 ## Pestaña «Prácticas de privacidad»
@@ -72,7 +72,7 @@ y completa y envía sus postulaciones en los portales de empleo que ella elige.
     `www.bumeran.com.pe`, `pe.indeed.com`, `smartapply.indeed.com`,
     `www.linkedin.com`: buscar vacantes, leer sus preguntas y completar y
     enviar la postulación en el portal que la persona eligió.
-  - `chamba-lista-ali-ab09.vercel.app`, `chambalista.vercel.app`: nuestro
+  - `chamba-lista-ali-ab09.vercel.app`, `chamba-lista.vercel.app`: nuestro
     servidor (cuenta, saldo y la IA que adapta el CV) y el puente que trae la
     sesión iniciada en la web.
   - `api.groq.com`, `generativelanguage.googleapis.com`: solo si la persona
@@ -94,7 +94,7 @@ y completa y envía sus postulaciones en los portales de empleo que ella elige.
 - No uso ni transfiero datos para fines ajenos al propósito único.
 - No uso ni transfiero datos para determinar solvencia crediticia ni préstamos.
 
-**URL de la política de privacidad**: https://chamba-lista-ali-ab09.vercel.app/privacidad
+**URL de la política de privacidad**: https://chamba-lista.vercel.app/privacidad
 
 ## Mensaje para el revisor (campo opcional)
 

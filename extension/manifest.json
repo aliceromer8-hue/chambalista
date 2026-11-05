@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Chamba Lista — postula sin escribir lo mismo mil veces",
-  "version": "1.0.3",
+  "version": "1.0.4",
   "description": "Busca vacantes en los portales peruanos y postula por ti con tu CV. Si prefieres, te avisa antes de enviar.",
   "permissions": [
     "storage",
@@ -13,7 +13,7 @@
     "https://bumeran.com.pe/*",
     "https://candidato.pe.computrabajo.com/*",
     "https://chamba-lista-ali-ab09.vercel.app/*",
-    "https://chambalista.vercel.app/*",
+    "https://chamba-lista.vercel.app/*",
     "https://generativelanguage.googleapis.com/*",
     "https://pe.computrabajo.com/*",
     "https://pe.indeed.com/*",
@@ -85,7 +85,7 @@
     {
       "matches": [
         "https://chamba-lista-ali-ab09.vercel.app/*",
-        "https://chambalista.vercel.app/*"
+        "https://chamba-lista.vercel.app/*"
       ],
       "js": [
         "contenido/puente.js"

@@ -2896,9 +2896,9 @@ async function pintarHerramientas() {
   const faltan = perfil ? huecos.delCatalogoSinCV(perfil) : [];
   $("#tarjeta-herramientas").classList.toggle("oculto", !faltan.length);
   const marcadas = (await almacen.preferencias.obtener()).habilidadesConfirmadas || {};
-  // Cada toque: no → «lo manejo» → «lo estoy aprendiendo» → no.
-  const ESTADOS = { no: ["", ""], si: ["on", "lo manejo"], aprendiendo: ["aprende", "aprendiendo"] };
-  const estadoDe = (n) => (marcadas[n] === true ? "si" : marcadas[n] === "aprendiendo" ? "aprendiendo" : "no");
+  // Cada toque: no ↔ «lo manejo».
+  const ESTADOS = { no: ["", ""], si: ["on", "lo manejo"] };
+  const estadoDe = (n) => (marcadas[n] === true ? "si" : "no");
   const pintarChip = (b, e) => {
     b.dataset.e = e;
     b.className = `chip-herr ${ESTADOS[e][0]}`;
@@ -2910,15 +2910,14 @@ async function pintarHerramientas() {
   caja.querySelectorAll("button").forEach((b) => {
     pintarChip(b, estadoDe(b.dataset.h));
     b.addEventListener("click", async () => {
-      const sig = { no: "si", si: "aprendiendo", aprendiendo: "no" }[b.dataset.e];
+      const sig = b.dataset.e === "si" ? "no" : "si";
       pintarChip(b, sig);
       const p = await almacen.preferencias.obtener();
       const h = { ...(p.habilidadesConfirmadas || {}) };
-      if (sig === "no") delete h[b.dataset.h]; else h[b.dataset.h] = sig === "si" ? true : "aprendiendo";
+      if (sig === "no") delete h[b.dataset.h]; else h[b.dataset.h] = true;
       await almacen.preferencias.guardar({ ...p, habilidadesConfirmadas: h });
-      $("#estado-herramientas").textContent = sig === "aprendiendo"
-        ? `Se agregará como «${b.dataset.h} (en aprendizaje)» en las vacantes que lo pidan.`
-        : sig === "si" ? `Se agregará «${b.dataset.h}» en las vacantes que lo pidan.` : "Quitado.";
+      $("#estado-herramientas").textContent = sig === "si"
+        ? `Se agregará «${b.dataset.h}» en las vacantes que lo pidan.` : "Quitado.";
     });
   });
 }
@@ -2935,7 +2934,7 @@ async function sugerirHerramientas(items) {
   if (!top.length) return;
   pista({ clave: `herr-${top.map(([h]) => h).join("-")}`, paso: "Tip",
           titulo: `Estas vacantes pedían ${top.map(([h, n]) => `${h} (${n})`).join(", ")}`,
-          texto: "Si lo manejas o lo estás aprendiendo, márcalo y lo agregamos en las que lo pidan.",
+          texto: "Si lo manejas, márcalo y lo agregamos en las que lo pidan.",
           boton: "Marcar en Mi perfil",
           accion: () => { irA("perfil"); pintarHerramientas(); setTimeout(() => resaltar("#tarjeta-herramientas"), 300); } });
 }
