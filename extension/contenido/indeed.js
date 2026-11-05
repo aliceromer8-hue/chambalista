@@ -373,7 +373,8 @@
    */
   async function pasarPantallasVacias() {
     for (let i = 0; i < 4 && enFormulario(); i++) {
-      if (botonEnviar() || leerPreguntas().length || pideArchivo()) return;
+      // También para en la pantalla del CV: ahí se adjunta el adaptado si se eligió.
+      if (botonEnviar() || leerPreguntas().length || pideArchivo() || camposDeArchivo().length) return;
       const s = await siguientePaso();
       if (!s.avanzado) return;
       await esperar(600);
@@ -449,10 +450,12 @@
       // Antes de leer se pasan las pantallas sin nada que contestar (la de
       // elegir CV): si no, se leían 0 preguntas y nada se preparaba.
       else if (msg.accion === "preguntas") pasarPantallasVacias().then(() =>
-        responder({ preguntas: leerPreguntas(), conArchivo: pideArchivo() }));
+        responder({ preguntas: leerPreguntas(), conArchivo: pideArchivo(),
+                    // Ya hay un CV elegido pero se puede subir otro: el adaptado.
+                    archivoOpcional: camposDeArchivo().length > 0 }));
       else if (msg.accion === "rellenar" || msg.accion === "escribir")
         responder(escribirRespuestas(msg.respuestas));
-      else if (msg.accion === "adjuntar") responder(adjuntarCV(msg.nombre, msg.base64));
+      else if (msg.accion === "adjuntar") responder(adjuntarCV(msg.nombre, msg.base64, msg.mime || undefined));
       else if (msg.accion === "siguiente") siguientePaso().then(responder);
       else if (msg.accion === "enviar") enviar().then(responder);
       else responder({ error: "Indeed no sabe hacer esa accion: " + msg.accion });

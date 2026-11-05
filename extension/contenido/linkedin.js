@@ -14,7 +14,7 @@
   // si fueran globales, y no lo son. Leer una pregunta, escribir una
   // respuesta o adjuntar el CV reventaba con «no está definido»: en
   // este portal nunca se llegó a rellenar nada.
-  const { rellenar, enunciadoDe, erroresValidacion, adjuntarCV } = window.ChambaComun;
+  const { rellenar, enunciadoDe, erroresValidacion, adjuntarCV, camposDeArchivo } = window.ChambaComun;
   const texto = (raiz, sel) => {
     const e = raiz.querySelector(sel);
     return e ? e.innerText.replace(/\s+/g, " ").trim() : "";
@@ -308,17 +308,18 @@
       // «abrirFormulario» es lo que manda el fondo. Solo se entendía
       // «abrir», así que la postulación moría en el primer paso.
       else if (msg.accion === "abrir" || msg.accion === "abrirFormulario") abrirFormulario().then(responder);
-      // En LinkedIn NO se sube un CV: la persona ya tiene uno marcado, y
-      // LinkedIn guarda como mucho 4. Subir un Word por postulación le
-      // llenaría la lista y reemplazaría el CV que ella eligió.
-      else if (msg.accion === "preguntas") responder({ preguntas: leerPreguntas(), conArchivo: false });
+      // El CV: solo si la persona eligió el de Chamba Lista (adaptado o
+      // Harvard). LinkedIn guarda sus últimos CV subidos y deja marcado el
+      // nuevo: así lo dice el panel al elegir el modo (Ali, 2026-11-05).
+      else if (msg.accion === "preguntas") responder({ preguntas: leerPreguntas(), conArchivo: false,
+                                                      archivoOpcional: camposDeArchivo().length > 0 });
       else if (msg.accion === "rellenar" || msg.accion === "escribir")
         responder(escribirRespuestas(msg.respuestas));
       // Faltaba: el fondo manda «adjuntar» en cada postulación y LinkedIn
       // contestaba «no sé hacer esa acción». Si el paso de CV de Solicitud
       // Sencilla tiene campo de archivo, se adjunta el adaptado; si no,
       // adjuntarCV lo dice y se postula con el CV del perfil.
-      else if (msg.accion === "adjuntar") responder(adjuntarCV(msg.nombre, msg.base64));
+      else if (msg.accion === "adjuntar") responder(adjuntarCV(msg.nombre, msg.base64, msg.mime || undefined));
       else if (msg.accion === "siguiente") siguientePaso().then(responder);
       else if (msg.accion === "enviar") enviar().then(responder);
       else responder({ error: "LinkedIn no sabe hacer esa accion: " + msg.accion });

@@ -96,7 +96,7 @@ Vercel → Settings → Domains → agregar `chambalista.vercel.app` como produc
 `noindex` (la web aparece en Google). Avisar para cambiar `extension/lib/servidor.js` ANTES de subir a la tienda.
 
 ## F. Chrome Web Store
-Todo en `tienda/FICHA-CHROME-WEB-STORE.md`. Paquete: `tienda/chamba-lista-1.0.2.zip`.
+Todo en `tienda/FICHA-CHROME-WEB-STORE.md`. Paquete: `tienda/chamba-lista-1.0.3.zip`.
 
 ## G. Google Search Console (gratis)
 search.google.com/search-console → agregar el dominio → enviar `/sitemap.xml`.

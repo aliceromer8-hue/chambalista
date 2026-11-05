@@ -2103,6 +2103,17 @@ titulo("LA PESTAÑA SIN CONTENT SCRIPT — el fallo mas probable del primer inte
     /\["pendiente", "sin_saldo"\]\.includes\(i\.estado\)/.test(pjs));
   check("una herramienta del catálogo que el CV no tiene se puede marcar una vez en Mi perfil",
     /async function pintarHerramientas/.test(pjs) && /habilidadesConfirmadas/.test(pjs) && /id="tarjeta-herramientas"/.test(phtml));
+  check("«lo estoy aprendiendo» entra como «(en aprendizaje)», no como dominio",
+    JSON.stringify(huecos.aCompetencias([{ habilidad: "SPSS" }, { habilidad: "SQL" }, { habilidad: "SAP" }],
+      { SPSS: "aprendiendo", SQL: true })) === JSON.stringify(["SPSS (en aprendizaje)", "SQL"]));
+  check("Bumeran recibe el CV en PDF (solo acepta PDF)",
+    /portalId \|\| ""\) === "bumeran" \? "pdf" : "docx"/.test(fondo) && /application\/pdf/.test(fondo));
+  check("en LinkedIn e Indeed el CV se adjunta también en pantallas posteriores",
+    /cvTrabajo/.test(fondo) && /leido\?\.archivoOpcional/.test(fondo));
+  check("Indeed se detiene en la pantalla del CV en vez de saltarla",
+    /pideArchivo\(\) \|\| camposDeArchivo\(\)\.length\) return;/.test(fs2.readFileSync(new URL("contenido/indeed.js", BASE), "utf8")));
+  check("y el panel dice si el CV adaptado se subió de verdad", /CV adaptado subido/.test(pjs) && /cvSubido/.test(fondo));
+  check("tras la tanda, sugiere marcar lo que pedían las vacantes", /async function sugerirHerramientas/.test(pjs));
   check("y la tanda solo agrega lo que la persona marcó",
     /habilidadesConfirmadas \|\| \{\}/.test(fondo) && /\.\.\.marcadas, \.\.\.\(respuestasPersona/.test(fondo));
   check("Mi perfil trae «Tu plan» con tu enlace para invitar",

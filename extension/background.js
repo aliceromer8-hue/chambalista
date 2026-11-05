@@ -341,6 +341,7 @@ async function adjuntarPedido(tabId, pedido) {
   try {
     puesto = await hablarCon(tabId, {
       accion: "adjuntar", nombre: pedido.nombre, base64: pedido.base64,
+      mime: /\.pdf$/i.test(pedido.nombre || "") ? "application/pdf" : undefined,
     });
   } catch (e) {
     return { adjuntado: false, nota: `No se pudo adjuntar: ${e.message}` };
@@ -427,17 +428,19 @@ async function prepararUna(vacante, perfil, guardados, respuestasPersona) {
   //   harvard   el de Chamba Lista tal cual
   //   portal    el que ya tienes en cada portal
   const modoCV = await modoCVElegido();
+  // Bumeran solo acepta PDF en su campo de CV; el resto, Word.
+  const formato = (vacante.portalId || "") === "bumeran" ? "pdf" : "docx";
   let perfilUsado = perfil;
   let pedidoCV = null;
   if (modoCV === "adaptado") {
     if (lote?.actual) lote.actual.paso = "Adaptando tu CV a esta vacante";
-    const listo = await cvAdaptado(perfil, vacante, confirmadas).catch(() => null);
+    const listo = await cvAdaptado(perfil, vacante, confirmadas, formato).catch(() => null);
     if (listo?.base) perfilUsado = listo.base;
     reporte.cvResumen = listo?.resumen || null;
     reporte.cambiosCV = listo?.cambios || [];
     if (listo?.pedido && !listo.pedido.error) pedidoCV = listo.pedido;
   } else if (modoCV === "harvard") {
-    pedidoCV = await cv.docxAdaptado(perfil, null, {}).catch(() => null);
+    pedidoCV = await cv.docxAdaptado(perfil, null, { competenciasExtra: confirmadas, formato }).catch(() => null);
     if (pedidoCV?.error) pedidoCV = null;
   }
   reporte.modoCV = modoCV;
@@ -547,13 +550,13 @@ async function prepararUna(vacante, perfil, guardados, respuestasPersona) {
   } catch (e) {
     return { ...reporte, error: `No se pudo leer el formulario (${e.message}).` };
   }
-  const conArchivo = Boolean(leido?.conArchivo);
+  const conArchivo = Boolean(leido?.conArchivo || (leido?.archivoOpcional && pedidoCV && modoCV !== "portal"));
   if (lote?.actual) lote.actual.paso = "Respondiendo sus preguntas con tu CV";
   // Si el formulario pide archivo y elegiste «el de cada portal», va el
   // de Chamba Lista: un campo de archivo vacío no deja enviar.
   const [redaccion, cvListo] = await Promise.all([
     redactarPantalla(leido?.preguntas || [], perfilUsado, guardados, respuestasPersona, vacante),
-    conArchivo && !pedidoCV ? cv.docxAdaptado(perfil, null, {}).then((pedido) => ({ pedido })).catch(() => null)
+    conArchivo && !pedidoCV ? cv.docxAdaptado(perfil, null, { formato }).then((pedido) => ({ pedido })).catch(() => null)
       : Promise.resolve(pedidoCV ? { pedido: pedidoCV, cambios: reporte.cambiosCV } : null),
   ]);
 
@@ -569,9 +572,13 @@ async function prepararUna(vacante, perfil, guardados, respuestasPersona) {
   } else {
     reporte.cv = { adjuntado: false,
                    nota: modoCV === "adaptado"
-                     ? "Este portal adjunta el CV de tu perfil; las respuestas salen de tu CV adaptado a esta vacante."
+                     ? "Esta pantalla no pide archivo. Si el paso del CV aparece más adelante, se adjunta ahí."
                      : "Este formulario usa el CV que ya tienes guardado en el portal." };
   }
+  // Para las pantallas siguientes (LinkedIn e Indeed ponen el CV en el
+  // paso 2 o 3): el archivo queda a mano y se adjunta donde aparezca.
+  await almacen.guardar("cvTrabajo", pedidoCV && modoCV !== "portal" && !reporte.cv?.enCuenta
+    ? { pedido: pedidoCV, adjuntado: Boolean(reporte.cv?.adjuntado) } : null);
 
   const patrones = datos.CAMPOS.map((c) => ({
     clave: c.clave, etiqueta: c.etiqueta, patron: c.patron.source, flags: c.patron.flags,
@@ -599,9 +606,17 @@ async function prepararUna(vacante, perfil, guardados, respuestasPersona) {
  */
 async function rellenarPantalla(tabId, perfil, guardados, respuestasPersona, contexto) {
   const leido = await hablarCon(tabId, { accion: "preguntas" });
+  // ¿Esta pantalla es la del CV? Se adjunta el de Chamba Lista si aún no se puso.
+  const cvT = await almacen.leer("cvTrabajo", null);
+  let cvNota = null;
+  if (cvT?.pedido && !cvT.adjuntado && (leido?.conArchivo || leido?.archivoOpcional)) {
+    cvNota = await adjuntarPedido(tabId, cvT.pedido);
+    if (cvNota?.adjuntado) await almacen.guardar("cvTrabajo", { ...cvT, adjuntado: true });
+    await esperar(800);
+  }
   const { preguntas } = await redactarPantalla(leido?.preguntas || [], perfil, guardados,
                                                respuestasPersona, contexto);
-  return { preguntas, escritas: await escribirRedactadas(tabId, preguntas) };
+  return { preguntas, escritas: await escribirRedactadas(tabId, preguntas), cv: cvNota };
 }
 
 /** Redacta sin escribir: para poder hacerlo a la vez que otras cosas. */
@@ -635,7 +650,7 @@ async function modoCVElegido() {
   return prefs.cvModo || prefs.cvPortal?.computrabajo || "portal";
 }
 
-async function cvAdaptado(perfil, vacante, confirmadas) {
+async function cvAdaptado(perfil, vacante, confirmadas, formato = "docx") {
   let resumen = null, cambios = [], base = perfil;
   try {
     const ad = await ia.adaptarAVacante(perfil, vacante);
@@ -650,7 +665,7 @@ async function cvAdaptado(perfil, vacante, confirmadas) {
       cambios = ad.cambios || [];
     }
   } catch { /* el CV base sirve igual */ }
-  const pedido = await cv.docxAdaptado(base, vacante, { resumen, competenciasExtra: confirmadas })
+  const pedido = await cv.docxAdaptado(base, vacante, { resumen, competenciasExtra: confirmadas, formato })
     .catch((e) => ({ error: e.message }));
   return { pedido, cambios, resumen, base };
 }
@@ -718,8 +733,11 @@ async function escribirYEnviar(respuestasAprobadas) {
     await rellenarPantalla(tabId, (await almacen.leer("perfilTrabajo", null)) || perfil, guardados, {},
                            await almacen.leer("vacanteTrabajo", {}));
   }
+  // Si el CV de Chamba Lista se adjuntó en alguna pantalla, se dice.
+  const cvSubido = Boolean((await almacen.leer("cvTrabajo", null))?.adjuntado);
   try {
-    return await hablarCon(tabId, { accion: "enviar" });
+    const r = await hablarCon(tabId, { accion: "enviar" });
+    return r && typeof r === "object" ? { ...r, cvSubido } : r;
   } catch (e) {
     // «Enviar» hizo navegar la página y el mensaje se cortó a medias. En la
     // tanda del 2026-09-25 eso se anotó como fallo y las postulaciones SÍ
@@ -856,7 +874,9 @@ async function correrLote({ vacantes, modo, aprobacion, respuestasPersona }) {
       const r = await prepararUna(cola[i], perfil, guardados, respuestasPersona);
       Object.assign(item, { preguntas: r.preguntas || [], cambiosCV: r.cambiosCV || [],
                             descripcion: r.descripcion || "", competencias: r.competenciasCV || [],
-                            cvResumen: r.cvResumen || null, modoCV: r.modoCV || "" });
+                            cvResumen: r.cvResumen || null, modoCV: r.modoCV || "",
+                            huecos: (r.huecos || []).map((h) => h.habilidad),
+                            cvSubido: Boolean(r.cv?.adjuntado) });
 
       // El portal postuló al entrar (ofertas sin preguntas): está ENVIADA.
       // Antes seguía hacia «enviar», no encontraba botón y la marcaba
@@ -924,6 +944,7 @@ async function correrLote({ vacantes, modo, aprobacion, respuestasPersona }) {
         try {
           lote.actual = { ...lote.actual, paso: "Llenando el formulario y enviando" };
           const env = await escribirYEnviar(aprobadas);
+          if (env?.cvSubido) item.cvSubido = true;
           item.estado = env?.enviada ? "enviada" : "fallida";
           item.motivo = env?.mensaje || env?.error || "";
         } catch (e) {
@@ -1004,6 +1025,7 @@ async function enviarAprobadas(ids) {
       const aprobadas = {};
       item.preguntas.forEach((q) => { if (q.texto) aprobadas[q.indice] = q.texto; });
       const env = await escribirYEnviar(aprobadas);
+      if (env?.cvSubido) item.cvSubido = true;
       item.estado = env?.enviada ? "enviada" : "fallida";
       item.motivo = env?.mensaje || env?.error || "";
       if (env?.enviada) sesion.usarSaldo().catch(() => {});

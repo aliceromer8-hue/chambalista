@@ -1,4 +1,4 @@
-# Ficha para la Chrome Web Store — Chamba Lista 1.0.2
+# Ficha para la Chrome Web Store — Chamba Lista 1.0.3
 
 Todo listo para copiar y pegar en https://chrome.google.com/webstore/devconsole
 (cuenta de desarrollador: pago único de USD 5 y verificación de identidad).
@@ -10,7 +10,7 @@ Todo listo para copiar y pegar en https://chrome.google.com/webstore/devconsole
    (`extension/lib/servidor.js`) y regenero el ZIP, así la versión de la
    tienda nace con la dirección definitiva. Si subes antes, cambiarla después
    obliga a otra revisión de Google.
-2. **Paquete**: `tienda/chamba-lista-1.0.2.zip` (sin archivos de prueba).
+2. **Paquete**: `tienda/chamba-lista-1.0.3.zip` (sin archivos de prueba).
 
 ## Ficha de la tienda
 

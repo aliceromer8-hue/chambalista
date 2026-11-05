@@ -1628,7 +1628,7 @@ async function guardarModo(auto) {
 const OPCIONES_CV = [
   { id: "portal", titulo: "El que ya tengo en cada portal", texto: "Cada portal usa el CV que ya tienes guardado ahí." },
   { id: "harvard", titulo: "El de Chamba Lista", texto: "Tu CV en formato Harvard. Va en cada postulación donde el portal deja poner un CV." },
-  { id: "adaptado", titulo: "Uno adaptado a cada vacante", texto: "Antes de cada postulación adaptamos tu CV a esa oferta, respondemos sus preguntas con ese CV y lo subimos donde el portal lo permite. Unos segundos más por postulación." },
+  { id: "adaptado", titulo: "Uno adaptado a cada vacante", texto: "Antes de cada postulación adaptamos tu CV a esa oferta y respondemos sus preguntas con él. Lo subimos a tu cuenta de Computrabajo y lo adjuntamos en Indeed, LinkedIn y Bumeran cuando su formulario deja subir un archivo (LinkedIn guarda tus últimos CV subidos y Bumeran reemplaza el CV adjunto de tu perfil). Unos segundos más por postulación." },
 ];
 const NOTA_CV = "Se sube en Computrabajo y en los formularios que piden archivo. En Indeed, LinkedIn y Bumeran el portal adjunta el CV de tu perfil ahí; las respuestas salen igual del CV que elijas.";
 
@@ -1891,6 +1891,7 @@ function seguirLote() {
       pintarInicio();
       // Primero el saldo: si un pago se activó durante la tanda, se celebra
       // y se ofrece seguir; no se le vuelve a vender lo que ya compró.
+      setTimeout(() => sugerirHerramientas(s.items), 2500);
       const sinSaldo = (s.items || []).filter((i) => i.estado === "sin_saldo").length;
       pintarSaldo().then(() => {
         if (sinSaldo && $("#modal").classList.contains("oculto")) momentoDeValor(sinSaldo, exitos);
@@ -2229,6 +2230,7 @@ function pintarResultadoLote(s) {
       <div style="min-width:0">
         <h3 title="${escapar(i.titulo)}">${escapar(i.titulo)}</h3>
         <div class="meta"><span class="portal-mini">${escapar(i.portal || "")}</span> · ${escapar(i.empresa || "")}`
+          + `${i.cvSubido ? ` · <b class="cv-ok">CV adaptado subido ✓</b>` : ""}`
           + `${i.motivo && i.estado !== "enviada" ? ` · ${escapar(i.motivo)}` : ""}</div>
       </div>
       ${["enviada", "preparada"].includes(i.estado)
@@ -2894,17 +2896,48 @@ async function pintarHerramientas() {
   const faltan = perfil ? huecos.delCatalogoSinCV(perfil) : [];
   $("#tarjeta-herramientas").classList.toggle("oculto", !faltan.length);
   const marcadas = (await almacen.preferencias.obtener()).habilidadesConfirmadas || {};
-  caja.innerHTML = faltan.map((n) =>
-    `<label class="chip-herr${marcadas[n] ? " on" : ""}"><input type="checkbox" data-h="${escapar(n)}"`
-    + `${marcadas[n] ? " checked" : ""}><span>${escapar(n)}</span></label>`).join("");
-  caja.querySelectorAll("input").forEach((i) => i.addEventListener("change", async () => {
-    const p = await almacen.preferencias.obtener();
-    const h = { ...(p.habilidadesConfirmadas || {}) };
-    if (i.checked) h[i.dataset.h] = true; else delete h[i.dataset.h];
-    await almacen.preferencias.guardar({ ...p, habilidadesConfirmadas: h });
-    i.closest("label").classList.toggle("on", i.checked);
-    $("#estado-herramientas").textContent = "Guardado. Se agrega solo a las vacantes que lo piden.";
-  }));
+  // Cada toque: no → «lo manejo» → «lo estoy aprendiendo» → no.
+  const ESTADOS = { no: ["", ""], si: ["on", "lo manejo"], aprendiendo: ["aprende", "aprendiendo"] };
+  const estadoDe = (n) => (marcadas[n] === true ? "si" : marcadas[n] === "aprendiendo" ? "aprendiendo" : "no");
+  const pintarChip = (b, e) => {
+    b.dataset.e = e;
+    b.className = `chip-herr ${ESTADOS[e][0]}`;
+    b.querySelector("small").textContent = ESTADOS[e][1];
+    b.setAttribute("aria-pressed", e === "no" ? "false" : "true");
+  };
+  caja.innerHTML = faltan.map((n) => `<button type="button" class="chip-herr" data-h="${escapar(n)}">`
+    + `<span>${escapar(n)}</span><small></small></button>`).join("");
+  caja.querySelectorAll("button").forEach((b) => {
+    pintarChip(b, estadoDe(b.dataset.h));
+    b.addEventListener("click", async () => {
+      const sig = { no: "si", si: "aprendiendo", aprendiendo: "no" }[b.dataset.e];
+      pintarChip(b, sig);
+      const p = await almacen.preferencias.obtener();
+      const h = { ...(p.habilidadesConfirmadas || {}) };
+      if (sig === "no") delete h[b.dataset.h]; else h[b.dataset.h] = sig === "si" ? true : "aprendiendo";
+      await almacen.preferencias.guardar({ ...p, habilidadesConfirmadas: h });
+      $("#estado-herramientas").textContent = sig === "aprendiendo"
+        ? `Se agregará como «${b.dataset.h} (en aprendizaje)» en las vacantes que lo pidan.`
+        : sig === "si" ? `Se agregará «${b.dataset.h}» en las vacantes que lo pidan.` : "Quitado.";
+    });
+  });
+}
+
+/**
+ * Tras la tanda: lo que pedían las vacantes y tu CV no tiene. Un toque en
+ * Mi perfil y desde la siguiente tanda entra en las que lo pidan.
+ */
+async function sugerirHerramientas(items) {
+  const marcadas = (await almacen.preferencias.obtener()).habilidadesConfirmadas || {};
+  const cuenta = {};
+  for (const i of items || []) for (const h of i.huecos || []) if (!marcadas[h]) cuenta[h] = (cuenta[h] || 0) + 1;
+  const top = Object.entries(cuenta).sort((a, b) => b[1] - a[1]).slice(0, 4);
+  if (!top.length) return;
+  pista({ clave: `herr-${top.map(([h]) => h).join("-")}`, paso: "Tip",
+          titulo: `Estas vacantes pedían ${top.map(([h, n]) => `${h} (${n})`).join(", ")}`,
+          texto: "Si lo manejas o lo estás aprendiendo, márcalo y lo agregamos en las que lo pidan.",
+          boton: "Marcar en Mi perfil",
+          accion: () => { irA("perfil"); pintarHerramientas(); setTimeout(() => resaltar("#tarjeta-herramientas"), 300); } });
 }
 document.addEventListener("visibilitychange", () => { if (document.visibilityState === "visible") pintarSaldo(); });
 

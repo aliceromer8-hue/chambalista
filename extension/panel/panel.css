@@ -1971,3 +1971,10 @@ body.muro-on > header, body.muro-on > main, body.muro-on > footer, body.muro-on 
   padding: 4px 11px; font-size: 12.5px; font-weight: 700; background: var(--papel-2); user-select: none; }
 .chip-herr input { accent-color: var(--tinta); }
 .chip-herr.on { background: var(--lima); }
+
+.chip-herr { border: 1.5px solid var(--tinta); }
+button.chip-herr { font: inherit; font-size: 12.5px; font-weight: 700; color: var(--tinta); }
+.chip-herr small { font-size: 10.5px; font-weight: 700; opacity: .75; }
+.chip-herr small:empty { display: none; }
+.chip-herr.aprende { background: var(--sol-suave); border-style: dashed; }
+.cv-ok { color: var(--acento); }
