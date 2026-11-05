@@ -219,14 +219,22 @@ export async function saldo() {
 }
 
 /** «Ya yapeé»: deja el aviso para que se compruebe y se active. */
-export async function avisarPago(plan, operacion = "") {
+export async function avisarPago(plan, operacion = "", soles = null) {
   if (!(await hayCuenta())) return { error: "Entra a tu cuenta primero." };
   try {
     const r = await conCuenta("/api/pago/aviso", {
-      method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ plan, operacion }),
+      method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ plan, operacion, soles }),
     });
     const j = await r.json().catch(() => ({}));
     return r.ok ? j : { error: j.error || "No se pudo avisar." };
+  } catch { return { error: "Sin conexión. Inténtalo otra vez." }; }
+}
+
+/** A dónde yapear. Solo con sesión. */
+export async function datosPago() {
+  try {
+    const r = await conCuenta("/api/pago/datos");
+    return r.ok ? await r.json() : {};
   } catch { return { error: "Sin conexión. Inténtalo otra vez." }; }
 }
 

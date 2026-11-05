@@ -225,17 +225,12 @@
         regaladas: 18, compradas: window.__compradas, usadas: 18 + window.__compradas - quedan,
         pase_activo: pase, pase_hasta: pase ? "2026-10-25T00:00:00Z" : null, dias_pase: pase ? 23 : 0,
         codigo: "a1b2c3d4", bono_referido: 10,
-        en_revision: params.get("revision") === "1" && !window.__activado ? { plan: "100" } : null,
+        en_revision: params.get("revision") === "1" && !window.__activado ? { plan: "80" } : null,
+        sumar: { disponible: window.__compradas > 0, plan: "80", precio: 0.4875, minimo: 5, maximo: 300 },
       }), { status: 200 });
     }
-    if (u.includes("/api/pago/aviso")) {
-      return new Response(JSON.stringify({ mensaje: "Recibido. Lo comprobamos en el Yape y lo activamos; te avisamos en la extensión." }), { status: 200 });
-    }
-    if (u.includes("/api/pago/aviso")) {
-      return new Response(JSON.stringify({ mensaje: "Recibido. Lo comprobamos en el Yape y lo activamos; te avisamos en la extensión." }), { status: 200 });
-    }
-    if (u.includes("/api/pago/aviso")) {
-      return new Response(JSON.stringify({ mensaje: "Recibido. Lo comprobamos en el Yape y lo activamos; te avisamos en la extensión." }), { status: 200 });
+    if (u.includes("/api/pago/datos")) {
+      return new Response(JSON.stringify({ yape: "999 888 777", titular: "Chamba Lista", correo: "chambalistaperu@gmail.com" }), { status: 200 });
     }
     if (u.includes("/api/pago/aviso")) {
       return new Response(JSON.stringify({ mensaje: "Recibido. Lo comprobamos en el Yape y lo activamos; te avisamos en la extensión." }), { status: 200 });
@@ -273,7 +268,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Chamba Lista — Panel</title>
-<link rel="stylesheet" href="panel.css?v=1793849757">
+<link rel="stylesheet" href="panel.css?v=1793850807">
 </head>
 <body>
 
@@ -675,6 +670,6 @@
   </div>
 </div>
 
-<script type="module" src="panel.js?v=1793849757"></script>
+<script type="module" src="panel.js?v=1793850807"></script>
 </body>
 </html>

@@ -97,7 +97,26 @@ Vercel → Settings → Domains → agregar `chambalista.vercel.app` como produc
 `noindex` (la web aparece en Google). Avisar para cambiar `extension/lib/servidor.js` ANTES de subir a la tienda.
 
 ## F. Chrome Web Store
-Todo en `tienda/FICHA-CHROME-WEB-STORE.md`. Paquete: `tienda/chamba-lista-1.0.0.zip`.
+Todo en `tienda/FICHA-CHROME-WEB-STORE.md`. Paquete: `tienda/chamba-lista-1.0.1.zip`.
 
 ## G. Google Search Console (gratis)
 search.google.com/search-console → agregar el dominio → enviar `/sitemap.xml`.
+
+## H. Cambios del 2026-11-05 (tarde)
+- **Packs**: 30 por S/ 15, 50 por S/ 29, 80 por S/ 39 (recomendado: mejor precio por postulación).
+  El pase de 30 días salió de la venta. **Sumar postulaciones** después de comprar, al precio
+  del último pack (S/ 0.50 · 0.58 · 0.49 c/u), desde S/ 5.
+- **Yape**: el número ya no es público; solo lo ve quien inició sesión (`/api/pago/datos`).
+- **Alertas al celular (gratis)**: instalar la app **ntfy** (Android/iOS) → suscribirse al tema que
+  está en `NTFY_TEMA`. En Vercel: `NTFY_TEMA` y `SITIO_ADMIN=https://chamba-lista-ali-ab09.vercel.app`.
+  Avisa al instante con cada «Ya yapeé» y cada reclamo, y un resumen diario de pendientes
+  (con alerta fuerte si un reclamo pasa de 10 días).
+- **SQL**: la 006 tiene dos columnas nuevas al final (`ultimo_plan`, `postulaciones`); si ya
+  la corriste, corre solo esas dos líneas.
+- **CV adaptado (auditoría)**: arreglado que la IA no recibiera el CV y que las respuestas usaran el
+  resumen viejo; se descartan líneas con cifras inventadas; en Computrabajo ya no se borra el CV
+  adaptado anterior. FALTA la prueba real (ver respuesta del chat).
+- **Legal (verificado por Indecopi)**: Libro de Reclamaciones virtual con aviso visible, respuesta
+  escrita al correo en 15 días hábiles guardando la prueba de envío. NO CONFIRMADO y para
+  abogado/contador: inscripción del banco de datos en la ANPD, transferencias a EE. UU., RUC/régimen
+  y boletas en SUNAT, uso de Yape personal para cobrar (existe «Yape Empresa»).

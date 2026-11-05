@@ -793,3 +793,5 @@ body.muro-on > header, body.muro-on > main, body.muro-on > footer, body.muro-on 
   header, footer, .acciones-cuenta, #form-reclamo { display: none !important; }
   .hoja-lista { box-shadow: none; border: 1px solid #000; }
 }
+
+.aviso-reclamos { font-size: 12px; color: var(--tinta-2); border: 1.5px solid var(--papel-3); border-radius: 9px; padding: 8px 12px; display: inline-block; }

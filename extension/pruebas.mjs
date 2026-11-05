@@ -2093,7 +2093,10 @@ titulo("LA PESTAÑA SIN CONTENT SCRIPT — el fallo mas probable del primer inte
   check("sin postulaciones, la tanda ni empieza: se abren los planes", /s\.plan === "agotado"\) \{\s*abrirPlanes/.test(pjs));
   check("con pocas, primero las que mejor encajan", /sort\(\(a, b\) => \(b\.encaje\?\.puntaje/.test(pjs));
   check("los planes del panel cuadran con los de la web (29, 39, 15)",
-    /"100": \{[^}]*soles: 29/.test(pjs) && /pase: \{[^}]*soles: 39/.test(pjs) && /"30": \{[^}]*soles: 15/.test(pjs));
+    /"80": \{[^}]*soles: 39/.test(pjs) && /"50": \{[^}]*soles: 29/.test(pjs) && /"30": \{[^}]*soles: 15/.test(pjs));
+  check("con un pack comprado, se pueden sumar postulaciones al precio del pack",
+    /function bloqueSumar/.test(pjs) && /s\?\.sumar\?\.disponible/.test(pjs) && /pagarPlan\("sumar"/.test(pjs));
+  check("el número de Yape se pide con sesión", /sesion\.datosPago\(\)/.test(pjs));
   check("los textos de planes no usan cupos, relojes ni «el más vendido»",
     !/cupos|últimas horas|solo hoy|oferta termina|más vendido|más elegido/i.test(pjs.slice(pjs.indexOf("const PLANES_EXT"), pjs.indexOf("let _relojPago"))));
   check("lo que dice el aviso es cierto: las frenadas por saldo se pueden reanudar",

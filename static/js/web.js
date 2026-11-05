@@ -688,8 +688,8 @@ restaurarTrabajo();
 // el número los da el servidor (/api/estado). «Ya yapeé» deja un aviso que
 // Ali comprueba en su Yape y activa con un clic; la extensión avisa sola.
 const PLANES_POR_DEFECTO = {
-  "100": { nombre: "Pack de 100 postulaciones", postulaciones: 100, dias: 0, soles: 29 },
-  pase: { nombre: "Pase de 30 días", postulaciones: 0, dias: 30, soles: 39 },
+  "80": { nombre: "Pack de 80 postulaciones", postulaciones: 80, dias: 0, soles: 39 },
+  "50": { nombre: "Pack de 50 postulaciones", postulaciones: 50, dias: 0, soles: 29 },
   "30": { nombre: "Pack de 30 postulaciones", postulaciones: 30, dias: 0, soles: 15 },
 };
 let planElegido = null;
@@ -701,7 +701,9 @@ async function abrirPago(plan) {
   const p = planes[plan] || PLANES_POR_DEFECTO[plan];
   if (!p) return;
   planElegido = plan;
-  const pago = info.pago || {};
+  // El número de Yape solo se pide con sesión (no queda a la vista de todos).
+  let pago = { correo: info.pago?.correo };
+  try { const r = await conCuenta("/api/pago/datos"); if (r.ok) pago = await r.json(); } catch { /* sin red */ }
   $("#pago-que").textContent = p.nombre;
   $("#pago-soles").textContent = p.soles;
   document.querySelectorAll(".pago-soles2").forEach((s) => { s.textContent = p.soles; });

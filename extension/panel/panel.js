@@ -1917,13 +1917,17 @@ function seguirLote() {
 // Todo con datos verdaderos: nada de cupos, relojes ni «el más vendido».
 
 const PLANES_EXT = {
-  "100": { nombre: "Pack de 100 postulaciones", corto: "100 postulaciones", soles: 29, unidad: "29 céntimos por postulación",
-           extra: "≈ 25 horas que no pasas llenando formularios · No caducan", cinta: "Recomendado" },
-  pase: { nombre: "Pase de 30 días", corto: "Pase de 30 días", soles: 39, unidad: "S/ 1.30 al día",
-          extra: "Postula sin contar, hasta 50 al día · No se renueva solo" },
+  "80": { nombre: "Pack de 80 postulaciones", corto: "80 postulaciones", soles: 39, unidad: "49 céntimos por postulación",
+          extra: "El mejor precio por postulación · ≈ 20 horas que te ahorras · No caducan", cinta: "Recomendado" },
+  "50": { nombre: "Pack de 50 postulaciones", corto: "50 postulaciones", soles: 29, unidad: "58 céntimos por postulación",
+          extra: "No caducan · Por S/ 10 más, el de 80 trae 30 más" },
   "30": { nombre: "Pack de 30 postulaciones", corto: "30 postulaciones", soles: 15, unidad: "50 céntimos por postulación",
           extra: "Para una búsqueda puntual · No caducan" },
 };
+const ORDEN_PLANES = ["80", "50", "30"];
+
+/** Cuántas da un monto al precio de su pack (el servidor lo vuelve a calcular). */
+const cuantasPor = (soles, precio) => Math.floor(soles / precio + 1e-9);
 
 let _infoPago = null;
 async function infoPago() {
@@ -1951,7 +1955,8 @@ async function abrirPlanes(contexto = {}) {
       ${contexto.eyebrow ? `<p class="valor-eyebrow">${escapar(contexto.eyebrow)}</p>` : ""}
       <h2>${escapar(contexto.titulo || "Elige cómo seguir postulando")}</h2>
       ${contexto.sub ? `<p class="nota">${escapar(contexto.sub)}</p>` : ""}
-      <div class="pe-lista">${["100", "pase", "30"].map(tarjeta).join("")}</div>
+      ${s?.sumar?.disponible ? bloqueSumar(s.sumar) : ""}
+      <div class="pe-lista">${ORDEN_PLANES.map(tarjeta).join("")}</div>
       <p class="nota">Cada postulación trae lo mismo en todos los planes: tu CV adaptado, sus preguntas
         respondidas y el seguimiento. Pagas con Yape o Plin, una vez, sin suscripción.</p>
       ${invitar ? `<p class="nota valor-invita">¿Sin pagar ahora? Invita a alguien: al entrar gana ${s.bono_referido || 10},
@@ -1961,13 +1966,51 @@ async function abrirPlanes(contexto = {}) {
   $("#btn-copiar-invita")?.addEventListener("click", (ev) => copiarInvitacion(invitar, ev.currentTarget));
   document.querySelectorAll("#modal-contenido .pe-plan").forEach((b) =>
     b.addEventListener("click", () => pagarPlan(b.dataset.plan, contexto)));
+  if (s?.sumar?.disponible) activarSumar(s.sumar, contexto);
   $("#modal").classList.remove("oculto");
 }
 
+/**
+ * Sumar postulaciones (Ali, 2026-11-05): quien ya compró un pack paga lo que
+ * quiera y recibe postulaciones al precio por postulación de SU pack.
+ */
+function bloqueSumar(r) {
+  const precio = `S/ ${r.precio.toFixed(2)}`;
+  return `
+    <div class="pe-sumar">
+      <p class="pe-nombre">Suma postulaciones a tu pack</p>
+      <div class="pe-monto">
+        <button type="button" class="pe-menos" aria-label="Menos">−</button>
+        <span>S/ <b id="pe-soles">10</b></span>
+        <button type="button" class="pe-mas" aria-label="Más">+</button>
+      </div>
+      <div class="pe-rapidos">${[5, 10, 20, 40].map((v) => `<button type="button" data-soles="${v}">S/ ${v}</button>`).join("")}</div>
+      <p class="pe-unidad"><b id="pe-cuantas">${cuantasPor(10, r.precio)}</b> postulaciones · a ${precio} cada una, el precio de tu pack de ${escapar(r.plan)}</p>
+      <button class="boton primario" type="button" id="pe-sumar-ir">Sumar con Yape</button>
+    </div>`;
+}
+
+function activarSumar(r, contexto) {
+  let soles = 10;
+  const pintar = () => {
+    $("#pe-soles").textContent = soles;
+    $("#pe-cuantas").textContent = cuantasPor(soles, r.precio);
+    $("#pe-sumar-ir").textContent = `Sumar ${cuantasPor(soles, r.precio)} con Yape · S/ ${soles}`;
+  };
+  const poner = (v) => { soles = Math.max(r.minimo, Math.min(r.maximo, v)); pintar(); };
+  $(".pe-menos").addEventListener("click", () => poner(soles - 5));
+  $(".pe-mas").addEventListener("click", () => poner(soles + 5));
+  document.querySelectorAll(".pe-rapidos button").forEach((b) =>
+    b.addEventListener("click", () => poner(Number(b.dataset.soles))));
+  $("#pe-sumar-ir").addEventListener("click", () => pagarPlan("sumar", contexto,
+    { soles, nombre: `${cuantasPor(soles, r.precio)} postulaciones más` }));
+  pintar();
+}
+
 /** Paso 2 del modal: cómo pagar el plan elegido, sin salir del panel. */
-async function pagarPlan(id, contexto) {
-  const p = PLANES_EXT[id];
-  const pago = (await infoPago()).pago || {};
+async function pagarPlan(id, contexto, extra = null) {
+  const p = extra ? { nombre: extra.nombre, soles: extra.soles } : PLANES_EXT[id];
+  const pago = await sesion.datosPago();
   $("#modal-contenido").innerHTML = `
     <div class="valor pe-pago">
       <button class="enlace pe-volver" type="button" id="pe-volver">← Otros planes</button>
@@ -1986,7 +2029,7 @@ async function pagarPlan(id, contexto) {
       : `<p class="nota">Escríbenos a <a href="mailto:${escapar(pago.correo || "chambalistaperu@gmail.com")}?subject=${encodeURIComponent(p.nombre)}">${escapar(pago.correo || "chambalistaperu@gmail.com")}</a>
           y te pasamos el número de Yape.</p>`}
       <p class="nota" id="pe-estado" role="status"></p>
-      <p class="nota">${p.soles === 39 ? "Empieza el día que lo activamos. Termina a los 30 días y no se renueva solo." : "No caducan y no se renuevan solos: pagas una vez."}</p>
+      <p class="nota">No caducan y no se renuevan solos: pagas una vez.</p>
     </div>`;
   $("#pe-volver").addEventListener("click", () => abrirPlanes(contexto));
   $("#pe-copiar")?.addEventListener("click", (ev) => copiarInvitacion(pago.yape, ev.currentTarget));
@@ -1994,7 +2037,7 @@ async function pagarPlan(id, contexto) {
     const b = ev.currentTarget;
     b.disabled = true;
     $("#pe-estado").textContent = "Avisando…";
-    const r = await sesion.avisarPago(id, $("#pe-operacion")?.value.trim() || "");
+    const r = await sesion.avisarPago(id, $("#pe-operacion")?.value.trim() || "", extra?.soles ?? null);
     $("#pe-estado").textContent = r.mensaje || r.error;
     if (r.error) { b.disabled = false; return; }
     b.remove();
@@ -2102,7 +2145,8 @@ function pintarTuPlan(s) {
   $("#tp-titulo").textContent = v.titulo;
   $("#tp-relleno").style.width = `${v.barra}%`;
   $("#tp-detalle").textContent = v.detalle;
-  $("#tp-planes").textContent = s.plan === "agotado" ? "Elegir un plan" : "Ver planes";
+  $("#tp-planes").textContent = s.sumar?.disponible ? "Sumar postulaciones"
+    : s.plan === "agotado" ? "Elegir un plan" : "Ver planes";
   $("#tp-planes").onclick = () => abrirPlanes();
 }
 
@@ -2129,7 +2173,9 @@ function vistaDelPlan(s) {
   return {
     etiqueta: "Sin postulaciones", titulo: "Se terminaron tus postulaciones", pildora: s.en_revision ? "Pago en revisión" : "Elegir un plan",
     barra: 0, poco: true,
-    detalle: s.en_revision ? revision.trim() : "Las vacantes siguen aquí. Elige un plan y seguimos.",
+    detalle: s.en_revision ? revision.trim() : s.sumar?.disponible
+      ? "Las vacantes siguen aquí. Suma las postulaciones que necesites al precio de tu pack y seguimos."
+      : "Las vacantes siguen aquí. Elige un plan y seguimos.",
   };
 }
 

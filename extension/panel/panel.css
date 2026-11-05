@@ -1954,3 +1954,13 @@ body.muro-on > header, body.muro-on > main, body.muro-on > footer, body.muro-on 
   .muro, .muro-tarjeta, .pista { transition: none; }
   .muro-chip, .resalte { animation: none; }
 }
+
+/* Sumar postulaciones (después de comprar un pack). */
+.pe-sumar { display: grid; gap: 8px; border: 2px dashed var(--tinta); border-radius: 12px; padding: 12px 14px; background: var(--menta-suave); }
+.pe-monto { display: flex; align-items: center; gap: 14px; justify-content: center; font-size: 22px; font-weight: 900; }
+.pe-monto button { width: 36px; height: 36px; border-radius: 99px; border: 2px solid var(--tinta); background: #fff; font-size: 20px; font-weight: 900; cursor: pointer; }
+.pe-rapidos { display: flex; gap: 6px; justify-content: center; flex-wrap: wrap; }
+.pe-rapidos button { border: 1.5px solid var(--tinta); background: #fff; border-radius: 99px; padding: 3px 10px; font: inherit; font-size: 12px; font-weight: 700; cursor: pointer; }
+
+/* La pista nunca tapa un modal abierto (el modal es z-index 40). */
+.pista { z-index: 35; }

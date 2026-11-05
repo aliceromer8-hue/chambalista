@@ -63,12 +63,14 @@ export const SOLO_RELLENA = [];
 // la veinte. Eso no se disimula — `correrLote` para en seco y lo dice
 // con el número exacto de las que sí salieron, en vez de pintar ochenta
 // tarjetas rojas idénticas. Con facturación en Gemini, las cien entran.
+// Los packs que se venden (Ali, 2026-11-05). La fuente de verdad de los
+// precios es saldo.PLANES en el servidor; esto solo es el pack mayor.
 export const PACKS = [
-  { postulaciones: 5, soles: 0, nombre: "Para probar" },
-  { postulaciones: 30, soles: 15, nombre: "Pack chico" },
-  { postulaciones: 100, soles: 29, nombre: "Recomendado" },
+  { postulaciones: 30, soles: 15, nombre: "Pack de 30" },
+  { postulaciones: 50, soles: 29, nombre: "Pack de 50" },
+  { postulaciones: 80, soles: 39, nombre: "Pack de 80" },
 ];
-export const PACK_MAYOR = 100;
+export const PACK_MAYOR = 80;
 
 // ── Lo seguro por día (Ali, 2026-09-25: «que no baneen tu cuenta») ──
 //

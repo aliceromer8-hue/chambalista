@@ -249,6 +249,9 @@ def registrar_reclamo():
     if not ok:
         return jsonify({"error": r}), 400
     medir("reclamo_registrado")
+    import alertas
+    alertas.alertar("Nuevo reclamo", f"{r}. Responde en máximo 15 días hábiles: está en /admin.",
+                    prioridad=4, etiquetas=["warning"])
     return jsonify({"numero": r})
 
 
@@ -376,9 +379,11 @@ def estado():
         # Cómo pagar un pack (Yape/Plin). El número vive en el entorno de
         # Vercel, no en el código: se cambia sin desplegar y no queda en
         # el repositorio. Sin número, la página pide escribir al correo.
+        # El número de Yape ya NO va aquí: esto lo lee cualquiera. Se da
+        # solo con sesión iniciada (/api/pago/datos). Ali, 2026-11-05: «me da
+        # miedo que me doxeen».
         "pago": {
-            "yape": os.environ.get("PAGO_YAPE", "").strip(),
-            "titular": os.environ.get("PAGO_TITULAR", "").strip(),
+            "listo": bool(os.environ.get("PAGO_YAPE", "").strip()),
             "correo": "chambalistaperu@gmail.com",
         },
         # Los planes salen de saldo.PLANES: web, extensión y /admin dicen
@@ -912,15 +917,31 @@ def ver_saldo():
                     "en_revision": saldo.aviso_pendiente(g.usuario["id"])})
 
 
+@app.get("/api/pago/datos")
+@con_sesion
+def datos_pago():
+    """A dónde yapear. Solo con sesión: el número no queda a la vista de todos."""
+    return jsonify({
+        "yape": os.environ.get("PAGO_YAPE", "").strip(),
+        "titular": os.environ.get("PAGO_TITULAR", "").strip(),
+        "correo": "chambalistaperu@gmail.com",
+    })
+
+
 @app.post("/api/pago/aviso")
 @con_sesion
 def aviso_pago():
     """«Ya yapeé». Solo deja el aviso para que Ali lo compruebe y acredite."""
+    import alertas
     import saldo
     if not _pasa_cuenta():
         return jsonify({"error": "Demasiados intentos. Espera unos minutos."}), 429
     d = request.get_json(silent=True) or {}
-    ok, mensaje = saldo.avisar_pago(g.usuario.get("correo"), d.get("plan"), g.usuario["id"], d.get("operacion"))
+    ok, mensaje, resumen = saldo.avisar_pago(g.usuario.get("correo"), d.get("plan"), g.usuario["id"],
+                                              d.get("operacion"), d.get("soles"))
+    if ok:
+        alertas.alertar("Nuevo «Ya yapeé»", f"{resumen}. Compruébalo en tu Yape y actívalo en /admin.",
+                        prioridad=4, etiquetas=["moneybag"])
     return (jsonify({"mensaje": mensaje}), 200) if ok else (jsonify({"error": mensaje}), 400)
 
 
@@ -1009,7 +1030,7 @@ def admin_acreditar():
     if not (0 <= cuantas <= 1000 and 0 <= dias <= 365 and (cuantas or dias)) or "@" not in str(d.get("correo") or ""):
         return jsonify({"error": "Pon un correo y un pack o pase válido."}), 400
     ok, mensaje, e = saldo.acreditar(d.get("correo"), cuantas, d.get("soles") or 0, d.get("nota") or "", dias,
-                                     aviso=d.get("aviso"))
+                                     aviso=d.get("aviso"), plan=d.get("plan"))
     return (jsonify({"mensaje": mensaje, "estado": e}), 200) if ok else (jsonify({"error": mensaje}), 400)
 
 
@@ -1033,7 +1054,29 @@ def mantener():
     vivo = nube._pedir("GET", "eventos?select=id&limit=1") is not None
     hace3 = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime(time.time() - 3 * 86400))
     nube._pedir("DELETE", f"uso_ia?creado=lt.{hace3}", None, {"Prefer": "return=minimal"})
+    _resumen_diario()
     return jsonify({"ok": vivo})
+
+
+def _resumen_diario():
+    """Una vez al día (el cron): lo que sigue pendiente en /admin, al celular."""
+    import alertas
+    import reclamos
+    import saldo
+    avisos = saldo.avisos_pendientes()
+    pendientes = [c for c in reclamos.pendientes() if not c.get("respondido")]
+    hace10 = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime(time.time() - 10 * 86400))
+    urgentes = [c for c in pendientes if (c.get("creado") or "") < hace10]
+    if not (avisos or pendientes):
+        return
+    partes = []
+    if avisos:
+        partes.append(f"{len(avisos)} pago(s) por activar")
+    if pendientes:
+        partes.append(f"{len(pendientes)} reclamo(s) por responder"
+                      + (f", {len(urgentes)} con más de 10 días" if urgentes else ""))
+    alertas.alertar("Pendientes en Chamba Lista", " · ".join(partes) + ".",
+                    prioridad=5 if urgentes else 3, etiquetas=["clipboard"])
 
 
 @app.errorhandler(413)

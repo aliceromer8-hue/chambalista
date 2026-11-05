@@ -5,9 +5,11 @@ Modelo (Ali, 2026-10-02):
   · GRATIS: 18 postulaciones al crear la cuenta. No caducan. Con todo
     incluido (CV adaptado, respuestas): quien ve salir sus postulaciones
     sabe lo que compra.
-  · PACKS: 30 por S/ 15, 100 por S/ 29. No caducan, se suman.
-  · PASE de 30 días: S/ 39. Postula sin descontar mientras dure (con el
-    tope diario seguro); lo que quede de packs se guarda para después.
+  · PACKS (Ali, 2026-11-05): 30 por S/ 15, 50 por S/ 29, 80 por S/ 39.
+    No caducan. (El pase de 30 días salió de la venta; el código lo sigue
+    entendiendo por si se vuelve a ofrecer.)
+  · SUMAR POSTULACIONES: quien ya compró un pack puede pagar el monto que
+    quiera y recibe postulaciones al precio por postulación de su pack.
   · INVITAR: la cuenta nueva gana 10 al canjear el código; quien invitó
     gana sus 10 cuando la invitada envía su primera postulación.
 
@@ -32,14 +34,27 @@ BONO_REFERIDO = int(os.environ.get("BONO_REFERIDO", "10"))
 
 # La única lista de planes: la usan /api/estado (web y extensión) y /admin.
 PLANES = {
-    "100": {"nombre": "Pack de 100 postulaciones", "postulaciones": 100, "dias": 0, "soles": 29},
-    "pase": {"nombre": "Pase de 30 días", "postulaciones": 0, "dias": 30, "soles": 39},
+    "80": {"nombre": "Pack de 80 postulaciones", "postulaciones": 80, "dias": 0, "soles": 39},
+    "50": {"nombre": "Pack de 50 postulaciones", "postulaciones": 50, "dias": 0, "soles": 29},
     "30": {"nombre": "Pack de 30 postulaciones", "postulaciones": 30, "dias": 0, "soles": 15},
 }
+RECARGA_MIN, RECARGA_MAX = 5, 300
+
+
+def precio_unitario(plan):
+    """Lo que cuesta una postulación en ese pack (S/ 15 / 30 = S/ 0.50)."""
+    p = PLANES.get(str(plan)) or PLANES["30"]
+    return p["soles"] / p["postulaciones"]
+
+
+def postulaciones_por(soles, plan):
+    """Cuántas da un monto al precio de ese pack. Siempre a favor de la persona
+    en el redondeo de centavos (S/ 10 en el pack de 80 → 20, no 20.5 → 20)."""
+    return int(float(soles) / precio_unitario(plan) + 1e-9)
 
 _UUID = re.compile(r"^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$")
 _CODIGO = re.compile(r"^[0-9a-f]{8}$")
-_COLUMNAS = "postulaciones,regaladas,compradas,pase_hasta,codigo,referido_por,bono_pagado,creado"
+_COLUMNAS = "postulaciones,regaladas,compradas,pase_hasta,codigo,referido_por,bono_pagado,creado,ultimo_plan"
 
 
 def cobrando():
@@ -101,6 +116,15 @@ def _estado_de(f, usuario_id):
         "codigo": f.get("codigo") or usuario_id[:8],
         "bono_referido": BONO_REFERIDO,
         "invitado": bool(f.get("referido_por")),
+        "ultimo_plan": f.get("ultimo_plan"),
+        # Sumar postulaciones: solo después de haber comprado un pack, al
+        # precio por postulación de ese pack.
+        "sumar": {
+            "disponible": compradas > 0,
+            "plan": f.get("ultimo_plan") if f.get("ultimo_plan") in PLANES else "30",
+            "precio": round(precio_unitario(f.get("ultimo_plan") if f.get("ultimo_plan") in PLANES else "30"), 4),
+            "minimo": RECARGA_MIN, "maximo": RECARGA_MAX,
+        },
     }
 
 
@@ -185,7 +209,7 @@ def _usuario_por_correo(correo):
     return None
 
 
-def acreditar(correo, postulaciones=0, soles=0, nota="", dias=0, aviso=None):
+def acreditar(correo, postulaciones=0, soles=0, nota="", dias=0, aviso=None, plan=None):
     """Suma un pack (postulaciones) o un pase (días). Devuelve (ok, mensaje, estado)."""
     usuario_id = _usuario_por_correo(correo)
     if not usuario_id:
@@ -197,6 +221,8 @@ def acreditar(correo, postulaciones=0, soles=0, nota="", dias=0, aviso=None):
     if postulaciones:
         cambios["postulaciones"] = int(f.get("postulaciones") or 0) + int(postulaciones)
         cambios["compradas"] = int(f.get("compradas") or 0) + int(postulaciones)
+        if str(plan or "") in PLANES:
+            cambios["ultimo_plan"] = str(plan)
     if dias:
         base = max(_ahora(), _fecha(f.get("pase_hasta")) or _ahora())
         cambios["pase_hasta"] = (base + timedelta(days=int(dias))).isoformat()
@@ -213,19 +239,39 @@ def acreditar(correo, postulaciones=0, soles=0, nota="", dias=0, aviso=None):
     return True, f"Listo: {correo} tiene ahora {detalle}.", e
 
 
-def avisar_pago(correo, plan, usuario_id=None, operacion=""):
-    """«Ya yapeé»: queda en la lista de /admin. No acredita nada."""
-    p = PLANES.get(str(plan))
+def avisar_pago(correo, plan, usuario_id=None, operacion="", soles=None):
+    """«Ya yapeé»: queda en la lista de /admin. No acredita nada.
+
+    Devuelve (ok, mensaje, resumen). El resumen («Pack de 80 · S/ 39») es lo
+    único que viaja a la alerta del celular: ni correo ni nombre.
+    """
     correo = (correo or "").strip().lower()[:200]
-    if not p or "@" not in correo:
-        return False, "Falta el plan o el correo."
-    fila = {"correo": correo, "plan": str(plan), "soles": p["soles"],
+    if "@" not in correo:
+        return False, "Falta el correo de tu cuenta.", None
+    if str(plan) == "sumar":
+        e = estado(usuario_id) if usuario_id else None
+        if not e or not e["sumar"]["disponible"]:
+            return False, "Sumar postulaciones es para quien ya compró un pack.", None
+        try:
+            monto = int(float(soles))
+        except (TypeError, ValueError):
+            monto = 0
+        if not (RECARGA_MIN <= monto <= RECARGA_MAX):
+            return False, f"El monto va de S/ {RECARGA_MIN} a S/ {RECARGA_MAX}.", None
+        cuantas = postulaciones_por(monto, e["sumar"]["plan"])
+        p = {"nombre": f"{cuantas} postulaciones más", "postulaciones": cuantas, "soles": monto}
+    else:
+        p = PLANES.get(str(plan))
+        if not p:
+            return False, "Ese plan no existe.", None
+    fila = {"correo": correo, "plan": str(plan), "soles": p["soles"], "postulaciones": p["postulaciones"],
             "operacion": re.sub(r"[^0-9A-Za-z-]", "", str(operacion or ""))[:30] or None}
     if usuario_id and _UUID.match(usuario_id):
         fila["usuario"] = usuario_id
     if nube._pedir("POST", "avisos_pago", [fila], {"Prefer": "return=minimal"}) is None:
-        return False, "No se pudo registrar el aviso. Escríbenos al correo y lo activamos igual."
-    return True, "Recibido. Lo comprobamos en el Yape y lo activamos; te avisamos en la extensión."
+        return False, "No se pudo registrar el aviso. Escríbenos al correo y lo activamos igual.", None
+    return (True, "Recibido. Lo comprobamos en el Yape y lo activamos; te avisamos en la extensión.",
+            f"{p['nombre']} · S/ {p['soles']}")
 
 
 def aviso_pendiente(usuario_id):
@@ -239,7 +285,7 @@ def aviso_pendiente(usuario_id):
 
 def avisos_pendientes():
     """Lo que Ali tiene por comprobar en /admin."""
-    return nube._pedir("GET", "avisos_pago?select=id,correo,plan,soles,operacion,creado"
+    return nube._pedir("GET", "avisos_pago?select=id,correo,plan,soles,postulaciones,operacion,creado"
                               "&atendido=eq.false&order=creado.asc&limit=100") or []
 
 

@@ -595,7 +595,7 @@ check("los términos se sirven aparte", _ter.status_code == 200)
 _ter = _ter.get_data(as_text=True)
 for _pieza, _que in [
     ("no caducan", "dicen que los packs no caducan"),
-    ("no se renueva solo", "dicen que el pase no se renueva solo"),
+    ("Sumar postulaciones", "dicen que se pueden sumar postulaciones al precio del pack"),
     ("solo se descuenta cuando se envía", "dicen cuándo se descuenta una postulación"),
     ("Devoluciones", "tienen política de devoluciones"),
     ("pueden limitar o suspender cuentas", "advierten del riesgo de los portales"),
@@ -1005,10 +1005,20 @@ check("los números del bloque de precios son tamaños de pack",
 check("y cada plan de pago dice su precio", _precios.count('class="plan-precio"') == 3, _precios.count('class="plan-precio"'))
 check("lo gratis son 18 postulaciones, no días", "<b>18</b> postulaciones" in _precios and "18 días" not in _visible)
 check("y no dice «sin tarjeta» (es obvio)", "sin tarjeta" not in _visible.lower())
-check("hay pase de 30 días que se paga igual que un pack", 'data-plan="pase"' in _precios and "Pase de 30 días" in _precios)
-check("el recomendado va al centro: pase, 100, 30", _precios.index('data-plan="pase"') < _precios.index('data-plan="100"') < _precios.index('data-plan="30"'))
-check("el ahorro que se anuncia es la cuenta real (0.29 frente a 0.50)", "42% menos" in _precios and round((1 - 0.29 / 0.50) * 100) == 42)
-check("el precio por día del pase es la cuenta real", "S/ 1.30 al día" in _precios and round(39 / 30, 2) == 1.30)
+check("los packs de Ali: 30 por 15, 50 por 29, 80 por 39",
+      all(f'data-plan="{_k}"' in _precios for _k in ("30", "50", "80")) and "pase" not in _precios.split("-->")[-1].lower())
+check("el recomendado (80) va al centro: 50, 80, 30",
+      _precios.index('data-plan="50"') < _precios.index('data-plan="80"') < _precios.index('data-plan="30"'))
+check("«el mejor precio por postulación» es verdad (39/80 < 15/30 < 29/50)",
+      "El mejor precio por postulación" in _precios and 39 / 80 < 15 / 30 < 29 / 50)
+check("los céntimos anunciados son la cuenta real", "49 céntimos" in _precios and round(39 / 80 * 100) == 49
+      and "58 céntimos" in _precios and round(29 / 50 * 100) == 58)
+check("«por S/ 10 más, 30 postulaciones más» es la cuenta real", "Por S/ 10 más, el de 80 trae 30 postulaciones más" in _precios
+      and 39 - 29 == 10 and 80 - 50 == 30)
+check("y se puede sumar después al precio del pack", "Sumas las que necesites" in _precios)
+check("el número de Yape ya no sale en /api/estado (solo con sesión)",
+      "yape" not in json.dumps(cliente.get("/api/estado").get_json()["pago"]).lower().replace("chambalistaperu", ""))
+check("/api/pago/datos pide sesión", cliente.get("/api/pago/datos").status_code == 401)
 check("«Ya yapeé» en el pago", 'id="pago-listo"' in _pag and "/api/pago/aviso" in pathlib.Path("static/js/web.js").read_text(encoding="utf-8"))
 check("ni rastro de «recarga» en la web", "recarg" not in _visible.lower())
 _webjs = (pathlib.Path("static/js/web.js")).read_text(encoding="utf-8")
@@ -1663,12 +1673,24 @@ check("un id raro no llega a la base", _sal.disponibles("1' or 1=1") is None)
 check("un código de invitación no se canjea a uno mismo", _sal.referir(_U, "11111111")[0] is False)
 check("ni un código con forma rara", _sal.referir(_U, "x' or 1=1")[0] is False)
 check("«Ya yapeé» exige un plan que exista", _sal.avisar_pago("a@b.pe", "999")[0] is False)
-check("los planes: 100 por 29, pase 30 días por 39, 30 por 15",
-      (_sal.PLANES["100"]["soles"], _sal.PLANES["pase"]["dias"], _sal.PLANES["pase"]["soles"], _sal.PLANES["30"]["soles"])
-      == (29, 30, 39, 15))
+check("los planes: 80 por 39, 50 por 29, 30 por 15",
+      (_sal.PLANES["80"]["soles"], _sal.PLANES["50"]["soles"], _sal.PLANES["30"]["soles"])
+      == (39, 29, 15))
 check("/api/estado reparte los planes (una sola fuente de precios)",
-      _c9.get("/api/estado").get_json()["planes"]["100"]["soles"] == 29)
-check("«Ya yapeé» pide cuenta", _c9.post("/api/pago/aviso", json={"plan": "100"}).status_code == 401)
+      _c9.get("/api/estado").get_json()["planes"]["80"]["soles"] == 39)
+check("sumar: S/ 10 al precio de cada pack, redondeado a favor de la persona",
+      (_sal.postulaciones_por(10, "80"), _sal.postulaciones_por(10, "50"), _sal.postulaciones_por(10, "30")) == (20, 17, 20))
+with _mk9.patch.object(_sal, "estado", lambda u: {"sumar": {"disponible": False}}):
+    check("sumar es solo para quien ya compró un pack", _sal.avisar_pago("a@b.pe", "sumar", _U, "", 10)[0] is False)
+with _mk9.patch.object(_sal, "estado", lambda u: {"sumar": {"disponible": True, "plan": "80"}}):
+    check("y con monto fuera de rango (S/ 1) no", _sal.avisar_pago("a@b.pe", "sumar", _U, "", 1)[0] is False)
+import alertas as _al
+with _mk9.patch.dict(_os.environ, {"NTFY_TEMA": ""}, clear=False):
+    check("sin NTFY_TEMA, la alerta no hace nada (ni revienta)", _al.alertar("t", "x") is False)
+_ap = pathlib.Path("app_web.py").read_text(encoding="utf-8")
+check("las alertas al celular no llevan correos ni nombres", "alertar(" in _ap and "g.usuario.get(\"correo\")}" not in _ap
+      and "resumen" in _ap)
+check("«Ya yapeé» pide cuenta", _c9.post("/api/pago/aviso", json={"plan": "80"}).status_code == 401)
 with _mk9.patch.dict(_os.environ, {"ADMIN_CLAVE": "una-clave-larga-de-prueba"}, clear=False):
     check("la lista de avisos pide la clave de admin",
           _c9.get("/api/admin/avisos", headers={"X-Admin": "otra"}).status_code in (401, 429))
@@ -1683,6 +1705,31 @@ with _mk9.patch.dict(_os.environ, {"ADMIN_CLAVE": ""}, clear=False):
 check("la página de admin no se indexa ni lleva scripts en línea",
       "noindex" in (_adm := pathlib.Path("templates/admin.html").read_text(encoding="utf-8")) and "<script>" not in _adm)
 check("hay migración para saldos y pagos", pathlib.Path("supabase/006-saldos.sql").exists())
+
+titulo("CV ADAPTADO — auditoría 2026-11-05")
+import redactor_ia as _ra
+check("una cifra que no está en el CV se detecta como inventada",
+      _ra.cifras_inventadas("Aumenté las ventas en 40 %", "Vendí en tienda 3 años") == ["40"])
+check("y una que sí está, no", _ra.cifras_inventadas("Con 3 años en ventas", "Vendí en tienda 3 años") == [])
+_perfil_estr = {"nombre": "Ana Pérez", "perfil": ["Estudiante de marketing en la USIL."],
+                "experiencia": [{"organizacion": "Tienda X", "cargo": "Vendedora", "fechas": "2024",
+                                 "logros": ["Atendí a más de 200 clientes al mes."]}]}
+import unittest.mock as _mk11
+_visto = {}
+def _llamar_falso(prompt, instrucciones):
+    _visto["prompt"] = prompt
+    return '{"resumen": ["Vendedora con 200 clientes al mes", "Logré 95% de satisfacción"], "cambios": ["x"]}'
+with _mk11.patch.object(_ra, "_llamar", _llamar_falso):
+    _ad = _ra.adaptar_para_vacante(_perfil_estr, {"titulo": "Ventas", "descripcion": "Atención al cliente"})
+check("la IA recibe el CV aunque venga estructurado (sin `secciones`)", "Tienda X" in _visto.get("prompt", ""))
+check("y la línea con una cifra inventada (95 %) se descarta", _ad and _ad["resumen"] == ["Vendedora con 200 clientes al mes"])
+with _mk11.patch.object(_ra, "_llamar", lambda p, i: '{"resumen": ["algo"]}'):
+    check("sin CV no se adapta nada", _ra.adaptar_para_vacante({"nombre": "X"}, {"titulo": "Ventas"}) is None)
+_bg = pathlib.Path("extension/background.js").read_text(encoding="utf-8")
+check("las respuestas usan el resumen adaptado también en `secciones`",
+      "base.secciones = { ...perfil.secciones, resumen: ad.resumen }" in _bg)
+check("en Computrabajo no se borra el CV adaptado anterior (hasta verificarlo)",
+      "ponerCVEnComputrabajo(tabId, pedidoCV, { reemplazarNuestro: false })" in _bg)
 
 print(f"\n{'TODO OK' if fallos == 0 else f'{fallos} FALLO(S)'}")
 sys.exit(1 if fallos else 0)

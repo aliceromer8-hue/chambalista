@@ -823,11 +823,14 @@ def adaptar_para_vacante(perfil, vacante):
     if vacante.get("requisitos"):
         partes.append("Requisitos: " + " | ".join(vacante["requisitos"][:12]))
 
-    secciones = perfil.get("secciones", {})
-    partes.append("\nCV ACTUAL:")
-    for clave in ("resumen", "experiencia", "educacion", "habilidades", "idiomas", "certificaciones"):
-        if secciones.get(clave):
-            partes.append(f"\n[{clave}]\n" + "\n".join(secciones[clave]))
+    # El CV entero, sea cual sea su forma. Antes solo se leía el plano
+    # `secciones`: con un perfil estructurado (el que manda la extensión
+    # cuando no trae `secciones`) le llegaba al modelo la vacante SIN el CV,
+    # y escribía un resumen de la nada. Auditoría 2026-11-05.
+    texto_cv = _cv_en_texto(perfil)
+    if len(texto_cv.strip()) < 80:
+        return None
+    partes.append("\nCV ACTUAL:\n" + texto_cv)
 
     datos = _extraer_json(_llamar("\n".join(partes), INSTRUCCIONES_ADAPTACION))
     if not isinstance(datos, dict):
@@ -843,7 +846,21 @@ def adaptar_para_vacante(perfil, vacante):
     cambios = datos.get("cambios")
     if isinstance(cambios, list):
         resultado["cambios"] = [str(c).strip() for c in cambios if str(c).strip()][:6]
+    # Red de seguridad contra inventos: una línea con una CIFRA que no está
+    # en el CV («aumenté ventas 40 %», «5 años») se descarta. Las reglas del
+    # modelo lo prohíben; esto lo comprueba.
+    for clave in ("resumen", "experiencia", "habilidades"):
+        if resultado.get(clave):
+            resultado[clave] = [l for l in resultado[clave] if not cifras_inventadas(l, texto_cv)]
+            if not resultado[clave]:
+                del resultado[clave]
     return resultado if len(resultado) > 1 else None
+
+
+def cifras_inventadas(linea, texto_cv):
+    """Las cifras de la línea que no aparecen en el CV (vacío si ninguna)."""
+    en_cv = set(re.findall(r"\d+", texto_cv or ""))
+    return [n for n in re.findall(r"\d+", linea or "") if n not in en_cv]
 
 
 def redactar(enunciado, perfil, extras=None):

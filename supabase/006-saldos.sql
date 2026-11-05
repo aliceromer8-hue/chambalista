@@ -60,3 +60,7 @@ create table if not exists avisos_pago (
 );
 alter table avisos_pago enable row level security;
 create index if not exists avisos_pago_pendientes on avisos_pago (atendido, creado);
+
+-- 2026-11-05: packs de 30/50/80 y «sumar postulaciones» al precio del pack.
+alter table saldos add column if not exists ultimo_plan text;
+alter table avisos_pago add column if not exists postulaciones integer not null default 0;

@@ -2,14 +2,17 @@
 // en ningún sitio: se escribe cada vez y viaja solo en la cabecera X-Admin.
 const $ = (s) => document.querySelector(s);
 const clave = () => $("#adm-clave").value;
-const VALOR = { "100": "100|29|0", pase: "0|39|30", "30": "30|15|0" };
+const VALOR = { "80": "80|39|0", "50": "50|29|0", "30": "30|15|0" };
 
-async function acreditar({ correo, valor, nota = "", aviso = "" }) {
+async function acreditar({ correo, valor, nota = "", aviso = "", plan = "" }) {
   const [postulaciones, soles, dias] = valor.split("|").map(Number);
+  // Qué pack es (para el precio de «sumar postulaciones»). Un regalo o una
+  // suma no cambia el pack de la persona.
+  plan = plan || (soles > 0 && VALOR[String(postulaciones)] ? String(postulaciones) : "");
   const r = await fetch("/api/admin/acreditar", {
     method: "POST",
     headers: { "Content-Type": "application/json", "X-Admin": clave() },
-    body: JSON.stringify({ correo, postulaciones, soles, dias, nota, aviso }),
+    body: JSON.stringify({ correo, postulaciones, soles, dias, nota, aviso, plan }),
   });
   const j = await r.json().catch(() => ({}));
   return { ok: r.ok, texto: j.mensaje || j.error || `El servidor respondió ${r.status}.` };
@@ -25,7 +28,7 @@ async function verAvisos() {
     lista.textContent = "";
     if (!j.avisos.length) { lista.textContent = "No hay pagos por activar."; return; }
     for (const a of j.avisos) {
-      const plan = j.planes[a.plan] || { nombre: a.plan, soles: a.soles };
+      const plan = j.planes[a.plan] || { nombre: a.plan === "sumar" ? `Sumar ${a.postulaciones} postulaciones` : a.plan, soles: a.soles };
       const li = document.createElement("li");
       const texto = document.createElement("span");
       texto.textContent = `${a.correo} · ${plan.nombre} · S/ ${plan.soles}`
@@ -36,7 +39,9 @@ async function verAvisos() {
       b.textContent = "Ya lo vi en mi Yape: activar";
       b.addEventListener("click", async () => {
         b.disabled = true;
-        const res = await acreditar({ correo: a.correo, valor: VALOR[a.plan], nota: a.operacion || "", aviso: String(a.id) });
+        const valor = VALOR[a.plan] || `${a.postulaciones}|${a.soles}|0`;
+        const res = await acreditar({ correo: a.correo, valor, nota: a.operacion || "", aviso: String(a.id),
+                                      plan: VALOR[a.plan] ? a.plan : "sumar" });
         texto.textContent = res.texto;
         if (res.ok) b.remove(); else b.disabled = false;
       });

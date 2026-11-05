@@ -457,7 +457,11 @@ async function prepararUna(vacante, perfil, guardados, respuestasPersona) {
   if ((vacante.portalId || "") === "computrabajo" && modoCV === "adaptado" && pedidoCV) {
     if (lote?.actual) lote.actual.paso = "Subiendo tu CV adaptado a Computrabajo";
     try {
-      const puesto = await ponerCVEnComputrabajo(tabId, pedidoCV, { reemplazarNuestro: true });
+      // Sin borrar el adaptado anterior: no sabemos todavía si Computrabajo
+      // guarda una copia del CV en cada postulación o si la postulación
+      // apunta al archivo (borrarlo dejaría a esa empresa sin tu CV). Solo
+      // se borra uno nuestro cuando la cuenta ya no admite más archivos.
+      const puesto = await ponerCVEnComputrabajo(tabId, pedidoCV, { reemplazarNuestro: false });
       reporte.cv = { adjuntado: true, enCuenta: true, archivo: puesto.nombre };
     } catch (e) {
       reporte.cv = { adjuntado: false, nota: `No se pudo poner el CV adaptado en Computrabajo (${e.message}). Va el principal de tu cuenta.` };
@@ -634,7 +638,12 @@ async function cvAdaptado(perfil, vacante, confirmadas) {
     const ad = await ia.adaptarAVacante(perfil, vacante);
     if (ad?.resumen?.length) {
       resumen = ad.resumen;
+      // El resumen adaptado en LAS DOS formas del CV: el servidor, al
+      // redactar las respuestas, lee primero `secciones` si existe. Antes
+      // solo se cambiaba `perfil` y las respuestas salían del resumen viejo
+      // aunque el panel dijera «con tu CV adaptado». Auditoría 2026-11-05.
       base = { ...perfil, perfil: ad.resumen };
+      if (perfil.secciones) base.secciones = { ...perfil.secciones, resumen: ad.resumen };
       cambios = ad.cambios || [];
     }
   } catch { /* el CV base sirve igual */ }
