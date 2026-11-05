@@ -1,4 +1,4 @@
-# Ficha para la Chrome Web Store — Chamba Lista 1.0.1
+# Ficha para la Chrome Web Store — Chamba Lista 1.0.2
 
 Todo listo para copiar y pegar en https://chrome.google.com/webstore/devconsole
 (cuenta de desarrollador: pago único de USD 5 y verificación de identidad).
@@ -10,14 +10,14 @@ Todo listo para copiar y pegar en https://chrome.google.com/webstore/devconsole
    (`extension/lib/servidor.js`) y regenero el ZIP, así la versión de la
    tienda nace con la dirección definitiva. Si subes antes, cambiarla después
    obliga a otra revisión de Google.
-2. **Paquete**: `tienda/chamba-lista-1.0.1.zip` (sin archivos de prueba).
+2. **Paquete**: `tienda/chamba-lista-1.0.2.zip` (sin archivos de prueba).
 
 ## Ficha de la tienda
 
 **Nombre** (máx. 75): Chamba Lista — postula sin escribir lo mismo mil veces
 
 **Resumen** (máx. 132):
-Postula a prácticas y primer empleo en Perú con tu CV adaptado a cada vacante. Busca, llena y envía por ti.
+Postula a prácticas y primer empleo en Perú con tu CV reenfocado a cada vacante. Busca, llena y envía por ti.
 
 **Categoría**: Productividad → Flujo de trabajo y planificación · **Idioma**: Español (Latinoamérica)
 
@@ -33,7 +33,7 @@ bueno.
 • Te dice qué vacantes encajan mejor contigo y cuánto te tomaría llegar.
 • Topes diarios y pausas para cuidar tus cuentas en los portales.
 • Seguimiento de todas tus postulaciones en un solo lugar.
-• Tus primeras 18 postulaciones son gratis.
+• Tus primeras 12 postulaciones son gratis.
 
 Trabaja con las sesiones que ya abriste en cada portal: nunca te pide ni
 guarda tus contraseñas de Computrabajo, Bumeran, LinkedIn ni Indeed.

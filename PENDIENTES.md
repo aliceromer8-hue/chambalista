@@ -11,8 +11,7 @@ Ninguno cuesta dinero.
    - `PAGO_YAPE` y `PAGO_TITULAR`: número y nombre para Yape/Plin.
    - `COBRAR=1`: SOLO el día que se empiece a vender (antes no limita nada).
    - Luego, redesplegar.
-3. **Supabase → SQL Editor**: ejecutar `supabase/005-uso-ia.sql` y
-   `supabase/006-saldos.sql` (saldos con 18 gratis, pagos y avisos «Ya yapeé»).
+3. **Supabase → SQL Editor**: pegar `supabase/PEGAR-TODO-EN-SUPABASE.sql` (ya trae 005, 006 y 007) (saldos con 18 gratis, pagos y avisos «Ya yapeé»).
    Cuando alguien pulse «Ya yapeé»: abrir /admin, «Ver avisos», comprobar el
    monto en tu Yape y pulsar «Ya lo vi en mi Yape: activar».
 4. **Correos de la cuenta**: SMTP gratis (Brevo, 300/día, o Gmail de
@@ -97,7 +96,7 @@ Vercel → Settings → Domains → agregar `chambalista.vercel.app` como produc
 `noindex` (la web aparece en Google). Avisar para cambiar `extension/lib/servidor.js` ANTES de subir a la tienda.
 
 ## F. Chrome Web Store
-Todo en `tienda/FICHA-CHROME-WEB-STORE.md`. Paquete: `tienda/chamba-lista-1.0.1.zip`.
+Todo en `tienda/FICHA-CHROME-WEB-STORE.md`. Paquete: `tienda/chamba-lista-1.0.2.zip`.
 
 ## G. Google Search Console (gratis)
 search.google.com/search-console → agregar el dominio → enviar `/sitemap.xml`.
@@ -120,3 +119,14 @@ search.google.com/search-console → agregar el dominio → enviar `/sitemap.xml
   escrita al correo en 15 días hábiles guardando la prueba de envío. NO CONFIRMADO y para
   abogado/contador: inscripción del banco de datos en la ANPD, transferencias a EE. UU., RUC/régimen
   y boletas en SUNAT, uso de Yape personal para cobrar (existe «Yape Empresa»).
+
+## I. Estado real de la plataforma (2026-11-05, sin maquillar)
+| Qué | Estado |
+|---|---|
+| Postular en Computrabajo e Indeed | Envíos reales confirmados el 2026-09-25 (Indeed: eventos 178 y 179). El motor se reescribió después (topes, esperas, CV adaptado): FALTA repetir una tanda real |
+| Bumeran, LinkedIn | Código escrito, ningún envío real visto. La web NO promete postular ahí |
+| Reenfocar el CV con IA | Funciona en pruebas (se verificó el Word generado); calidad con vacantes reales sin medir |
+| Subir el CV adaptado | SOLO Computrabajo y formularios con campo de archivo. Código escrito, subida real NUNCA probada |
+| Herramientas (ej. SPSS) | Solo se agregan si la persona las marca en Mi perfil → «Herramientas que manejas» |
+| Dashboard | El avance de una tanda es en vivo (cada 1.2 s) mientras el service worker de Chrome siga despierto; no lee qué hace cada portal después (vistas, entrevistas) salvo importar «Mis postulaciones» de Computrabajo |
+| Prueba pendiente | Modo «Te avisa antes», CV adaptado, 2 ofertas de Computrabajo (no envía). Pide OK de Ali |

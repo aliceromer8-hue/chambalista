@@ -814,11 +814,11 @@ function infoEstado() {
 
 const MURO = { modo: null, cerradoFin: false };
 const TEXTOS_MURO = {
-  fin: ["Entra y empieza a postular", "Tus primeras 18 postulaciones van por nuestra cuenta."],
+  fin: ["Entra y empieza a postular", "Tus primeras 12 postulaciones van por nuestra cuenta."],
   cv: ["Entra para subir tu CV", "Lo guardamos en tu cuenta y lo usamos en cada postulación."],
   plan: ["Entra para elegir tu plan", "El plan se activa en tu cuenta y la extensión lo ve al instante."],
   extension: ["Entra para descargar la extensión", "La extensión usa tu cuenta: entra una vez y ya queda conectada."],
-  gratis: ["Crea tu cuenta gratis", "18 postulaciones con todo incluido. Sin tarjeta, sin trucos."],
+  gratis: ["Crea tu cuenta gratis", "12 postulaciones con todo incluido. Sin tarjeta, sin trucos."],
   accion: ["Entra para seguir", "Esto usa tu CV y la IA: necesita tu cuenta."],
 };
 

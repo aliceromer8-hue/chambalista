@@ -1,13 +1,13 @@
 -- Saldo de postulaciones por cuenta, packs, pase, referidos y avisos de
--- pago (2026-10-02, revisado el mismo día: lo gratis son 18 POSTULACIONES,
--- no 18 días).
+-- pago (2026-10-02, revisado el mismo día: lo gratis son 12 POSTULACIONES,
+-- no 12 días).
 --
 -- Sin pasarela: se cobra por Yape/Plin (sin comisión). La persona pulsa
 -- «Ya yapeé» (aviso de pago), Ali lo comprueba en su Yape y lo acredita
 -- con un clic desde /admin. Ver saldo.py.
 --
 --   postulaciones  las que le quedan (regaladas + compradas - usadas)
---   regaladas      total histórico regalado: 18 al crear + bonos de invitar
+--   regaladas      total histórico regalado: 12 al crear + bonos de invitar
 --   compradas      total histórico comprado en packs
 --   pase_hasta     mientras no venza, postula sin descontar (con el tope
 --                  diario seguro); lo que tenga en postulaciones se guarda
@@ -21,8 +21,8 @@
 -- propio saldo y nada más; pagos y avisos no los ve nadie desde el navegador.
 create table if not exists saldos (
   usuario        uuid primary key references auth.users(id) on delete cascade,
-  postulaciones  integer not null default 18 check (postulaciones >= 0),
-  regaladas      integer not null default 18,
+  postulaciones  integer not null default 12 check (postulaciones >= 0),
+  regaladas      integer not null default 12,
   compradas      integer not null default 0,
   pase_hasta     timestamptz,
   codigo         text unique,

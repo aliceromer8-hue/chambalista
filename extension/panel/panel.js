@@ -8,6 +8,7 @@ import * as almacen from "../lib/almacen.js";
 import * as datos from "../lib/datos.js";
 import * as ia from "../lib/ia.js";
 import * as coincidencia from "../lib/coincidencia.js";
+import * as huecos from "../lib/huecos.js";
 import * as cv from "../lib/cv.js";
 import * as distritos from "../lib/distritos.js";
 import { sincronizar } from "../lib/sincro.js";
@@ -573,7 +574,7 @@ function pintarPortada(resumen) {
 
   if (etapa === 0) {
     $("#portada-titulo").innerHTML = titularPortada();
-    $("#portada-bajada").textContent = "Tus primeras 18 postulaciones van por nuestra cuenta.";
+    $("#portada-bajada").textContent = "Tus primeras 12 postulaciones van por nuestra cuenta.";
     acciones.innerHTML = `
       <div class="acceso-portada" data-libre>
         <button class="boton-google" type="button" id="p-google"><svg width="18" height="18" viewBox="0 0 48 48" aria-hidden="true"><path fill="#FFC107" d="M43.6 20.5H42V20H24v8h11.3C33.7 32.7 29.2 36 24 36c-6.6 0-12-5.4-12-12s5.4-12 12-12c3.1 0 5.8 1.2 7.9 3.1l5.7-5.7C34 6.1 29.3 4 24 4 12.9 4 4 12.9 4 24s8.9 20 20 20 20-8.9 20-20c0-1.3-.1-2.4-.4-3.5z"/><path fill="#FF3D00" d="M6.3 14.7l6.6 4.8C14.7 15.1 19 12 24 12c3.1 0 5.8 1.2 7.9 3.1l5.7-5.7C34 6.1 29.3 4 24 4 16.3 4 9.7 8.3 6.3 14.7z"/><path fill="#4CAF50" d="M24 44c5.2 0 9.9-2 13.4-5.2l-6.2-5.2C29.2 35.1 26.7 36 24 36c-5.2 0-9.6-3.3-11.3-7.9l-6.5 5C9.5 39.6 16.2 44 24 44z"/><path fill="#1976D2" d="M43.6 20.5H42V20H24v8h11.3c-.8 2.2-2.2 4.2-4.1 5.6l6.2 5.2C36.9 39.2 44 34 44 24c0-1.3-.1-2.4-.4-3.5z"/></svg><span>Continuar con Google</span></button>
@@ -1903,8 +1904,8 @@ function seguirLote() {
 // ---------------------------------------------------------------------
 //
 // Recorrido (Ali, 2026-10-02):
-//   gratis  → 18 postulaciones al crear la cuenta, con todo incluido.
-//             «Gratis · 12 de 18» junto a Postular; ámbar cuando quedan 3.
+//   gratis  → 12 postulaciones al crear la cuenta, con todo incluido.
+//             «Gratis · 8 de 12» junto a Postular; ámbar cuando quedan 3.
 //   agotado → la tanda se para ANTES de abrir la siguiente; lo que faltaba
 //             queda «En espera» y se abre «Quedan N vacantes que encajan
 //             contigo» con los planes. Elegir uno → Yape → «Ya yapeé».
@@ -1957,8 +1958,8 @@ async function abrirPlanes(contexto = {}) {
       ${contexto.sub ? `<p class="nota">${escapar(contexto.sub)}</p>` : ""}
       ${s?.sumar?.disponible ? bloqueSumar(s.sumar) : ""}
       <div class="pe-lista">${ORDEN_PLANES.map(tarjeta).join("")}</div>
-      <p class="nota">Cada postulación trae lo mismo en todos los planes: tu CV adaptado, sus preguntas
-        respondidas y el seguimiento. Pagas con Yape o Plin, una vez, sin suscripción.</p>
+      <p class="nota">Cada postulación trae lo mismo en todos los packs: tu CV reenfocado a la vacante,
+        sus preguntas respondidas con él y el seguimiento. Pagas con Yape o Plin, una vez, sin suscripción.</p>
       ${invitar ? `<p class="nota valor-invita">¿Sin pagar ahora? Invita a alguien: al entrar gana ${s.bono_referido || 10},
         y tú otras ${s.bono_referido || 10} cuando envíe su primera.
         <button class="enlace" type="button" id="btn-copiar-invita">Copiar mi enlace</button></p>` : ""}
@@ -2883,6 +2884,28 @@ async function pintarCVBarra() {
 }
 $("#cv-elegido")?.addEventListener("click", () => preguntarCV(null));
 document.querySelector('.tab[data-vista="perfil"]')?.addEventListener("click", pintarSaldo);
+document.querySelector('.tab[data-vista="perfil"]')?.addEventListener("click", () => pintarHerramientas());
+
+/** «Herramientas que manejas»: se marca una vez y vale para todas las vacantes. */
+async function pintarHerramientas() {
+  const caja = $("#herramientas");
+  if (!caja) return;
+  const perfil = estado.perfil || await almacen.perfil.obtener();
+  const faltan = perfil ? huecos.delCatalogoSinCV(perfil) : [];
+  $("#tarjeta-herramientas").classList.toggle("oculto", !faltan.length);
+  const marcadas = (await almacen.preferencias.obtener()).habilidadesConfirmadas || {};
+  caja.innerHTML = faltan.map((n) =>
+    `<label class="chip-herr${marcadas[n] ? " on" : ""}"><input type="checkbox" data-h="${escapar(n)}"`
+    + `${marcadas[n] ? " checked" : ""}><span>${escapar(n)}</span></label>`).join("");
+  caja.querySelectorAll("input").forEach((i) => i.addEventListener("change", async () => {
+    const p = await almacen.preferencias.obtener();
+    const h = { ...(p.habilidadesConfirmadas || {}) };
+    if (i.checked) h[i.dataset.h] = true; else delete h[i.dataset.h];
+    await almacen.preferencias.guardar({ ...p, habilidadesConfirmadas: h });
+    i.closest("label").classList.toggle("on", i.checked);
+    $("#estado-herramientas").textContent = "Guardado. Se agrega solo a las vacantes que lo piden.";
+  }));
+}
 document.addEventListener("visibilitychange", () => { if (document.visibilityState === "visible") pintarSaldo(); });
 
 // Tu historial de Computrabajo, aunque no haya pasado por Chamba Lista.
@@ -3204,7 +3227,7 @@ function esMasNueva(a, b) {
 // final de la página, también. Entrar con Google se hace en la web (una
 // pestaña) y el puente trae la sesión aquí sola.
 const MURO_TEXTOS = {
-  fin: ["Entra y empieza a postular", "Tus primeras 18 postulaciones van por nuestra cuenta."],
+  fin: ["Entra y empieza a postular", "Tus primeras 12 postulaciones van por nuestra cuenta."],
   accion: ["Entra para usar esto", "Necesita tu cuenta: ahí guardamos tu CV y tus postulaciones."],
   correo: ["Entra con tu correo", "El mismo de tu cuenta de Chamba Lista."],
 };

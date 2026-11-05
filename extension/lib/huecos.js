@@ -118,6 +118,22 @@ function textoDelCV(perfil) {
   return normal(partes.join(" \n "));
 }
 
+/**
+ * Las herramientas del catálogo que el CV NO menciona.
+ *
+ * Para la tarjeta «Herramientas que manejas» de Mi perfil: la persona marca
+ * UNA VEZ lo que sí sabe usar y se le olvidó poner; desde entonces se agrega
+ * solo, y solo a las vacantes que lo piden. Marcarlo es una decisión suya
+ * (ella responde por su CV ante la empresa), nunca de la IA.
+ */
+export function delCatalogoSinCV(perfil) {
+  const cv = textoDelCV(perfil);
+  if (!cv.trim()) return [];
+  const vistos = new Set();
+  return CATALOGO.filter(([, e]) => !e.test(cv)).map(([n]) => n)
+    .filter((n) => (vistos.has(n) ? false : (vistos.add(n), true)));
+}
+
 /** La frase del anuncio donde aparece la habilidad, para dar contexto. */
 function frasePara(texto, expresion) {
   for (const trozo of (texto || "").split(/[\n•·|]|(?<=[.;])\s+/)) {

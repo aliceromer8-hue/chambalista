@@ -2062,7 +2062,7 @@ titulo("LA PESTAÑA SIN CONTENT SCRIPT — el fallo mas probable del primer inte
 }
 
 {
-  titulo("PLANES — 18 gratis, packs, pase, «Ya yapeé» y cómo cambia el panel");
+  titulo("PLANES — 12 gratis, packs, pase, «Ya yapeé» y cómo cambia el panel");
   const fs = await import("node:fs/promises");
   const fondo = await fs.readFile(new URL("background.js", BASE), "utf8");
   const pjs = await fs.readFile(new URL("panel/panel.js", BASE), "utf8");
@@ -2075,7 +2075,7 @@ titulo("LA PESTAÑA SIN CONTENT SCRIPT — el fallo mas probable del primer inte
     /const SIN_SALDO = "Se terminaron tus postulaciones/.test(fondo) && /sinSaldo === SIN_SALDO/.test(fondo));
   check("las frenadas por saldo quedan «En espera», no «Mañana»",
     /estado = "sin_saldo"/.test(fondo) && /sin_saldo: "En espera"/.test(pjs));
-  check("cada etapa tiene su forma: gratis «12 de 18», pack, pase en días, agotado",
+  check("cada etapa tiene su forma: gratis «8 de 12», pack, pase en días, agotado",
     /Gratis · \$\{n\} de \$\{s\.regaladas\}/.test(pjs) && /Pase · \$\{dias\}/.test(pjs)
     && /s\.plan === "pase"/.test(pjs) && /s\.plan === "gratis"/.test(pjs) && /s\.plan === "pack"/.test(pjs));
   check("la píldora avisa en ámbar cuando quedan pocas (sin modales ni presión)", /poco: n <= 3/.test(pjs) && /\.saldo-barra\.poco/.test(css));
@@ -2101,6 +2101,10 @@ titulo("LA PESTAÑA SIN CONTENT SCRIPT — el fallo mas probable del primer inte
     !/cupos|últimas horas|solo hoy|oferta termina|más vendido|más elegido/i.test(pjs.slice(pjs.indexOf("const PLANES_EXT"), pjs.indexOf("let _relojPago"))));
   check("lo que dice el aviso es cierto: las frenadas por saldo se pueden reanudar",
     /\["pendiente", "sin_saldo"\]\.includes\(i\.estado\)/.test(pjs));
+  check("una herramienta del catálogo que el CV no tiene se puede marcar una vez en Mi perfil",
+    /async function pintarHerramientas/.test(pjs) && /habilidadesConfirmadas/.test(pjs) && /id="tarjeta-herramientas"/.test(phtml));
+  check("y la tanda solo agrega lo que la persona marcó",
+    /habilidadesConfirmadas \|\| \{\}/.test(fondo) && /\.\.\.marcadas, \.\.\.\(respuestasPersona/.test(fondo));
   check("Mi perfil trae «Tu plan» con tu enlace para invitar",
     /id="tu-plan"/.test(phtml) && /id="invitar"/.test(phtml) && /\?ref=\$\{encodeURIComponent/.test(pjs));
 }

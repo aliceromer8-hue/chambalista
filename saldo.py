@@ -2,7 +2,7 @@
 """Saldo por cuenta: gratis, packs, pase y referidos. Sin pasarela.
 
 Modelo (Ali, 2026-10-02):
-  · GRATIS: 18 postulaciones al crear la cuenta. No caducan. Con todo
+  · GRATIS: 12 postulaciones al crear la cuenta. No caducan. Con todo
     incluido (CV adaptado, respuestas): quien ve salir sus postulaciones
     sabe lo que compra.
   · PACKS (Ali, 2026-11-05): 30 por S/ 15, 50 por S/ 29, 80 por S/ 39.
@@ -29,7 +29,7 @@ from datetime import datetime, timedelta, timezone
 
 import nube
 
-GRATIS = int(os.environ.get("GRATIS", "18"))
+GRATIS = int(os.environ.get("GRATIS", "12"))
 BONO_REFERIDO = int(os.environ.get("BONO_REFERIDO", "10"))
 
 # La única lista de planes: la usan /api/estado (web y extensión) y /admin.
@@ -73,7 +73,7 @@ def _fecha(texto):
 
 
 def _fila(usuario_id):
-    """La fila de saldo. Si no existe, nace con sus 18 gratis. None si la base falla."""
+    """La fila de saldo. Si no existe, nace con sus 12 gratis. None si la base falla."""
     if not _UUID.match(usuario_id or ""):
         return None
     filas = nube._pedir("GET", f"saldos?select={_COLUMNAS}&usuario=eq.{usuario_id}")

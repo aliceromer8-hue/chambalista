@@ -1964,3 +1964,10 @@ body.muro-on > header, body.muro-on > main, body.muro-on > footer, body.muro-on 
 
 /* La pista nunca tapa un modal abierto (el modal es z-index 40). */
 .pista { z-index: 35; }
+
+/* Herramientas que manejas (Mi perfil). */
+.chips-herr { display: flex; flex-wrap: wrap; gap: 6px; margin: 8px 0 4px; }
+.chip-herr { display: inline-flex; align-items: center; gap: 6px; cursor: pointer; border: 1.5px solid var(--tinta); border-radius: 99px;
+  padding: 4px 11px; font-size: 12.5px; font-weight: 700; background: var(--papel-2); user-select: none; }
+.chip-herr input { accent-color: var(--tinta); }
+.chip-herr.on { background: var(--lima); }

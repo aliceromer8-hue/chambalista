@@ -1003,7 +1003,7 @@ check("los números del bloque de precios son tamaños de pack",
       all(_re.search(r"S/\s*\d+|Gratis", _precios) for _ in _cifras) and len(_cifras) >= 2,
       f"cifras encontradas: {_cifras}")
 check("y cada plan de pago dice su precio", _precios.count('class="plan-precio"') == 3, _precios.count('class="plan-precio"'))
-check("lo gratis son 18 postulaciones, no días", "<b>18</b> postulaciones" in _precios and "18 días" not in _visible)
+check("lo gratis son 12 postulaciones, no días", "<b>12</b> postulaciones" in _precios and "12 días" not in _visible)
 check("y no dice «sin tarjeta» (es obvio)", "sin tarjeta" not in _visible.lower())
 check("los packs de Ali: 30 por 15, 50 por 29, 80 por 39",
       all(f'data-plan="{_k}"' in _precios for _k in ("30", "50", "80")) and "pase" not in _precios.split("-->")[-1].lower())
@@ -1600,7 +1600,7 @@ with _mk9.patch.dict(_os.environ, {"GEMINI_API_KEY": "g", "GEMINI_API_KEY_GRATIS
 
 import proxy_ia as _pi
 with _mk9.patch.object(_pi, "es_pago", lambda d: False):
-    check("plan gratis: 60 llamadas de IA al día (alcanza para sus 18)", _pi.limite("u:x") == 60)
+    check("plan gratis: 60 llamadas de IA al día (alcanza para sus 12)", _pi.limite("u:x") == 60)
 with _mk9.patch.object(_pi, "es_pago", lambda d: True):
     check("plan pagado: 400 (más que las 50 postulaciones diarias)", _pi.limite("u:x") == 400)
 check("sin cuenta no hay plan pagado", _pi.es_pago("ip:1.2.3.4") is False)
@@ -1626,14 +1626,14 @@ _YO = "99999999-2222-3333-4444-555555555555"
 
 
 def _fila_falsa(**k):
-    base = {"postulaciones": 18, "regaladas": 18, "compradas": 0, "pase_hasta": None,
+    base = {"postulaciones": 12, "regaladas": 12, "compradas": 0, "pase_hasta": None,
             "codigo": _U[:8], "referido_por": None, "bono_pagado": False, "creado": "2026-10-01T00:00:00+00:00"}
     return {**base, **k}
 
 
 with _mk9.patch.dict(_os.environ, {"COBRAR": ""}, clear=False):
     check("mientras no se cobra, el saldo no frena a nadie", _sal.usar(_U)[0] is True)
-check("lo gratis son 18 POSTULACIONES (no días)", _sal.GRATIS == 18 and not hasattr(_sal, "PRUEBA_DIAS"))
+check("lo gratis son 12 POSTULACIONES (no días)", _sal.GRATIS == 12 and not hasattr(_sal, "PRUEBA_DIAS"))
 _cambios = []
 with _mk9.patch.dict(_os.environ, {"COBRAR": "1"}, clear=False), \
      _mk9.patch.object(_sal, "_fila", lambda u: _fila_falsa(postulaciones=0)), \
@@ -1651,7 +1651,7 @@ with _mk9.patch.dict(_os.environ, {"COBRAR": "1"}, clear=False), \
      _mk9.patch.object(_sal, "_actualizar", lambda u, c: _cambios.append(c) or True):
     _ok, _e = _sal.usar(_U)
     check("con gratis se descuenta una", _ok and _cambios[0]["postulaciones"] == 4 and _e["plan"] == "gratis")
-    check("y se sabe cuántas usó de las 18", _e["usadas"] == 14)
+    check("y se sabe cuántas usó de las 12", _e["usadas"] == 8)
 check("etapas: gratis, pack, pase, agotado",
       (_sal._plan(5, 0, False), _sal._plan(5, 100, False), _sal._plan(0, 100, True), _sal._plan(0, 100, False))
       == ("gratis", "pack", "pase", "agotado"))

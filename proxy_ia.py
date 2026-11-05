@@ -33,7 +33,7 @@ import redactor_ia
 # Llamadas al modelo por cuenta y ventana. Una postulación gasta unas 2-3
 # (adaptar el CV y responder sus preguntas). Antes eran 40 para todos: unas
 # 20 postulaciones al día, menos que las 50 del titular. Ahora:
-#   · plan gratis  → 60: alcanza para sus 18 postulaciones y para el CV.
+#   · plan gratis  → 60: alcanza para sus 12 postulaciones y para el CV.
 #   · plan pagado  → 400: más que las 50 diarias seguras de una tanda.
 LIBRES_POR_VENTANA = int(os.environ.get("IA_LIBRES", "60"))
 LIBRES_PAGO = int(os.environ.get("IA_LIBRES_PAGO", "400"))

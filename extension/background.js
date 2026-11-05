@@ -407,7 +407,10 @@ async function prepararUna(vacante, perfil, guardados, respuestasPersona) {
   // persona ANTES de adaptar: si dice que sí, entran al .docx; si no
   // contesta, no entra nada. Nunca las decide el modelo.
   reporte.huecos = huecos.detectar(vacante, perfil);
-  const confirmadas = huecos.aCompetencias(reporte.huecos, respuestasPersona?.habilidades || {});
+  // Lo que la persona marcó UNA VEZ en Mi perfil («Herramientas que manejas»)
+  // más lo que conteste en esta tanda. Nada se agrega sin que ella lo marque.
+  const marcadas = (await almacen.preferencias.obtener()).habilidadesConfirmadas || {};
+  const confirmadas = huecos.aCompetencias(reporte.huecos, { ...marcadas, ...(respuestasPersona?.habilidades || {}) });
   // Lo necesario para rehacer el CV adaptado a ESTA vacante cuando se
   // pida desde Postulaciones. Guardar el Word de cada una llenaría el
   // almacén; los datos para generarlo ocupan poco.
