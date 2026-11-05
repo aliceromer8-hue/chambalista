@@ -23,7 +23,7 @@ const escapar = (t) => String(t ?? "").replace(/[&<>"']/g,
 const estado = {
   // ¿Hay sesión de Chamba Lista? Sin ella, el CV adaptado, la IA y la
   // medición devuelven 401 y el panel no podría explicar por qué.
-  conCuenta: false,
+  conCuenta: null,          // null = aún no se sabe (el muro espera a saberlo)
   perfil: null, vacantes: [], vacanteAbierta: null, reporte: null,
   respuestasPersona: {}, aprobacion: {},
   // Las vacantes elegidas con su casilla. Vacío = «todas».
@@ -206,7 +206,7 @@ const PASOS = {
   cuenta: {
     titulo: "Entra a tu cuenta",
     boton: "Entrar",
-    hacer: () => { irA("inicio"); setTimeout(() => $("#acceso-correo")?.focus(), 50); },
+    hacer: () => abrirMuro("correo"),
   },
   cv: {
     titulo: "Sube tu CV",
@@ -513,6 +513,8 @@ function pintarPortada(resumen) {
     : !(estado.datosOk && cvListo) ? 2
     : !(conectados.length && prefs.portalesListo) ? 3 : 4;
   const paso = estado.verPaso != null && estado.verPaso < pasoReal && estado.verPaso >= 1 ? estado.verPaso : pasoReal;
+  clearTimeout(estado.relojGuia);
+  estado.relojGuia = setTimeout(() => guiar(pasoReal, resumen), 700);
   // Lo demás del panel (pestañas, tablero) sigue con sus cuatro etapas.
   const etapa = paso <= 1 ? paso : paso <= 3 ? 2 : 3;
 
@@ -571,43 +573,17 @@ function pintarPortada(resumen) {
 
   if (etapa === 0) {
     $("#portada-titulo").innerHTML = titularPortada();
-    $("#portada-bajada").textContent =
-      "Entra con tu cuenta de Chamba Lista.";
+    $("#portada-bajada").textContent = "Tus primeras 18 postulaciones van por nuestra cuenta.";
     acciones.innerHTML = `
-      <form class="acceso-panel" id="form-acceso" style="width:100%">
-        <input type="email" id="acceso-correo" placeholder="tu@correo.com"
-               autocomplete="email" required>
-        <input type="password" id="acceso-clave" placeholder="tu contraseña"
-               autocomplete="current-password" required minlength="8">
-        <p class="nota aviso-acceso oculto" id="acceso-error"></p>
-        <button class="boton primario" type="submit" id="acceso-enviar">Entrar</button>
-        <button class="enlace" type="button" id="acceso-crear">No tengo cuenta todavía</button>
-      </form>`;
-
-    $("#acceso-crear").addEventListener("click", () => {
-      chrome.tabs.create({ url: sesion.URL_CUENTA, active: true });
-      avisar("Crea tu cuenta en la web y vuelve aquí a entrar.");
-    });
-
-    $("#form-acceso").addEventListener("submit", async (ev) => {
-      ev.preventDefault();
-      const boton = $("#acceso-enviar");
-      const error = $("#acceso-error");
-      boton.disabled = true;
-      error.classList.add("oculto");
-      const r = await sesion.entrar($("#acceso-correo").value.trim(),
-                                    $("#acceso-clave").value);
-      boton.disabled = false;
-      if (r.error) {
-        error.textContent = r.error;
-        error.classList.remove("oculto");
-        return;
-      }
-      estado.conCuenta = true;
-      estado.usuario = r.usuario || null;
-      avisar(`Hola, ${r.usuario?.correo || "de nuevo"}.`);
-      await pintarInicio();
-    });
+      <div class="acceso-portada" data-libre>
+        <button class="boton-google" type="button" id="p-google"><svg width="18" height="18" viewBox="0 0 48 48" aria-hidden="true"><path fill="#FFC107" d="M43.6 20.5H42V20H24v8h11.3C33.7 32.7 29.2 36 24 36c-6.6 0-12-5.4-12-12s5.4-12 12-12c3.1 0 5.8 1.2 7.9 3.1l5.7-5.7C34 6.1 29.3 4 24 4 12.9 4 4 12.9 4 24s8.9 20 20 20 20-8.9 20-20c0-1.3-.1-2.4-.4-3.5z"/><path fill="#FF3D00" d="M6.3 14.7l6.6 4.8C14.7 15.1 19 12 24 12c3.1 0 5.8 1.2 7.9 3.1l5.7-5.7C34 6.1 29.3 4 24 4 16.3 4 9.7 8.3 6.3 14.7z"/><path fill="#4CAF50" d="M24 44c5.2 0 9.9-2 13.4-5.2l-6.2-5.2C29.2 35.1 26.7 36 24 36c-5.2 0-9.6-3.3-11.3-7.9l-6.5 5C9.5 39.6 16.2 44 24 44z"/><path fill="#1976D2" d="M43.6 20.5H42V20H24v8h11.3c-.8 2.2-2.2 4.2-4.1 5.6l6.2 5.2C36.9 39.2 44 34 44 24c0-1.3-.1-2.4-.4-3.5z"/></svg><span>Continuar con Google</span></button>
+        <button class="boton" type="button" id="p-correo">Entrar con mi correo</button>
+        <button class="enlace" type="button" id="p-crear">Crear cuenta gratis</button>
+      </div>`;
+    $("#p-google").addEventListener("click", entrarConGoogle);
+    $("#p-correo").addEventListener("click", () => abrirMuro("correo"));
+    $("#p-crear").addEventListener("click", crearCuenta);
+    infoPago().then((i) => { if (i.google === false) $("#p-google")?.classList.add("oculto"); });
     return;
   }
 
@@ -3171,4 +3147,191 @@ function esMasNueva(a, b) {
     if ((pa[i] || 0) !== (pb[i] || 0)) return (pa[i] || 0) > (pb[i] || 0);
   }
   return false;
+}
+
+
+// ---------------------------------------------------------------------
+// Muro de acceso y guía (Ali, 2026-11-04)
+// ---------------------------------------------------------------------
+// Sin cuenta se puede mirar todo el panel, pero cualquier función —subir
+// el CV, buscar, postular, tocar los datos— abre el muro. Al llegar al
+// final de la página, también. Entrar con Google se hace en la web (una
+// pestaña) y el puente trae la sesión aquí sola.
+const MURO_TEXTOS = {
+  fin: ["Entra y empieza a postular", "Tus primeras 18 postulaciones van por nuestra cuenta."],
+  accion: ["Entra para usar esto", "Necesita tu cuenta: ahí guardamos tu CV y tus postulaciones."],
+  correo: ["Entra con tu correo", "El mismo de tu cuenta de Chamba Lista."],
+};
+const muro = { modo: null, cerradoFin: false };
+
+async function abrirMuro(modo = "accion") {
+  if (estado.conCuenta !== false) return;
+  const [titulo, texto] = MURO_TEXTOS[modo] || MURO_TEXTOS.accion;
+  muro.modo = modo;
+  $("#muro-titulo").textContent = titulo;
+  $("#muro-texto").textContent = texto;
+  $("#muro-privacidad").href = `${SERVIDOR}/privacidad`;
+  $("#muro-terminos").href = `${SERVIDOR}/terminos`;
+  $("#muro").hidden = false;
+  document.body.classList.add("muro-on");
+  requestAnimationFrame(() => $("#muro").classList.add("visible"));
+  if (modo === "correo") setTimeout(() => $("#muro-correo")?.focus(), 250);
+  const info = await infoPago();
+  const google = info.google !== false;
+  $("#muro-google").classList.toggle("oculto", !google);
+  $("#muro-o").classList.toggle("oculto", !google);
+}
+
+function cerrarMuro() {
+  if (!muro.modo) return;
+  if (muro.modo === "fin") muro.cerradoFin = true;
+  muro.modo = null;
+  $("#muro").classList.remove("visible");
+  document.body.classList.remove("muro-on");
+  setTimeout(() => { if (!muro.modo) $("#muro").hidden = true; }, 260);
+}
+
+function entrarConGoogle() {
+  chrome.tabs.create({ url: `${SERVIDOR}/entrar/google?volver=${encodeURIComponent("/?desde=extension")}`, active: true });
+  if (!muro.modo) abrirMuro("fin");
+  $("#muro-esperando").classList.remove("oculto");
+}
+
+function crearCuenta() {
+  chrome.tabs.create({ url: `${SERVIDOR}/?registro=1`, active: true });
+  avisar("Crea tu cuenta en la web: al terminar, el panel se abre solo.");
+}
+
+async function alEntrar(usuario) {
+  estado.conCuenta = true;
+  estado.usuario = usuario || estado.usuario || null;
+  cerrarMuro();
+  $("#muro-esperando")?.classList.add("oculto");
+  const nombre = estado.usuario?.nombre;
+  avisar(`¡Hola${nombre ? `, ${nombre}` : ""}! Ya estás dentro.`, "bien");
+  if (!estado.perfil) {
+    const guardado = await sesion.bajarPerfil().catch(() => null);
+    if (guardado) { estado.perfil = guardado; await almacen.perfil.guardar(guardado); pintarPerfil(); }
+  }
+  await pintarInicio();
+}
+
+$("#muro-cerrar")?.addEventListener("click", cerrarMuro);
+$("#muro-google")?.addEventListener("click", entrarConGoogle);
+$("#muro-crear")?.addEventListener("click", crearCuenta);
+document.addEventListener("keydown", (e) => { if (e.key === "Escape" && muro.modo) cerrarMuro(); });
+$("#muro-form")?.addEventListener("submit", async (ev) => {
+  ev.preventDefault();
+  const boton = $("#muro-entrar");
+  const error = $("#muro-error");
+  boton.disabled = true;
+  error.classList.add("oculto");
+  const r = await sesion.entrar($("#muro-correo").value.trim(), $("#muro-clave").value);
+  boton.disabled = false;
+  if (r.error) { error.textContent = r.error; error.classList.remove("oculto"); return; }
+  $("#muro-clave").value = "";
+  await alEntrar(r.usuario);
+});
+
+// La sesión que llega por el puente (Google o registro en la web).
+chrome.storage?.onChanged?.addListener((cambios, area) => {
+  const nueva = cambios?.sesion?.newValue;
+  if (area === "local" && nueva?.token && !estado.conCuenta) alEntrar(nueva.usuario);
+});
+
+// Sin cuenta, lo que hace algo pasa por el muro. Se puede navegar entre
+// pestañas y leer; lo marcado con data-libre abre el muro por su cuenta.
+const LIBRE_SIN_CUENTA = ".menu, .tab, #muro, .pie-version, [data-libre], #avisos";
+document.addEventListener("click", (ev) => {
+  if (estado.conCuenta !== false) return;
+  const el = ev.target.closest("button, a[href], input, label, select, textarea, summary, [role=switch], .fila-v");
+  if (!el || el.closest(LIBRE_SIN_CUENTA)) return;
+  ev.preventDefault();
+  ev.stopImmediatePropagation();
+  abrirMuro("accion");
+}, true);
+
+// Al final de la página (tras deslizar, o tras un rato si todo cabe).
+let panelDeslizado = false;
+setTimeout(() => { panelDeslizado = true; revisarFinPanel(); }, 12000);
+function revisarFinPanel() {
+  if (estado.conCuenta !== false) return;
+  const cerca = innerHeight + scrollY >= document.documentElement.scrollHeight - 100;
+  if (scrollY > 200) panelDeslizado = true;
+  if (cerca && panelDeslizado && !muro.modo && !muro.cerradoFin) abrirMuro("fin");
+  else if (!cerca && muro.modo === "fin") { cerrarMuro(); muro.cerradoFin = false; }
+  else if (!cerca) muro.cerradoFin = false;
+}
+let marcoPanel = null;
+addEventListener("scroll", () => {
+  if (marcoPanel) return;
+  marcoPanel = requestAnimationFrame(() => { marcoPanel = null; revisarFinPanel(); });
+}, { passive: true });
+
+// ── La guía: una pista pequeña abajo, que lleva y resalta dónde tocar ──
+function resaltar(sel) {
+  const el = document.querySelector(sel);
+  if (!el) return;
+  el.scrollIntoView({ behavior: "smooth", block: "center" });
+  el.classList.remove("resalte");
+  void el.offsetWidth;
+  el.classList.add("resalte");
+  setTimeout(() => el.classList.remove("resalte"), 4200);
+}
+
+function cerrarPista() { $("#pista")?.classList.remove("visible"); }
+
+function pista({ clave, paso, titulo, texto, boton, accion }) {
+  try { if (sessionStorage.getItem(`pista_${clave}`)) { cerrarPista(); return; } } catch { /* da igual */ }
+  let caja = $("#pista");
+  if (!caja) {
+    caja = document.createElement("aside");
+    caja.id = "pista";
+    caja.className = "pista";
+    caja.setAttribute("role", "status");
+    document.body.appendChild(caja);
+  }
+  if (caja.dataset.clave === clave && caja.classList.contains("visible")) return;
+  caja.dataset.clave = clave;
+  caja.innerHTML = `
+    <span class="pista-paso"></span>
+    <div class="pista-cuerpo"><b></b><span></span></div>
+    <div class="pista-acciones"><button class="boton primario chico" type="button"></button>
+      <button class="enlace" type="button">Luego</button></div>`;
+  caja.querySelector(".pista-paso").textContent = paso;
+  caja.querySelector("b").textContent = titulo;
+  caja.querySelector(".pista-cuerpo span").textContent = texto;
+  const [ir, luego] = caja.querySelectorAll("button");
+  ir.textContent = boton;
+  ir.addEventListener("click", () => { cerrarPista(); accion(); });
+  luego.addEventListener("click", () => {
+    try { sessionStorage.setItem(`pista_${clave}`, "1"); } catch { /* da igual */ }
+    cerrarPista();
+  });
+  caja.classList.remove("visible");
+  requestAnimationFrame(() => caja.classList.add("visible"));
+}
+
+/** Qué falta, en orden: CV → perfil y datos → portales → postular. */
+function guiar(pasoReal, resumen) {
+  if (!estado.conCuenta) { cerrarPista(); return; }
+  if (pasoReal === 1) {
+    pista({ clave: "cv", paso: "1 de 4", titulo: "No olvides subir tu CV",
+            texto: "Con él respondemos por ti en cada postulación.", boton: "Ir a mi perfil",
+            accion: () => { irA("perfil"); setTimeout(() => resaltar("#btn-cargar-cv"), 250); } });
+  } else if (pasoReal === 2) {
+    pista({ clave: "datos", paso: "2 de 4", titulo: "Completa tu perfil",
+            texto: "Tu distrito, tus datos y con qué CV postulas. Una sola vez.", boton: "Completar",
+            accion: () => { irA("inicio"); setTimeout(() => resaltar("#portada"), 250); } });
+  } else if (pasoReal === 3) {
+    pista({ clave: "portales", paso: "3 de 4", titulo: "Conecta tus portales",
+            texto: "Entras tú en cada portal una vez y queda conectado.", boton: "Conectar",
+            accion: () => { irA("inicio"); setTimeout(() => resaltar("#portada-acciones"), 250); } });
+  } else if (pasoReal === 4 && !(resumen?.total > 0)) {
+    pista({ clave: "postular", paso: "4 de 4", titulo: "¡Todo listo! A postular",
+            texto: "Busca vacantes y lanza tu primera tanda.", boton: "Buscar vacantes",
+            accion: () => { irA("vacantes"); setTimeout(() => resaltar("#btn-buscar"), 250); } });
+  } else {
+    cerrarPista();
+  }
 }

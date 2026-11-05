@@ -128,6 +128,7 @@ $("#procesar").addEventListener("click", async () => {
     // El paso de instalar solo aparece cuando ya hay un CV convertido:
     // antes de eso no significa nada y sería una interrupción.
     $("#zona-3").classList.remove("oculto");
+    setTimeout(guiarWeb, 1500);
 
     // Lo que sobra una vez que ya convirtió: «Qué pasa con tu CV» es un
     // argumento para decidirse a subirlo, y ya lo subió.
@@ -763,6 +764,11 @@ function planPendiente() {
   let plan = new URLSearchParams(location.search).get("plan");
   if (!plan) { try { plan = sessionStorage.getItem("chamba_plan"); } catch { /* privado */ } }
   if (!plan || !PLANES_POR_DEFECTO[plan]) return;
+  if (!sesion()?.token) {
+    try { sessionStorage.setItem("chamba_plan", plan); } catch { /* privado */ }
+    setTimeout(() => abrirMuro("plan"), 400);
+    return;
+  }
   try { sessionStorage.removeItem("chamba_plan"); } catch { /* privado */ }
   setTimeout(() => abrirPago(plan), 400);
 }
@@ -792,3 +798,169 @@ async function canjearReferido() {
   } catch { /* se intenta en la próxima visita */ }
 }
 setTimeout(canjearReferido, 1500);
+
+
+// ---------- muro de acceso (Ali, 2026-11-04) ----------
+// Se puede mirar todo sin cuenta. Lo que use la IA o tus datos —subir el
+// CV, elegir un plan, bajar la extensión— pide entrar; y al llegar al final
+// de la página, el fondo se difumina y aparece el popup. Subir lo quita.
+let _info = null;
+function infoEstado() {
+  _info = _info || fetch("/api/estado").then((r) => r.json()).catch(() => ({}));
+  return _info;
+}
+
+const MURO = { modo: null, cerradoFin: false };
+const TEXTOS_MURO = {
+  fin: ["Entra y empieza a postular", "Tus primeras 18 postulaciones van por nuestra cuenta."],
+  cv: ["Entra para subir tu CV", "Lo guardamos en tu cuenta y lo usamos en cada postulación."],
+  plan: ["Entra para elegir tu plan", "El plan se activa en tu cuenta y la extensión lo ve al instante."],
+  extension: ["Entra para descargar la extensión", "La extensión usa tu cuenta: entra una vez y ya queda conectada."],
+  gratis: ["Crea tu cuenta gratis", "18 postulaciones con todo incluido. Sin tarjeta, sin trucos."],
+  accion: ["Entra para seguir", "Esto usa tu CV y la IA: necesita tu cuenta."],
+};
+
+async function abrirMuro(modo = "accion") {
+  if (sesion()?.token) return;
+  const [titulo, texto] = TEXTOS_MURO[modo] || TEXTOS_MURO.accion;
+  MURO.modo = modo;
+  $("#muro-titulo").textContent = titulo;
+  $("#muro-texto").textContent = texto;
+  $("#muro").hidden = false;
+  document.body.classList.add("muro-on");
+  requestAnimationFrame(() => $("#muro").classList.add("visible"));
+  const info = await infoEstado();
+  $("#muro-google").classList.toggle("oculto", !info.google);
+  $("#muro-o").classList.toggle("oculto", !info.google);
+}
+
+function cerrarMuro() {
+  if (!MURO.modo) return;
+  if (MURO.modo === "fin") MURO.cerradoFin = true;
+  MURO.modo = null;
+  $("#muro").classList.remove("visible");
+  document.body.classList.remove("muro-on");
+  setTimeout(() => { if (!MURO.modo) $("#muro").hidden = true; }, 260);
+}
+
+$("#muro-cerrar")?.addEventListener("click", cerrarMuro);
+$("#muro-crear")?.addEventListener("click", () => { cerrarMuro(); abrirCuenta(true); });
+$("#muro-entrar")?.addEventListener("click", () => { cerrarMuro(); abrirCuenta(false); });
+$("#muro-google")?.addEventListener("click", () => {
+  const volver = location.pathname + location.search;
+  location.href = `/entrar/google?volver=${encodeURIComponent(volver)}`;
+});
+document.addEventListener("keydown", (e) => { if (e.key === "Escape" && MURO.modo) cerrarMuro(); });
+
+// Todo lo que lleva data-cuenta pasa por el muro si no hay sesión. En la
+// fase de captura, para llegar ANTES que el manejador propio del botón.
+document.addEventListener("click", (ev) => {
+  if (sesion()?.token) return;
+  const el = ev.target.closest("[data-cuenta]");
+  if (!el) return;
+  ev.preventDefault();
+  ev.stopImmediatePropagation();
+  // El plan elegido se recuerda: al entrar, se abre su pago solo.
+  if (el.dataset.plan) { try { sessionStorage.setItem("chamba_plan", el.dataset.plan); } catch { /* privado */ } }
+  abrirMuro(el.dataset.cuenta);
+}, true);
+
+// Al final de la página, el muro. Solo después de haber deslizado de
+// verdad (o de un rato, si la página entra entera en la pantalla).
+let haDeslizado = false;
+setTimeout(() => { haDeslizado = true; revisarFin(); }, 9000);
+function revisarFin() {
+  if (sesion()?.token) return;
+  const alto = document.documentElement.scrollHeight;
+  const cerca = innerHeight + scrollY >= alto - 120;
+  if (scrollY > 250) haDeslizado = true;
+  if (cerca && haDeslizado && !MURO.modo && !MURO.cerradoFin) abrirMuro("fin");
+  else if (!cerca && MURO.modo === "fin") { cerrarMuro(); MURO.cerradoFin = false; }
+  else if (!cerca) MURO.cerradoFin = false;
+}
+let _marco = null;
+addEventListener("scroll", () => {
+  if (_marco) return;
+  _marco = requestAnimationFrame(() => { _marco = null; revisarFin(); });
+}, { passive: true });
+
+// ---------- pistas: te guía después de entrar ----------
+// Pequeñas, abajo, con un botón que te lleva y resalta dónde hacer clic.
+function resaltar(sel) {
+  const el = $(sel);
+  if (!el) return;
+  el.scrollIntoView({ behavior: "smooth", block: "center" });
+  el.classList.remove("resalte");
+  void el.offsetWidth;
+  el.classList.add("resalte");
+  setTimeout(() => el.classList.remove("resalte"), 4200);
+}
+
+function pista({ clave, paso, titulo, texto, boton, accion }) {
+  try { if (sessionStorage.getItem(`pista_${clave}`)) return; } catch { /* da igual */ }
+  let caja = $("#pista");
+  if (!caja) {
+    caja = document.createElement("aside");
+    caja.id = "pista";
+    caja.className = "pista";
+    caja.setAttribute("role", "status");
+    document.body.appendChild(caja);
+  }
+  caja.innerHTML = `
+    <span class="pista-paso">${paso}</span>
+    <div class="pista-cuerpo"><b></b><span></span></div>
+    <div class="pista-acciones"><button class="boton principal chico" type="button"></button>
+      <button class="enlace" type="button">Luego</button></div>`;
+  caja.querySelector("b").textContent = titulo;
+  caja.querySelector(".pista-cuerpo span").textContent = texto;
+  const [ir, luego] = caja.querySelectorAll("button");
+  ir.textContent = boton;
+  ir.addEventListener("click", () => { cerrarPista(); accion(); });
+  luego.addEventListener("click", () => {
+    try { sessionStorage.setItem(`pista_${clave}`, "1"); } catch { /* da igual */ }
+    cerrarPista();
+  });
+  caja.classList.remove("visible");
+  requestAnimationFrame(() => caja.classList.add("visible"));
+}
+
+function cerrarPista() { $("#pista")?.classList.remove("visible"); }
+
+function guiarWeb() {
+  if (!sesion()?.token) return;
+  if (!estado.perfil) {
+    pista({ clave: "cv", paso: "1 de 2", titulo: "No olvides subir tu CV",
+            texto: "En segundos lo dejamos en formato Harvard, listo para postular.",
+            boton: "Subir mi CV", accion: () => resaltar("#zona-1") });
+  } else if (!$("#zona-3").classList.contains("oculto")) {
+    pista({ clave: "ext", paso: "2 de 2", titulo: "Ahora, la extensión",
+            texto: "Es la que postula por ti en los portales. Entras una vez y queda conectada.",
+            boton: "Descargarla", accion: () => resaltar("#instalar") });
+  } else {
+    cerrarPista();
+  }
+}
+
+// Después de entrar (con correo o con Google) y al abrir la página con sesión.
+const _pintarCuentaAntes = pintarCuenta;
+pintarCuenta = function () {
+  _pintarCuentaAntes();
+  if (sesion()?.token) { cerrarMuro(); setTimeout(guiarWeb, 900); }
+};
+
+(() => {
+  const q = new URLSearchParams(location.search);
+  if (q.get("registro") === "1" && !sesion()?.token) abrirCuenta(true);
+  else if (q.get("entrar") === "1" && !sesion()?.token) abrirMuro("accion");
+  let hola = false;
+  try { hola = sessionStorage.getItem("chamba_bienvenida") === "1"; sessionStorage.removeItem("chamba_bienvenida"); } catch { /* da igual */ }
+  if (hola && sesion()?.token) {
+    const nombre = sesion().usuario?.nombre;
+    const t = document.createElement("div");
+    t.className = "bienvenida";
+    t.textContent = `¡Hola${nombre ? `, ${nombre}` : ""}! Ya estás dentro.`;
+    document.body.appendChild(t);
+    setTimeout(() => t.remove(), 4200);
+  }
+  if (sesion()?.token) setTimeout(guiarWeb, 1200);
+})();

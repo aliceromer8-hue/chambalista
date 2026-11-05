@@ -583,9 +583,71 @@ for pieza, que in [
     ("credenciales", "aclara que no accede a las cuentas de los portales"),
     ("diez (10) días", "da el plazo de respuesta"),
 ]:
-    check(f"la política {que}", pieza.lower() in _pol.lower())
+    _donde = _pol + cliente.get("/terminos").get_data(as_text=True)
+    check(f"la política {que}", pieza.lower() in _donde.lower())
 
 check("la página enlaza a la política", "/privacidad" in BASE_HTML)
+
+# ---------------------------------------------------------------------
+# Términos, Libro de Reclamaciones y lo que Ali pidió el 2026-11-04.
+_ter = cliente.get("/terminos")
+check("los términos se sirven aparte", _ter.status_code == 200)
+_ter = _ter.get_data(as_text=True)
+for _pieza, _que in [
+    ("no caducan", "dicen que los packs no caducan"),
+    ("no se renueva solo", "dicen que el pase no se renueva solo"),
+    ("solo se descuenta cuando se envía", "dicen cuándo se descuenta una postulación"),
+    ("Devoluciones", "tienen política de devoluciones"),
+    ("pueden limitar o suspender cuentas", "advierten del riesgo de los portales"),
+    ("Las que impliquen trabajar sin pago te las preguntamos siempre", "cuentan qué responde sola la IA"),
+    ("quince (15) días hábiles", "dan el plazo del Libro de Reclamaciones"),
+    ("INDECOPI", "remiten al INDECOPI"),
+    ("leyes del Perú", "fijan la ley peruana"),
+]:
+    check(f"los términos {_que}", _pieza.lower() in _ter.lower())
+_lib = cliente.get("/reclamaciones")
+check("hay Libro de Reclamaciones virtual", _lib.status_code == 200)
+_lib = _lib.get_data(as_text=True)
+for _campo in ("nombre", "documento", "domicilio", "correo", "descripcion", "detalle", "pedido", "monto"):
+    check(f"la hoja pide «{_campo}»", f'name="{_campo}"' in _lib)
+check("la hoja distingue reclamo y queja", 'value="reclamo"' in _lib and 'value="queja"' in _lib)
+check("y lleva la leyenda de que no impide ir al INDECOPI", "no impide acudir a otras vías" in _lib)
+import reclamos as _rc
+check("un reclamo sin datos no se registra", _rc.registrar({})[0] is False)
+check("ni con un correo roto", _rc.limpiar({"nombre": "a", "documento": "1", "domicilio": "x", "correo": "no",
+                                            "descripcion": "d", "detalle": "d", "pedido": "p", "conforme": True})[0] is None)
+check("el número correlativo tiene forma CL-AÑO-000001", _rc.numero(1).startswith("CL-") and _rc.numero(1).endswith("-000001"))
+check("las tres páginas legales en el pie de la web",
+      all(f'href="{_p}"' in BASE_HTML for _p in ("/privacidad", "/terminos", "/reclamaciones")))
+check("la política nombra a Groq y Google como IA", "Groq" in _pol and "Gemini" in _pol)
+check("los datos para postular viven solo en el navegador (y la política lo dice)", "solo en tu navegador" in _pol.lower())
+check("robots.txt deja indexar la portada y no /admin ni /api",
+      "Allow: /" in cliente.get("/robots.txt").get_data(as_text=True)
+      and "Disallow: /admin" in cliente.get("/robots.txt").get_data(as_text=True))
+check("hay sitemap con las páginas públicas", "/terminos" in cliente.get("/sitemap.xml").get_data(as_text=True))
+check("la portada lleva imagen para compartir", 'og:image' in BASE_HTML and pathlib.Path("static/img/compartir.png").exists())
+
+# Muro y Google.
+_wjs = pathlib.Path("static/js/web.js").read_text(encoding="utf-8")
+check("sin sesión, subir CV, planes y extensión pasan por el muro",
+      all(f'id="{_i}"' in BASE_HTML for _i in ("muro", "fin-pagina")) and 'data-cuenta="plan"' in BASE_HTML
+      and 'data-cuenta="extension"' in BASE_HTML and "closest(\"[data-cuenta]\")" in _wjs)
+check("el muro aparece al final de la página y se va al subir", "revisarFin" in _wjs and 'abrirMuro("fin")' in _wjs)
+check("el muro muestra la aceptación de la política y los términos", "Al continuar declaras ser mayor de 18" in BASE_HTML)
+import os as _os2, unittest.mock as _mk10
+with _mk10.patch.dict(_os2.environ, {"LOGIN_GOOGLE": ""}, clear=False):
+    check("sin LOGIN_GOOGLE, el botón de Google no lleva a un error", cliente.get("/entrar/google").status_code in (301, 302)
+          and "/?entrar=1" in cliente.get("/entrar/google").headers.get("Location", ""))
+with _mk10.patch.dict(_os2.environ, {"LOGIN_GOOGLE": "1", "SUPABASE_URL": "https://x.supabase.co"}, clear=False):
+    import cuentas as _cu2
+    with _mk10.patch.object(_cu2, "URL", "https://x.supabase.co"):
+        _loc = cliente.get("/entrar/google?volver=//malo.com").headers.get("Location", "")
+        check("con LOGIN_GOOGLE, va a Supabase con proveedor google", "provider=google" in _loc)
+        check("y nunca devuelve a otro sitio (volver=//malo.com → /)", "malo.com" not in _loc)
+with _mk10.patch.object(_cu2, "quien_es", lambda t: None):
+    check("/api/cuenta/google rechaza un token que Supabase no reconoce",
+          cliente.post("/api/cuenta/google", json={"token": "x"}).status_code in (401, 429))
+check("tras entrar, pistas que guían (CV y luego la extensión)", "No olvides subir tu CV" in _wjs and "Ahora, la extensión" in _wjs)
 check("la casilla está en el formulario", 'id="acepta"' in BASE_HTML)
 
 # ---------------------------------------------------------------------
@@ -1513,7 +1575,25 @@ with _mk9.patch.dict(_os.environ, {"GEMINI_API_KEY": "g", "GROQ_API_KEY": "q", "
 
 with _mk9.patch.dict(_os.environ, {"GEMINI_API_KEY": "g", "GROQ_API_KEY": "q", "GEMINI_FACTURACION": "1"}, clear=False), \
      _mk9.patch.object(_ri, "_ollama_modelo", lambda: None):
-    check("con facturación, Gemini (que entonces no entrena) va primero", _ri.cadena()[0][0] == "gemini")
+    with _ri.con_plan(True):
+        check("plan pagado + facturación: Gemini de pago va primero", _ri.cadena()[0][0] == "gemini")
+    with _ri.con_plan(False):
+        check("plan gratis: nunca toca la clave con facturación (sin costo)",
+              "gemini" not in [n for n, _ in _ri.cadena()], str(_ri.cadena()))
+    check("y fuera de una petición se asume gratis", _ri.cadena()[0][0] == "groq")
+
+with _mk9.patch.dict(_os.environ, {"GEMINI_API_KEY": "g", "GEMINI_API_KEY_GRATIS": "gg", "GROQ_API_KEY": "q",
+                                   "GEMINI_FACTURACION": "1"}, clear=False), \
+     _mk9.patch.object(_ri, "_ollama_modelo", lambda: None):
+    with _ri.con_plan(False):
+        check("una clave gratuita aparte sirve al plan gratis", "gemini-gratis" in [n for n, _ in _ri.cadena()])
+
+import proxy_ia as _pi
+with _mk9.patch.object(_pi, "es_pago", lambda d: False):
+    check("plan gratis: 60 llamadas de IA al día (alcanza para sus 18)", _pi.limite("u:x") == 60)
+with _mk9.patch.object(_pi, "es_pago", lambda d: True):
+    check("plan pagado: 400 (más que las 50 postulaciones diarias)", _pi.limite("u:x") == 400)
+check("sin cuenta no hay plan pagado", _pi.es_pago("ip:1.2.3.4") is False)
 
 import harvard_pdf as _hp
 _pdf = _hp.pdf_en_bytes({"nombre": "Ana Pérez Núñez", "contacto": {"email": "a@b.pe"},

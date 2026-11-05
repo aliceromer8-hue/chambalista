@@ -3,8 +3,10 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Política de Privacidad y Términos de Uso — Chamba Lista</title>
-<meta name="description" content="Cómo Chamba Lista trata tus datos personales, con quién los comparte y cómo ejercer tus derechos bajo la Ley 29733.">
+<title>Política de Privacidad — Chamba Lista</title>
+<meta name="description" content="Qué datos trata Chamba Lista, para qué, dónde viven, cuánto tiempo y cómo ejercer tus derechos bajo la Ley 29733.">
+<link rel="canonical" href="{{ canonico }}/privacidad">
+<link rel="icon" href="/static/img/icono.png">
 <link rel="stylesheet" href="/static/css/web.css">
 </head>
 <body>
@@ -20,172 +22,159 @@
       </svg>
       Chamba Lista
     </a>
-    <span class="detalle" id="lema">Privacidad y términos</span>
+    <span class="detalle" id="lema">Política de Privacidad</span>
   </div>
 </header>
 
-<!-- Estructura y tono del sector: secciones numeradas, lenguaje formal
-     pero legible, y las cosas incómodas dichas en su sitio en vez de
-     escondidas o puestas de golpe en la portada.
-
-     Lo que NO se hace, aunque se estile: prometer que los datos no se
-     usan para entrenar modelos mientras eso no sea verdad. Los
-     competidores pueden decirlo porque pagan la API; la frase de la
-     sección 4 sale de la configuración real del servidor y cambiará
-     sola cuando se active la facturación. Una política que dice algo
-     que el sistema no cumple no protege: es lo primero que se mira si
-     hay una reclamación. -->
+<!-- Escrita para leerse, no para esconder. Lo que la competencia deja en el
+     aire (qué IA ve tu CV, cuánto se guarda, qué NO se hace) aquí va con
+     nombre y plazo. La frase sobre Google la escribe privacidad.js con la
+     configuración real del servidor: una política que no coincide con el
+     sistema es lo primero que se revisa si alguien reclama. -->
 
 <main class="ancho legal">
 
-  <h1>Política de Privacidad y Términos de Uso</h1>
-  <p class="detalle">Vigente desde el 7 de septiembre de 2026 · versión 2026-09-07</p>
+  <h1>Política de Privacidad</h1>
+  <p class="detalle">Vigente desde el 5 de noviembre de 2026 · versión 2026-11-05 ·
+    <a href="/terminos">Términos y Condiciones</a> · <a href="/reclamaciones">Libro de Reclamaciones</a></p>
 
   <section class="resumen-legal">
-    <h2>Resumen</h2>
-    <p>Esto no reemplaza al texto completo, pero recoge lo esencial:</p>
+    <h2>Lo esencial, en 30 segundos</h2>
     <ul>
-      <li>Necesitas una cuenta para usar el servicio: lo que se envía a las empresas
-        va a tu nombre y tiene que quedar claro de quién viene.</li>
-      <li>Tu CV queda guardado en tu cuenta. Solo tú puedes verlo.</li>
-      <li>Para leer tu CV, su contenido se procesa con inteligencia artificial de Google.</li>
-      <li>No vendemos tus datos ni los cedemos con fines publicitarios.</li>
-      <li>Puedes eliminar toda tu información en cualquier momento.</li>
+      <li>Necesitas una cuenta para usar el servicio: lo que se envía a las empresas va a tu nombre.</li>
+      <li>Tu CV queda en tu cuenta y solo tú puedes verlo. Tu DNI y tus datos para postular viven
+        <strong>solo en tu navegador</strong>.</li>
+      <li>Para adaptar tu CV y responder preguntas usamos inteligencia artificial (Groq y Google).
+        Te decimos cuál y en qué modalidad.</li>
+      <li><strong>No vendemos tus datos</strong>, no se los pasamos a reclutadores ni los usamos para publicidad.</li>
+      <li>Puedes descargar o eliminar toda tu información cuando quieras, en un clic.</li>
     </ul>
   </section>
 
-  <h2>1. Responsable del tratamiento</h2>
-  <p>Chamba Lista, servicio operado desde Lima, Perú. Para cualquier consulta
-    relacionada con tus datos personales o para ejercer tus derechos, escribe a
-    <a href="mailto:chambalistaperu@gmail.com">chambalistaperu@gmail.com</a>.</p>
+  <h2>1. Quién es responsable</h2>
+  <p>El titular del banco de datos y responsable del tratamiento es
+    <strong>{{ empresa.nombre }}</strong>{% if empresa.ruc %}, RUC {{ empresa.ruc }}{% endif %}{% if empresa.domicilio %},
+    con domicilio en {{ empresa.domicilio }}{% endif %}, que opera el servicio «Chamba Lista» desde Lima, Perú.
+    Para cualquier asunto sobre tus datos escribe a
+    <a href="mailto:{{ empresa.correo }}">{{ empresa.correo }}</a>.</p>
 
-  <h2>2. Datos que tratamos y con qué finalidad</h2>
-
-  <h3>2.1 Tu cuenta</h3>
-  <p>El servicio requiere registro. Al registrarte tratamos tu
-    <strong>dirección de correo electrónico</strong>, con
-    la finalidad de identificarte, permitirte iniciar sesión y recuperar tu
-    contraseña. La contraseña se gestiona mediante nuestro proveedor de
-    autenticación y no es accesible para nosotros.</p>
-  <p>Mientras tu cuenta esté activa también conservamos:</p>
-  <ul>
-    <li>El <strong>contenido de tu CV</strong> —el texto, no el archivo que subiste—,
-      para que no lo pierdas al cambiar de dispositivo y para adaptarlo a cada
-      vacante. El archivo original se procesa y se descarta; lo que se guarda es
-      el resultado.</li>
-    <li>Tu <strong>historial de postulaciones</strong> —empresa, puesto y estado—, para
-      que puedas hacerles seguimiento.</li>
-    <li>Los <strong>datos adicionales que decidas guardar</strong> (documento de
-      identidad, distrito, teléfono), con la única finalidad de completar por ti
-      los formularios de los portales de empleo. Su registro es voluntario.</li>
-  </ul>
-
-  <h3>2.2 Datos estadísticos</h3>
-  <p>Registramos conteos de uso agregados y anónimos, que no permiten
-    identificar a ninguna persona, con la finalidad de mejorar el servicio.</p>
+  <h2>2. Qué datos tratamos, para qué y dónde viven</h2>
+  <div class="tabla-legal">
+  <table>
+    <thead><tr><th>Dato</th><th>Para qué</th><th>Dónde vive</th><th>Cuánto tiempo</th></tr></thead>
+    <tbody>
+      <tr><td>Correo y nombre (o los que comparte Google si entras con Google: nombre y correo)</td>
+        <td>Identificarte, abrir tu sesión y recuperar el acceso</td><td>Supabase</td><td>Mientras tengas cuenta</td></tr>
+      <tr><td>Contenido de tu CV (el texto, no el archivo)</td>
+        <td>Convertirlo a formato Harvard, adaptarlo a cada vacante y responder sus preguntas</td>
+        <td>Supabase y tu navegador</td><td>Mientras tengas cuenta</td></tr>
+      <tr><td>Datos para postular: DNI, fecha de nacimiento, distrito, teléfono, pretensión salarial, disponibilidad y horario</td>
+        <td>Completar los formularios de los portales por ti</td>
+        <td><strong>Solo en tu navegador</strong> (la extensión). Salen únicamente hacia el portal donde postulas</td>
+        <td>Hasta que los borres o desinstales la extensión</td></tr>
+      <tr><td>Historial de postulaciones (empresa, puesto, estado)</td>
+        <td>Que hagas seguimiento y no postules dos veces a lo mismo</td><td>Supabase y tu navegador</td><td>Mientras tengas cuenta</td></tr>
+      <tr><td>Saldo, plan, avisos de pago («Ya yapeé»: correo, plan, monto y número de operación si lo das)</td>
+        <td>Activar lo que compraste y llevar las cuentas</td><td>Supabase</td>
+        <td>Lo que exija la normativa tributaria y contable</td></tr>
+      <tr><td>Código de invitación y quién invitó a quién</td>
+        <td>Dar los bonos de invitación y evitar fraudes</td><td>Supabase</td><td>Mientras tengas cuenta</td></tr>
+      <tr><td>Conteo de usos de la IA</td><td>Repartir la IA con justicia entre todos</td><td>Supabase</td><td>3 días</td></tr>
+      <tr><td>Hojas del Libro de Reclamaciones</td><td>Atender tu reclamo y cumplir la ley</td><td>Supabase</td>
+        <td>Lo que exija la normativa de protección al consumidor</td></tr>
+      <tr><td>Estadísticas de uso agregadas y anónimas</td><td>Mejorar el servicio</td><td>Supabase</td><td>Indefinido (no te identifican)</td></tr>
+    </tbody>
+  </table>
+  </div>
+  <p>El archivo que subes <strong>se procesa y se descarta</strong>: lo que guardamos es el texto ya leído.
+    Tu CV convertido también queda en tu navegador para que no pierdas el trabajo al recargar la página.</p>
+  <p><strong>Mientras postula</strong>, la extensión lee en tu equipo la página de la vacante y su formulario (puesto,
+    empresa, requisitos y preguntas). El texto de la vacante y de sus preguntas, junto con tu CV, se envía a la IA
+    para adaptar tu CV y redactar las respuestas. No leemos otras pestañas, ni tus mensajes, ni tus correos.</p>
+  <p><strong>Nunca te pedimos datos sensibles</strong> (salud, origen étnico, religión, orientación, afiliación
+    política o sindical). Si un portal los pregunta, esa pregunta queda para que la respondas tú.</p>
 
   <h2>3. Base legal</h2>
-  <p>El tratamiento se realiza sobre la base de tu <strong>consentimiento</strong>,
-    otorgado de forma libre, previa, expresa e informada al crear tu cuenta,
-    conforme a la Ley N.º 29733 de Protección de Datos Personales y su
-    reglamento.</p>
+  <p>Tratamos tus datos con tu <strong>consentimiento</strong> libre, previo, expreso e informado, que das al crear tu
+    cuenta o al continuar con Google, conforme a la Ley N.º 29733 de Protección de Datos Personales y su reglamento.
+    Los datos de pagos y reclamos se tratan además porque son necesarios para cumplir lo que contrataste y
+    obligaciones legales que nos corresponden.</p>
 
-  <h2>4. Encargados de tratamiento</h2>
-  <p>Para prestar el servicio recurrimos a proveedores que tratan datos por
-    nuestra cuenta y siguiendo nuestras instrucciones:</p>
+  <h2>4. La inteligencia artificial</h2>
+  <p>Usamos IA para leer tu CV, adaptarlo a cada vacante y redactar respuestas a sus preguntas a partir de lo que tu CV
+    dice. La IA <strong>no decide nada sobre ti</strong>: prepara textos; quien decide si te contrata es la empresa.</p>
   <ul>
-    <li><strong>Google</strong> — cuando usas funciones asistidas por inteligencia
-      artificial, el contenido de tu CV se envía a sus servidores para ser
-      analizado. <span id="aviso-gemini">Consulta las condiciones aplicables más abajo.</span></li>
-    <li><strong>Supabase</strong> — almacenamiento de tu cuenta, tu CV y tu historial.</li>
-    <li><strong>Vercel</strong> — alojamiento del servicio.</li>
+    <li><strong>Groq</strong> (EE. UU.) — nuestro primer proveedor. No guarda ni usa para entrenar lo que recibe.</li>
+    <li><strong>Google (Gemini)</strong> (EE. UU.) — <span id="aviso-gemini">Consulta la modalidad aplicable en esta sección.</span></li>
   </ul>
-  <p><strong>No vendemos tus datos personales ni los cedemos a terceros con fines
-    comerciales o publicitarios.</strong></p>
-  <p>Estos proveedores operan fuera del territorio peruano, por lo que existe un
-    flujo transfronterizo de datos que aceptas al registrarte.</p>
+  <p>Nosotros <strong>no entrenamos modelos propios con tu CV</strong> ni con tus respuestas.</p>
 
-  <h2>5. Cómo funcionan las postulaciones</h2>
-  <p>La extensión de navegador opera <strong>localmente en tu equipo</strong>, utilizando
-    las sesiones que tú ya has iniciado en cada portal de empleo. No accedemos a
-    tus credenciales ni iniciamos sesión en tu nombre.</p>
-  <p>Ninguna postulación se envía sin tu confirmación expresa. Las preguntas que
-    impliquen <strong>aceptar condiciones</strong> —prácticas no remuneradas, términos y
-    condiciones, compromisos de permanencia— se te presentan siempre para que
-    decidas tú; el sistema no las responde automáticamente.</p>
-
-  <h2>6. Conservación</h2>
-  <p>Tus datos se conservan mientras mantengas tu cuenta activa. Si la eliminas,
-    tu CV, tu historial y la constancia de tu aceptación se suprimen junto con
-    ella. Los datos estadísticos anónimos se conservan de forma indefinida al no
-    permitir identificarte.</p>
-  <p>Mientras la cuenta exista, conservamos además la <strong>fecha y la versión de
-    esta política que aceptaste</strong> al registrarte. Es el registro que acredita tu
-    consentimiento y no puede modificarse desde la cuenta.</p>
-
-  <h2>7. Tus derechos</h2>
-  <p>La Ley N.º 29733 te reconoce los derechos de <strong>acceso, rectificación,
-    cancelación y oposición</strong> sobre tus datos personales. Puedes ejercerlos:</p>
+  <h2>5. Con quién compartimos datos (encargados) y transferencias</h2>
+  <p>Solo con proveedores que tratan datos por nuestra cuenta y siguiendo nuestras instrucciones:</p>
   <ul>
-    <li><strong>De forma inmediata, desde «Mis datos y mi cuenta»</strong> en la página
-      principal, con la sesión iniciada:
-      <em>Descargar mis datos</em> te entrega un archivo con tu CV y tu historial
-      completo (derecho de acceso), y <em>Borrar mi cuenta</em> elimina la cuenta y
-      todo lo que cuelga de ella en el acto, sin pedirte explicaciones
-      (derecho de cancelación).</li>
-    <li><strong>Por escrito</strong>: a <a href="mailto:chambalistaperu@gmail.com">chambalistaperu@gmail.com</a>,
-      con respuesta en un plazo máximo de diez (10) días hábiles.</li>
+    <li><strong>Supabase</strong> — base de datos y autenticación.</li>
+    <li><strong>Vercel</strong> — alojamiento de la web y del servidor.</li>
+    <li><strong>Groq</strong> y <strong>Google</strong> — inteligencia artificial (sección 4). Google también, si entras con tu cuenta de Google.</li>
+    <li>Nuestro proveedor de <strong>correo</strong> — para los correos de tu cuenta (confirmación y recuperación de contraseña).</li>
+    <li>Los <strong>portales de empleo</strong> (Computrabajo, Bumeran, LinkedIn, Indeed) y las <strong>empresas</strong> a las que
+      postulas reciben lo que tú decides enviarles al postular. Eso pasa desde tu navegador, con tu propia sesión.</li>
   </ul>
-  <p>Si consideras que tus derechos no han sido atendidos, puedes presentar un
-    reclamo ante la Autoridad Nacional de Protección de Datos Personales del
-    Ministerio de Justicia y Derechos Humanos.</p>
+  <p>Estos proveedores operan fuera del Perú, principalmente en EE. UU., por lo que existe un
+    <strong>flujo transfronterizo</strong> de datos que aceptas al crear tu cuenta. Los pagos se hacen entre tu Yape o Plin
+    y el nuestro: <strong>nunca recibimos datos de tu tarjeta ni de tu banca</strong>.</p>
 
-  <h2>8. Seguridad</h2>
-  <p>Aplicamos medidas técnicas para proteger tu información: las conexiones van
-    cifradas, las contraseñas no se almacenan en nuestros sistemas, y la
-    separación entre cuentas está impuesta por la propia base de datos, de modo
-    que una cuenta no puede leer los datos de otra ni por error de programación.</p>
-  <p>Tu CV convertido también queda guardado <strong>en tu navegador</strong> para que no
-    pierdas el trabajo al recargar la página. Eso vive en tu equipo, no en el
-    nuestro; se borra al pulsar «Convertir otro CV», al borrar tu cuenta o solo,
-    a la semana.</p>
+  <h2>6. Lo que NO hacemos</h2>
+  <ul>
+    <li><strong>No vendemos</strong> tus datos ni los cedemos con fines comerciales o publicitarios.</li>
+    <li>No le pasamos tu perfil a reclutadores ni a «bolsas de talento».</li>
+    <li>No pedimos ni guardamos las <strong>credenciales</strong> (usuario y contraseña) de tus portales: la extensión
+      trabaja con las sesiones que tú ya abriste en tu navegador.</li>
+    <li>No usamos cookies de publicidad ni herramientas de rastreo de terceros.</li>
+    <li>No inventamos experiencia, títulos ni competencias que tu CV no tenga.</li>
+  </ul>
 
-  <h2>9. Términos de uso</h2>
-  <h3>9.1 Uso del servicio</h3>
-  <p>Debes ser mayor de 18 años. Te comprometes a usar el servicio para postular
-    a ofertas laborales reales y a proporcionar información veraz sobre tu
-    formación y experiencia.</p>
+  <h2>7. Cuánto tiempo los conservamos</h2>
+  <p>Los plazos están en la tabla de la sección 2. Si borras tu cuenta, tu CV, tu historial, tu saldo y la constancia de
+    tu aceptación se suprimen en el acto. Las copias de seguridad de nuestros proveedores se renuevan en sus ciclos
+    ordinarios. Se conservan solo los registros que la ley nos obliga a guardar (pagos y reclamos).</p>
+  <p>Mientras la cuenta exista guardamos la <strong>fecha y la versión de esta política que aceptaste</strong>. Es la
+    prueba de tu consentimiento y no puede modificarse desde la cuenta.</p>
 
-  <h3>9.2 Naturaleza del servicio</h3>
-  <p>Chamba Lista es una herramienta que <strong>automatiza el envío de
-    postulaciones</strong>. No somos una agencia de empleo, no intermediamos en
-    procesos de selección y <strong>no garantizamos la obtención de un puesto de
-    trabajo, entrevistas ni respuestas por parte de las empresas</strong>. El resultado
-    de cada postulación depende exclusivamente del empleador.</p>
+  <h2>8. Tus derechos</h2>
+  <p>La Ley N.º 29733 te reconoce los derechos de <strong>acceso, rectificación, cancelación y oposición</strong>
+    (y, cuando corresponda, a recibir tus datos en un formato reutilizable). Puedes ejercerlos:</p>
+  <ul>
+    <li><strong>En el acto, desde «Mis datos y mi cuenta»</strong> en la página principal, con la sesión iniciada:
+      <em>Descargar mis datos</em> te entrega un archivo con tu CV y tu historial, y <em>Borrar mi cuenta</em> elimina
+      la cuenta y todo lo que cuelga de ella, sin pedirte explicaciones.</li>
+    <li><strong>Por escrito</strong>, a <a href="mailto:{{ empresa.correo }}">{{ empresa.correo }}</a>, con respuesta en un
+      plazo máximo de diez (10) días hábiles.</li>
+  </ul>
+  <p>Si consideras que no atendimos tus derechos, puedes reclamar ante la Autoridad Nacional de Protección de Datos
+    Personales del Ministerio de Justicia y Derechos Humanos.</p>
 
-  <h3>9.3 Responsabilidad sobre el contenido</h3>
-  <p>El contenido de tu CV y de tus respuestas es tuyo y respondes por él. La
-    herramienta reformula y reordena la información que tú proporcionas: no
-    genera experiencia, títulos ni competencias que no consten en tu CV. Cuando
-    una oferta requiere algo que tu CV no menciona, se te consulta antes de
-    incluirlo.</p>
+  <h2>9. Seguridad</h2>
+  <p>Las conexiones van cifradas; las contraseñas no se guardan en nuestros sistemas; la base de datos impide que una
+    cuenta lea los datos de otra; y nuestras claves de servicio nunca viajan al navegador. Si ocurriera un incidente
+    que afecte tus datos, te avisaremos sin demora indebida con lo que pasó y lo que hicimos.</p>
 
-  <h3>9.4 Uso de los portales de empleo</h3>
-  <p>El uso de Computrabajo, Bumeran, LinkedIn e Indeed se rige por los términos
-    de cada plataforma, que eres responsable de cumplir. Chamba Lista no está
-    afiliado a ninguna de ellas.</p>
+  <h2>10. Menores de edad</h2>
+  <p>El servicio es solo para mayores de 18 años. Si detectamos una cuenta de un menor, la eliminamos.</p>
 
-  <h2>10. Modificaciones</h2>
-  <p>Podemos actualizar esta política. Si los cambios son sustanciales, se
-    comunicarán en el servicio antes de su entrada en vigor. La fecha de
-    vigencia figura al inicio del documento.</p>
+  <h2>11. Navegador y extensión</h2>
+  <p>Usamos el almacenamiento de tu navegador (localStorage y el de la extensión) para mantener tu sesión, tu CV
+    convertido y tus datos para postular. No usamos cookies de terceros. Desinstalar la extensión borra lo que vive en ella.</p>
+
+  <h2>12. Cambios a esta política</h2>
+  <p>Si hacemos un cambio importante, te avisaremos en el servicio con al menos siete (7) días de anticipación y, si
+    amplía lo que hacemos con tus datos, te pediremos aceptarlo de nuevo. La versión vigente figura arriba.</p>
 
   <p class="volver"><a href="/">← Volver a Chamba Lista</a></p>
-
 </main>
 
 <footer class="ancho">
-  <p>Chamba Lista — hecho para buscar trabajo en Perú.</p>
+  <p>Chamba Lista — hecho para buscar trabajo en Perú · <a href="/terminos">Términos y Condiciones</a>
+    · <a href="/reclamaciones" class="enlace-reclamos">Libro de Reclamaciones</a></p>
 </footer>
 
 <script src="/static/js/privacidad.js"></script>

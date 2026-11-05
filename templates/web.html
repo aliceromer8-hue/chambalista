@@ -5,6 +5,17 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Chamba Lista — un clic, cincuenta postulaciones</title>
 <meta name="description" content="Encuentra vacantes de prácticas y primer empleo en Computrabajo, Bumeran, LinkedIn e Indeed. Chamba Lista llena cada postulación con tu CV y tus datos y la envía por ti; si prefieres, te avisa antes.">
+<link rel="canonical" href="{{ canonico }}/">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="Chamba Lista">
+<meta property="og:locale" content="es_PE">
+<meta property="og:title" content="Chamba Lista — un clic, cincuenta postulaciones">
+<meta property="og:description" content="Postula a prácticas y primer empleo en Perú con tu CV adaptado a cada vacante. Tus primeras 18 postulaciones son gratis.">
+<meta property="og:url" content="{{ canonico }}/">
+<meta property="og:image" content="{{ canonico }}/static/img/compartir.png">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="theme-color" content="#D4F249">
+<link rel="icon" href="/static/img/icono.png">
 <link rel="stylesheet" href="/static/css/web.css">
 </head>
 <body>
@@ -113,7 +124,7 @@
         <p class="gratis-cifra"><b>18</b> postulaciones</p>
         <p class="gratis-texto">Tus primeras 18 van por nuestra cuenta. Con todo incluido.</p>
       </div>
-      <button class="boton principal" type="button" id="btn-gratis">Empezar gratis</button>
+      <button class="boton principal" type="button" id="btn-gratis" data-cuenta="gratis">Empezar gratis</button>
     </div>
     <p class="frase-precios">Cada día que no postulas, esa práctica se la lleva otra persona.</p>
 
@@ -127,7 +138,7 @@
           <li>Si te quedan postulaciones de un pack, se guardan</li>
           <li>Termina a los 30 días. No se renueva solo</li>
         </ul>
-        <button class="boton secundario btn-pack" type="button" data-plan="pase">Elegir el pase</button>
+        <button class="boton secundario btn-pack" type="button" data-plan="pase" data-cuenta="plan">Elegir el pase</button>
       </div>
 
       <div class="plan-web elegido">
@@ -140,7 +151,7 @@
           <li><b>≈ 25 horas</b> que no pasas llenando formularios</li>
           <li>No caducan: úsalas a tu ritmo</li>
         </ul>
-        <button class="boton primario btn-pack" type="button" data-plan="100">Elegir 100</button>
+        <button class="boton primario btn-pack" type="button" data-plan="100" data-cuenta="plan">Elegir 100</button>
       </div>
 
       <div class="plan-web plan-chico">
@@ -151,7 +162,7 @@
           <li>Para una búsqueda puntual</li>
           <li>No caducan</li>
         </ul>
-        <button class="boton secundario btn-pack" type="button" data-plan="30">Elegir 30</button>
+        <button class="boton secundario btn-pack" type="button" data-plan="30" data-cuenta="plan">Elegir 30</button>
       </div>
     </div>
     <p class="incluye">Cada postulación trae lo mismo, en todos los planes: <b>tu CV adaptado a la vacante,
@@ -172,8 +183,8 @@
       <p class="grande">Crea tu cuenta y empieza</p>
       <p class="detalle">Tu CV y tus postulaciones se guardan contigo, en cualquier equipo.</p>
       <div class="acciones-puerta">
-        <button class="boton principal" id="puerta-crear">Crear cuenta</button>
-        <button class="boton secundario" id="puerta-entrar">Ya tengo cuenta</button>
+        <button class="boton principal" id="puerta-crear" data-cuenta="cv">Crear cuenta gratis</button>
+        <button class="boton secundario" id="puerta-entrar" data-cuenta="cv">Ya tengo cuenta</button>
       </div>
     </div>
 
@@ -225,7 +236,7 @@
         <p class="detalle">Busca en los cuatro portales y, en Computrabajo, llena la
           postulación por ti — con las sesiones que ya tienes abiertas.</p>
       </div>
-      <a class="boton principal" id="instalar" href="/extension.zip" download>Descargar la extensión</a>
+      <a class="boton principal" id="instalar" href="/extension.zip" download data-cuenta="extension">Descargar la extensión</a>
     </div>
     <details class="como-instalar">
       <summary>Cómo instalarla · 1 minuto</summary>
@@ -239,8 +250,30 @@
     </details>
   </section>
 
-
+  <!-- Fin de la página: al llegar aquí, si no entró, el muro (abajo). -->
+  <div class="fin-pagina" id="fin-pagina" aria-hidden="true"></div>
 </main>
+
+<!-- El muro (Ali, 2026-11-04): se puede mirar todo, pero al terminar de
+     deslizar —o al tocar cualquier cosa que use la IA o tus datos— se
+     difumina el fondo y se pide entrar. Volver a subir lo quita. -->
+<div class="muro" id="muro" role="dialog" aria-modal="true" aria-labelledby="muro-titulo" hidden>
+  <div class="muro-tarjeta">
+    <button class="muro-cerrar" id="muro-cerrar" type="button" aria-label="Seguir mirando">×</button>
+    <p class="muro-chip">18 postulaciones gratis</p>
+    <h2 id="muro-titulo">Entra y empieza a postular</h2>
+    <p class="detalle" id="muro-texto">Tu CV, tus datos y tus postulaciones quedan guardados en tu cuenta.</p>
+    <button class="boton-google oculto" id="muro-google" type="button"><svg width="18" height="18" viewBox="0 0 48 48" aria-hidden="true"><path fill="#FFC107" d="M43.6 20.5H42V20H24v8h11.3C33.7 32.7 29.2 36 24 36c-6.6 0-12-5.4-12-12s5.4-12 12-12c3.1 0 5.8 1.2 7.9 3.1l5.7-5.7C34 6.1 29.3 4 24 4 12.9 4 4 12.9 4 24s8.9 20 20 20 20-8.9 20-20c0-1.3-.1-2.4-.4-3.5z"/><path fill="#FF3D00" d="M6.3 14.7l6.6 4.8C14.7 15.1 19 12 24 12c3.1 0 5.8 1.2 7.9 3.1l5.7-5.7C34 6.1 29.3 4 24 4 16.3 4 9.7 8.3 6.3 14.7z"/><path fill="#4CAF50" d="M24 44c5.2 0 9.9-2 13.4-5.2l-6.2-5.2C29.2 35.1 26.7 36 24 36c-5.2 0-9.6-3.3-11.3-7.9l-6.5 5C9.5 39.6 16.2 44 24 44z"/><path fill="#1976D2" d="M43.6 20.5H42V20H24v8h11.3c-.8 2.2-2.2 4.2-4.1 5.6l6.2 5.2C36.9 39.2 44 34 44 24c0-1.3-.1-2.4-.4-3.5z"/></svg><span>Continuar con Google</span></button>
+    <div class="muro-o oculto" id="muro-o"><span>o con tu correo</span></div>
+    <div class="muro-correo">
+      <button class="boton principal" id="muro-crear" type="button">Crear cuenta</button>
+      <button class="boton secundario" id="muro-entrar" type="button">Ya tengo cuenta</button>
+    </div>
+    <p class="muro-legal">Al continuar declaras ser mayor de 18 años y aceptas la
+      <a href="/privacidad" target="_blank" rel="noopener">Política de Privacidad</a> y los
+      <a href="/terminos" target="_blank" rel="noopener">Términos y Condiciones</a>.</p>
+  </div>
+</div>
 
 <!-- Cuenta. Un solo diálogo para entrar y para registrarse: son el mismo
      formulario y separarlos obliga a elegir antes de saber si ya tienes
@@ -264,8 +297,8 @@
     <label class="casilla oculto" id="fila-acepta">
       <input type="checkbox" id="acepta">
       <span>Declaro ser mayor de 18 años y acepto la
-        <a href="/privacidad" target="_blank" rel="noopener">Política de Privacidad
-        y los Términos de Uso</a>. <span id="privacidad-ia"></span></span>
+        <a href="/privacidad" target="_blank" rel="noopener">Política de Privacidad</a>
+        y los <a href="/terminos" target="_blank" rel="noopener">Términos y Condiciones</a>. <span id="privacidad-ia"></span></span>
     </label>
     <p class="aviso-cuenta oculto" id="error-cuenta"></p>
     <div class="acciones-cuenta">
@@ -300,7 +333,8 @@
 </section>
 
 <footer class="ancho">
-  <p>Chamba Lista — hecho para buscar trabajo en Perú · <a href="/privacidad">Privacidad y condiciones</a></p>
+  <p>Chamba Lista — hecho para buscar trabajo en Perú · <a href="/privacidad">Política de Privacidad</a>
+    · <a href="/terminos">Términos y Condiciones</a> · <a href="/reclamaciones" class="enlace-reclamos">Libro de Reclamaciones</a></p>
 </footer>
 
 <!-- Pagar un pack: Yape o Plin, que es como se paga aquí. -->

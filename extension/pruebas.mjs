@@ -352,14 +352,20 @@ titulo("EL PANEL SABE ENTRAR — faltaba y nada lo avisaba");
   check("hay una etapa 0 antes de todo lo demas", /etapa === 0/.test(pjs));
   check("que se decide por la cuenta, no por el CV",
     /!estado\.conCuenta \? 0/.test(pjs));
-  check("con formulario para entrar de verdad",
-    /sesion\.entrar\(/.test(pjs) && /form-acceso/.test(pjs));
-  check("y salida para quien aun no tiene cuenta",
-    /sesion\.URL_CUENTA/.test(pjs));
+  check("con formulario para entrar de verdad (en el muro)",
+    /sesion\.entrar\(/.test(pjs) && /muro-form/.test(pjs));
+  check("y salida para quien aun no tiene cuenta (registro en la web)",
+    /\/\?registro=1/.test(pjs));
+  check("y con Google, por la web y el puente", /entrar\/google/.test(pjs) && /chrome\.storage\?\.onChanged/.test(pjs));
+  check("sin cuenta, tocar una función abre el muro (navegar sí se puede)",
+    /LIBRE_SIN_CUENTA = "\.menu, \.tab/.test(pjs) && /abrirMuro\("accion"\)/.test(pjs));
+  check("el muro solo actúa cuando YA se sabe que no hay cuenta", /conCuenta: null/.test(pjs) && /conCuenta !== false/.test(pjs));
+  check("tras entrar, la guía: CV, perfil, portales, postular",
+    ["No olvides subir tu CV", "Completa tu perfil", "Conecta tus portales", "A postular"].every((t) => pjs.includes(t)));
   check("un token muerto se trata como no tener cuenta",
     /sesion\.verificar\(\)/.test(pjs));
   check("el error de entrar se enseña, no se traga",
-    /acceso-error/.test(pjs));
+    /muro-error/.test(pjs));
 }
 
 

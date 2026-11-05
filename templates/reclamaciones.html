@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Libro de Reclamaciones — Chamba Lista</title>
+<meta name="description" content="Libro de Reclamaciones virtual de Chamba Lista. Registra un reclamo o una queja y recibe respuesta en un máximo de 15 días hábiles.">
+<link rel="canonical" href="{{ canonico }}/reclamaciones">
+<link rel="icon" href="/static/img/icono.png">
+<link rel="stylesheet" href="/static/css/web.css">
+</head>
+<body>
+
+<header class="cabecera">
+  <div class="ancho">
+    <a class="logo" href="/">
+      <svg width="22" height="24" viewBox="0 0 24 26" fill="none" aria-hidden="true">
+        <rect x="1.5" y="1.5" width="21" height="23" rx="2" stroke="currentColor" stroke-width="1.6"/>
+        <line x1="6" y1="7.5" x2="18" y2="7.5" stroke="currentColor" stroke-width="1.6"/>
+        <line x1="6" y1="12" x2="12" y2="12" stroke="currentColor" stroke-width="1.6"/>
+        <line x1="6" y1="16" x2="12" y2="16" stroke="currentColor" stroke-width="1.6"/>
+      </svg>
+      Chamba Lista
+    </a>
+    <span class="detalle" id="lema">Libro de Reclamaciones</span>
+  </div>
+</header>
+
+<main class="ancho legal reclamos">
+  <h1>Libro de Reclamaciones</h1>
+  <p class="detalle">Hoja de reclamación virtual · conforme al Código de Protección y Defensa del Consumidor</p>
+
+  <section class="hoja-proveedor">
+    <p><b>Proveedor:</b> {{ empresa.nombre }}{% if empresa.ruc %} · <b>RUC:</b> {{ empresa.ruc }}{% endif %}</p>
+    {% if empresa.domicilio %}<p><b>Domicilio:</b> {{ empresa.domicilio }}</p>{% endif %}
+    <p><b>Fecha:</b> <span id="hoja-fecha"></span></p>
+  </section>
+
+  <form id="form-reclamo" class="hoja" novalidate>
+    <fieldset>
+      <legend>1. Tus datos</legend>
+      <label>Nombre completo <input name="nombre" required maxlength="120" autocomplete="name"></label>
+      <div class="fila-doble">
+        <label>Documento
+          <select name="documento_tipo"><option>DNI</option><option>Carné de extranjería</option><option>Pasaporte</option></select>
+        </label>
+        <label>Número <input name="documento" required maxlength="15" inputmode="numeric"></label>
+      </div>
+      <label>Domicilio <input name="domicilio" required maxlength="200" autocomplete="street-address"></label>
+      <div class="fila-doble">
+        <label>Teléfono <input name="telefono" maxlength="20" inputmode="tel" autocomplete="tel"></label>
+        <label>Correo <input name="correo" type="email" required maxlength="200" autocomplete="email"></label>
+      </div>
+      <label>Si eres menor de edad: nombre de tu padre, madre o apoderado
+        <input name="apoderado" maxlength="120"></label>
+    </fieldset>
+
+    <fieldset>
+      <legend>2. Lo que contrataste</legend>
+      <div class="fila-doble">
+        <label>Tipo
+          <select name="bien_tipo"><option value="servicio">Servicio</option><option value="producto">Producto</option></select>
+        </label>
+        <label>Monto reclamado (S/) <input name="monto" inputmode="decimal" maxlength="12" placeholder="0.00"></label>
+      </div>
+      <label>Descripción <input name="descripcion" required maxlength="200" placeholder="Ej.: Pack de 100 postulaciones"></label>
+    </fieldset>
+
+    <fieldset>
+      <legend>3. Tu reclamo o queja</legend>
+      <div class="tipo-reclamo">
+        <label class="opcion"><input type="radio" name="tipo" value="reclamo" checked>
+          <span><b>Reclamo</b><small>Disconformidad con el servicio o producto.</small></span></label>
+        <label class="opcion"><input type="radio" name="tipo" value="queja">
+          <span><b>Queja</b><small>Malestar con la atención, no con el servicio en sí.</small></span></label>
+      </div>
+      <label>Detalle <textarea name="detalle" required maxlength="3000" rows="5"></textarea></label>
+      <label>Pedido (¿qué quieres que hagamos?) <textarea name="pedido" required maxlength="1500" rows="3"></textarea></label>
+    </fieldset>
+
+    <label class="casilla"><input type="checkbox" name="conforme" required>
+      <span>Declaro que los datos son correctos y acepto que se usen para atender este reclamo, según la
+        <a href="/privacidad" target="_blank" rel="noopener">Política de Privacidad</a>.</span></label>
+
+    <p class="nota">La formulación del reclamo no impide acudir a otras vías de solución de controversias ni es
+      requisito previo para interponer una denuncia ante el INDECOPI. El proveedor deberá dar respuesta al reclamo en
+      un plazo no mayor a quince (15) días hábiles improrrogables.</p>
+
+    <p class="aviso-cuenta oculto" id="reclamo-error" role="alert"></p>
+    <button class="boton principal" type="submit" id="reclamo-enviar">Registrar</button>
+  </form>
+
+  <section class="hoja-lista oculto" id="hoja-lista" aria-live="polite">
+    <h2>Reclamo registrado</h2>
+    <p class="numero-hoja">N.º <b id="hoja-numero"></b></p>
+    <p>Guarda una copia: imprímela o guárdala como PDF. Te responderemos al correo que indicaste en un plazo
+      máximo de quince (15) días hábiles.</p>
+    <div id="hoja-copia" class="hoja-copia"></div>
+    <div class="acciones-cuenta">
+      <button class="boton principal" type="button" id="hoja-imprimir">Imprimir o guardar PDF</button>
+      <a class="boton secundario" href="/">Volver</a>
+    </div>
+  </section>
+</main>
+
+<footer class="ancho">
+  <p>Chamba Lista · <a href="/privacidad">Política de Privacidad</a> · <a href="/terminos">Términos y Condiciones</a></p>
+</footer>
+<script src="/static/js/reclamaciones.js"></script>
+</body>
+</html>

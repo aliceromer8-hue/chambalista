@@ -57,7 +57,7 @@ SITIO = (os.environ.get("SITIO_URL") or "").rstrip("/")
 # Versión de la política que se acepta al registrarse. Cambia cuando
 # cambie el documento: sin esto, «aceptó» no dice QUÉ aceptó, y una
 # aceptación que no se puede fechar ni ubicar no demuestra nada.
-VERSION_POLITICA = "2026-09-07"
+VERSION_POLITICA = "2026-11-05"
 
 CORREO = re.compile(r"^[^@\s]+@[^@\s]+\.[a-z]{2,}$", re.I)
 MINIMO_CONTRASENA = 8
@@ -142,7 +142,13 @@ def _nombre_de(usuario):
     y cargaba otro CV, el panel pasaba a llamarla como la persona del CV.
     La identidad es la cuenta; el CV es un documento que se usa.
     """
-    return _limpiar_nombre((usuario.get("user_metadata") or {}).get("nombre"))
+    meta = usuario.get("user_metadata") or {}
+    if meta.get("nombre"):
+        return _limpiar_nombre(meta["nombre"])
+    # Con Google no hay formulario: el nombre viene de su perfil. Solo el
+    # primero, que es como saluda el panel («Hola, Ali»).
+    completo = meta.get("given_name") or meta.get("full_name") or meta.get("name") or ""
+    return _limpiar_nombre(completo.split(" ")[0] if completo else None)
 
 
 def _sesion(d):

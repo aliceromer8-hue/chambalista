@@ -30,10 +30,38 @@ from collections import defaultdict
 
 import redactor_ia
 
-# Operaciones gratuitas por dispositivo y ventana. Una "operación" es una
-# llamada al modelo: analizar un CV, o adaptar+responder una vacante.
-LIBRES_POR_VENTANA = int(os.environ.get("IA_LIBRES", "40"))
+# Llamadas al modelo por cuenta y ventana. Una postulación gasta unas 2-3
+# (adaptar el CV y responder sus preguntas). Antes eran 40 para todos: unas
+# 20 postulaciones al día, menos que las 50 del titular. Ahora:
+#   · plan gratis  → 60: alcanza para sus 18 postulaciones y para el CV.
+#   · plan pagado  → 400: más que las 50 diarias seguras de una tanda.
+LIBRES_POR_VENTANA = int(os.environ.get("IA_LIBRES", "60"))
+LIBRES_PAGO = int(os.environ.get("IA_LIBRES_PAGO", "400"))
 VENTANA_HORAS = int(os.environ.get("IA_VENTANA_HORAS", "24"))
+
+_planes = {}
+
+
+def es_pago(dispositivo):
+    """¿Esta cuenta compró algo (pack o pase)? Se recuerda 2 minutos."""
+    if not str(dispositivo or "").startswith("u:"):
+        return False
+    ahora = time.time()
+    guardado = _planes.get(dispositivo)
+    if guardado and ahora - guardado[0] < 120:
+        return guardado[1]
+    try:
+        import saldo
+        e = saldo.estado(dispositivo[2:])
+        pago = bool(e and (e.get("pase_activo") or (e.get("compradas") or 0) > 0))
+    except Exception:                                             # noqa: BLE001
+        pago = False
+    _planes[dispositivo] = (ahora, pago)
+    return pago
+
+
+def limite(dispositivo):
+    return LIBRES_PAGO if es_pago(dispositivo) else LIBRES_POR_VENTANA
 
 _uso = defaultdict(list)
 _candado = threading.Lock()
@@ -63,7 +91,7 @@ def _usadas_en_base(dispositivo):
             return None
         desde = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime(time.time() - VENTANA_HORAS * 3600))
         filas = nube._pedir("GET", f"uso_ia?select=creado&usuario=eq.{dispositivo[2:]}&creado=gte.{desde}"
-                                   f"&order=creado.asc&limit={LIBRES_POR_VENTANA + 5}")
+                                   f"&order=creado.asc&limit={limite(dispositivo) + 5}")
         return None if filas is None else filas
     except Exception:                                             # noqa: BLE001
         return None
@@ -80,12 +108,14 @@ def consultar_cuota(dispositivo):
         marcas = [time.mktime(time.strptime(f["creado"][:19], "%Y-%m-%dT%H:%M:%S")) - time.timezone
                   for f in en_base if f.get("creado")] or marcas[:0]
     usadas = len(marcas)
-    restantes = max(0, LIBRES_POR_VENTANA - usadas)
+    tope = limite(dispositivo)
+    restantes = max(0, tope - usadas)
     proxima = (min(marcas) + VENTANA_HORAS * 3600) if marcas and not restantes else None
     return {
         "usadas": usadas,
         "restantes": restantes,
-        "limite": LIBRES_POR_VENTANA,
+        "limite": tope,
+        "plan_pagado": es_pago(dispositivo),
         "ventana_horas": VENTANA_HORAS,
         "se_renueva_en_minutos": round((proxima - ahora) / 60) if proxima else None,
     }
@@ -93,9 +123,10 @@ def consultar_cuota(dispositivo):
 
 def _consumir(dispositivo):
     """Registra una operación. Devuelve False si ya no le queda."""
+    tope = limite(dispositivo)
     en_base = _usadas_en_base(dispositivo)
     if en_base is not None:
-        if len(en_base) >= LIBRES_POR_VENTANA:
+        if len(en_base) >= tope:
             return False
         import nube
         nube._pedir("POST", "uso_ia", [{"usuario": dispositivo[2:]}], {"Prefer": "return=minimal"})
@@ -103,7 +134,7 @@ def _consumir(dispositivo):
     ahora = time.time()
     with _candado:
         marcas = _limpiar(_uso.get(dispositivo, []), ahora)
-        if len(marcas) >= LIBRES_POR_VENTANA:
+        if len(marcas) >= tope:
             _uso[dispositivo] = marcas
             return False
         marcas.append(ahora)
@@ -132,8 +163,9 @@ def procesar(operacion, carga, dispositivo, clave_propia=None):
             cuota = consultar_cuota(dispositivo)
             minutos = cuota["se_renueva_en_minutos"]
             return None, (
-                f"Llegaste al límite de {LIBRES_POR_VENTANA} usos gratis. "
+                f"Llegaste al límite de {cuota['limite']} usos de IA de hoy. "
                 + (f"Se renueva en {minutos} minutos. " if minutos else "")
+                + ("" if cuota.get("plan_pagado") else "Con un pack o el pase el límite sube. ")
                 + "También puedes poner tu propia clave gratuita en Mi perfil."
             ), 429
 
@@ -142,7 +174,9 @@ def procesar(operacion, carga, dispositivo, clave_propia=None):
     if propia:
         os.environ["GEMINI_API_KEY"] = clave_propia
     try:
-        return _ejecutar(operacion, carga), None, 200
+        # Plan pagado → cadena de pago (Gemini con facturación primero).
+        with redactor_ia.con_plan(es_pago(dispositivo) and not propia):
+            return _ejecutar(operacion, carga), None, 200
     except Exception as e:
         return None, f"El modelo falló: {e}", 502
     finally:

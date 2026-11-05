@@ -25,7 +25,9 @@ from functools import wraps
 from collections import defaultdict, deque
 from pathlib import Path
 
-from flask import Flask, g, jsonify, render_template, request, send_file
+from urllib.parse import quote
+
+from flask import Flask, g, jsonify, redirect, render_template, request, send_file
 from werkzeug.utils import secure_filename
 
 BASE = Path(__file__).parent
@@ -178,15 +180,76 @@ def con_sesion(f):
     return envoltura
 
 
+def _canonico():
+    """El dominio con el que queremos salir en Google (DOMINIO_PUBLICO en
+    Vercel, p. ej. https://chambalista.vercel.app). Sin él, el actual."""
+    return (os.environ.get("DOMINIO_PUBLICO") or _origen()).rstrip("/")
+
+
+PAGINAS_PUBLICAS = ("/", "/privacidad", "/terminos", "/reclamaciones")
+
+
+@app.get("/robots.txt")
+def robots():
+    texto = ("User-agent: *\nAllow: /\nDisallow: /admin\nDisallow: /api/\nDisallow: /entrar/\n"
+             f"Sitemap: {_canonico()}/sitemap.xml\n")
+    return app.response_class(texto, mimetype="text/plain")
+
+
+@app.get("/sitemap.xml")
+def sitemap():
+    urls = "".join(f"<url><loc>{_canonico()}{p}</loc></url>" for p in PAGINAS_PUBLICAS)
+    xml = ('<?xml version="1.0" encoding="UTF-8"?>'
+           f'<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">{urls}</urlset>')
+    return app.response_class(xml, mimetype="application/xml")
+
+
 @app.get("/")
 def index():
     medir("pagina_vista")
-    return render_template("web.html")
+    return render_template("web.html", canonico=_canonico())
+
+
+def _empresa():
+    """Quién presta el servicio. Lo exigen la política de datos (titular del
+    banco de datos) y el Libro de Reclamaciones (razón social, RUC y
+    domicilio). Se pone en Vercel: EMPRESA_NOMBRE, EMPRESA_RUC, EMPRESA_DOMICILIO."""
+    return {
+        "nombre": os.environ.get("EMPRESA_NOMBRE", "").strip() or "Chamba Lista",
+        "ruc": os.environ.get("EMPRESA_RUC", "").strip(),
+        "domicilio": os.environ.get("EMPRESA_DOMICILIO", "").strip(),
+        "correo": os.environ.get("EMPRESA_CORREO", "").strip() or "chambalistaperu@gmail.com",
+    }
 
 
 @app.get("/privacidad")
 def privacidad():
-    return render_template("privacidad.html")
+    return render_template("privacidad.html", empresa=_empresa(), canonico=_canonico())
+
+
+@app.get("/terminos")
+def terminos():
+    return render_template("terminos.html", empresa=_empresa(), canonico=_canonico())
+
+
+@app.get("/reclamaciones")
+def reclamaciones():
+    return render_template("reclamaciones.html", empresa=_empresa(), canonico=_canonico())
+
+
+@app.post("/api/reclamos")
+def registrar_reclamo():
+    """Hoja del Libro de Reclamaciones. Sin cuenta: reclamar es un derecho."""
+    import cuentas
+    import reclamos
+    if not _pasa_cuenta():
+        return jsonify({"error": "Demasiados intentos. Espera unos minutos."}), 429
+    usuario = cuentas.quien_es(_token()) if _token() else None
+    ok, r = reclamos.registrar(request.get_json(silent=True) or {}, (usuario or {}).get("id"))
+    if not ok:
+        return jsonify({"error": r}), 400
+    medir("reclamo_registrado")
+    return jsonify({"numero": r})
 
 
 @app.get("/recuperar")
@@ -218,6 +281,72 @@ def _ia_privada():
         return False
 
 
+def _google_activo():
+    """Entrar con Google. Se enciende con LOGIN_GOOGLE=1 cuando el proveedor
+    ya está configurado en Supabase: sin eso el botón llevaría a un error."""
+    return os.environ.get("LOGIN_GOOGLE", "").lower() in ("1", "true", "si", "sí")
+
+
+def _origen():
+    """https://dominio-actual. En Vercel siempre https; en local, lo que sea."""
+    host = request.host
+    local = host.startswith(("localhost", "127.0.0.1"))
+    return f"{'http' if local else 'https'}://{host}"
+
+
+def _volver_seguro(volver):
+    """Solo rutas de NUESTRO sitio: nada de «//otro.com» ni URLs completas."""
+    volver = (volver or "/").strip()
+    return volver if volver.startswith("/") and not volver.startswith("//") and "\\" not in volver else "/"
+
+
+@app.get("/entrar/google")
+def entrar_google():
+    """Manda a Google (vía Supabase) y vuelve a /entrar/listo con la sesión.
+
+    La extensión también entra por aquí: abre esta página en una pestaña y,
+    al volver, el puente (contenido/puente.js) le pasa la sesión sola.
+    """
+    import cuentas
+    volver = _volver_seguro(request.args.get("volver"))
+    if not (_google_activo() and cuentas.URL):
+        return redirect("/?entrar=1")
+    medir("google_iniciado")
+    destino = f"{_origen()}/entrar/listo?volver={quote(volver, safe='')}"
+    return redirect(f"{cuentas.URL}/auth/v1/authorize?provider=google&redirect_to={quote(destino, safe='')}")
+
+
+@app.get("/entrar/listo")
+def entrar_listo():
+    return render_template("entrar.html")
+
+
+@app.post("/api/cuenta/google")
+def cuenta_google():
+    """Recibe los tokens que Google/Supabase dejaron en la URL y los valida.
+
+    No se confía en el token por venir del navegador: se le pregunta a
+    Supabase de quién es. La aceptación de la política queda anotada igual
+    que en el registro con correo (el botón de Google la muestra encima).
+    """
+    import cuentas
+    if not _pasa_cuenta():
+        return jsonify({"error": "Demasiados intentos. Espera unos minutos."}), 429
+    d = request.get_json(silent=True) or {}
+    token = str(d.get("token") or "")
+    usuario = cuentas.quien_es(token) if token else None
+    if not usuario:
+        return jsonify({"error": "No se pudo confirmar tu cuenta de Google. Inténtalo otra vez."}), 401
+    cuentas.anotar_aceptacion(usuario["id"])       # si ya existía, no pasa nada
+    medir("cuenta_google")
+    try:
+        expira = int(d.get("expira_en") or 3600)
+    except (TypeError, ValueError):
+        expira = 3600
+    return jsonify({"token": token, "refresco": str(d.get("refresco") or ""), "expira_en": expira,
+                    "usuario": usuario, "falta_confirmar": False})
+
+
 @app.get("/api/estado")
 def estado():
     # Si la clave de Gemini tiene facturación activada.
@@ -243,6 +372,7 @@ def estado():
         # arreglos que su Chrome no había cargado y parecía que no
         # funcionaban.
         "version_extension": _version_extension(),
+        "google": _google_activo(),
         # Cómo pagar un pack (Yape/Plin). El número vive en el entorno de
         # Vercel, no en el código: se cambia sin desplegar y no queda en
         # el repositorio. Sin número, la página pide escribir al correo.
@@ -839,6 +969,27 @@ def admin_avisos():
         return jsonify({"error": "Clave de administración incorrecta."}), 401
     import saldo
     return jsonify({"avisos": saldo.avisos_pendientes(), "planes": saldo.PLANES})
+
+
+@app.get("/api/admin/reclamos")
+def admin_reclamos():
+    if not _pasa_cuenta():
+        return jsonify({"error": "Demasiados intentos. Espera unos minutos."}), 429
+    if not _es_admin():
+        return jsonify({"error": "Clave de administración incorrecta."}), 401
+    import reclamos
+    return jsonify({"reclamos": reclamos.pendientes()})
+
+
+@app.post("/api/admin/reclamos/<int:id_>")
+def admin_responder_reclamo(id_):
+    if not _pasa_cuenta():
+        return jsonify({"error": "Demasiados intentos. Espera unos minutos."}), 429
+    if not _es_admin():
+        return jsonify({"error": "Clave de administración incorrecta."}), 401
+    import reclamos
+    ok = reclamos.responder(id_, (request.get_json(silent=True) or {}).get("respuesta"))
+    return (jsonify({"mensaje": "Marcado como respondido."}), 200) if ok else (jsonify({"error": "Escribe la respuesta."}), 400)
 
 
 @app.post("/api/admin/acreditar")

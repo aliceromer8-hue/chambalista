@@ -65,3 +65,52 @@ $("#form-acreditar").addEventListener("submit", async (ev) => {
     boton.disabled = false;
   }
 });
+
+
+// ---------- Libro de Reclamaciones ----------
+async function verReclamos() {
+  const lista = $("#adm-lista-reclamos");
+  lista.textContent = "Cargando…";
+  try {
+    const r = await fetch("/api/admin/reclamos", { headers: { "X-Admin": clave() } });
+    const j = await r.json().catch(() => ({}));
+    if (!r.ok) { lista.textContent = j.error || `El servidor respondió ${r.status}.`; return; }
+    lista.textContent = "";
+    if (!j.reclamos.length) { lista.textContent = "No hay reclamos."; return; }
+    for (const c of j.reclamos) {
+      const li = document.createElement("li");
+      li.className = c.respondido ? "respondido" : "";
+      const dias = Math.floor((Date.now() - new Date(c.creado)) / 86400000);
+      const cabeza = document.createElement("b");
+      cabeza.textContent = `${c.numero || c.id} · ${c.tipo} · ${c.nombre} <${c.correo}> · hace ${dias} días`
+        + (c.respondido ? " · RESPONDIDO" : "");
+      const cuerpo = document.createElement("p");
+      cuerpo.textContent = `${c.descripcion}${c.monto ? ` (S/ ${c.monto})` : ""} — ${c.detalle} — Pide: ${c.pedido}`;
+      li.append(cabeza, cuerpo);
+      if (!c.respondido) {
+        const t = document.createElement("textarea");
+        t.rows = 2;
+        t.placeholder = "Qué le respondiste (queda registrado)";
+        const b = document.createElement("button");
+        b.className = "boton chico primario";
+        b.type = "button";
+        b.textContent = "Marcar respondido";
+        b.addEventListener("click", async () => {
+          b.disabled = true;
+          const rr = await fetch(`/api/admin/reclamos/${c.id}`, {
+            method: "POST", headers: { "Content-Type": "application/json", "X-Admin": clave() },
+            body: JSON.stringify({ respuesta: t.value }),
+          });
+          const jj = await rr.json().catch(() => ({}));
+          cabeza.textContent += rr.ok ? " · RESPONDIDO" : ` · ${jj.error || "error"}`;
+          if (rr.ok) { t.remove(); b.remove(); } else b.disabled = false;
+        });
+        li.append(t, b);
+      }
+      lista.append(li);
+    }
+  } catch (e) {
+    lista.textContent = `No se pudo cargar: ${e.message}`;
+  }
+}
+$("#adm-reclamos").addEventListener("click", verReclamos);

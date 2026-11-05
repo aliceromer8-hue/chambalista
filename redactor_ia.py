@@ -19,6 +19,8 @@ respuestas.py): aceptar condiciones y comprometer disponibilidad. Eso lo
 responde la persona siempre.
 """
 
+import contextlib
+import contextvars
 import json
 import logging
 import os
@@ -343,9 +345,32 @@ def _facturada():
     return os.environ.get("GEMINI_FACTURACION", "").lower() in ("1", "true", "si", "sí")
 
 
+# Quién pide: el plan de la persona cambia la cadena (Ali, 2026-11-04:
+# «primero usen el gratis, y cuando escogen el pagado se activa el tema de
+# costos de IA»). Va en un contextvar porque cada petición es su propio
+# contexto y así no se cruzan dos personas en el mismo servidor.
+_PAGADO = contextvars.ContextVar("chamba_plan_pagado", default=False)
+
+
+@contextlib.contextmanager
+def con_plan(pagado):
+    """Durante el bloque, la cadena es la de un plan pagado (o no)."""
+    marca = _PAGADO.set(bool(pagado))
+    try:
+        yield
+    finally:
+        _PAGADO.reset(marca)
+
+
 def cadena():
-    """Los proveedores, EN ORDEN, todos gratuitos (Ali, 2026-10-02: «todas
-    las soluciones posibles sin costo económico»).
+    """Los proveedores, EN ORDEN.
+
+    Plan gratis: solo proveedores gratuitos (Ali, 2026-10-02: «todas las
+    soluciones posibles sin costo económico»). Plan pagado: si Gemini tiene
+    facturación (GEMINI_FACTURACION=1), va primero — cuesta centavos por
+    postulación y no tiene el techo diario de las capas gratis. Una clave
+    gratuita aparte (GEMINI_API_KEY_GRATIS) sirve a los de plan gratis aunque
+    la principal tenga facturación.
 
       1. Ollama           local: gratis y nada sale del equipo
       2. Gemini           solo si tiene facturación (entonces no entrena)
@@ -364,14 +389,22 @@ def cadena():
     if modelo:
         c.append(("ollama", modelo))
     gemini, groq = os.environ.get("GEMINI_API_KEY"), os.environ.get("GROQ_API_KEY")
-    if gemini and _facturada():
+    gemini_gratis = os.environ.get("GEMINI_API_KEY_GRATIS")
+    pagado = _PAGADO.get()
+    if gemini and _facturada() and pagado:
         c.append(("gemini", _modelos_gemini()[0]))
     if groq:
         c.append(("groq", os.environ.get("GROQ_MODEL", "llama-3.3-70b-versatile")))
-    if gemini and not _facturada():
+    if gemini_gratis:
+        c.append(("gemini-gratis", _modelos_gemini()[0]))
+    elif gemini and not _facturada():
         c.append(("gemini", _modelos_gemini()[0]))
     if groq:
         c.append(("groq", os.environ.get("GROQ_MODEL_RESPALDO", "llama-3.1-8b-instant")))
+    # Con facturación y sin NINGÚN gratuito configurado, mejor que el plan
+    # gratis responda con la de pago a que se quede sin IA.
+    if not c and gemini:
+        c.append(("gemini", _modelos_gemini()[0]))
     return c
 
 
@@ -392,6 +425,8 @@ def _uno(nombre, detalle, prompt):
         return _con_ollama(prompt, detalle)
     if nombre == "gemini":
         return _con_gemini(prompt, os.environ["GEMINI_API_KEY"])
+    if nombre == "gemini-gratis":
+        return _con_gemini(prompt, os.environ["GEMINI_API_KEY_GRATIS"])
     return _con_groq(prompt, os.environ["GROQ_API_KEY"], detalle)
 
 

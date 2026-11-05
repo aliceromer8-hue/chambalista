@@ -55,3 +55,6 @@ extension/_docx-real.json
 # Banco de pruebas del panel: copia temporal para poder recorrerlo en un
 # navegador normal. No es producto y no debe empaquetarse.
 static/_banco/
+
+# Paquete para la Chrome Web Store: se genera, no se versiona.
+tienda/*.zip

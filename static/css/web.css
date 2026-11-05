@@ -662,3 +662,134 @@ dialog#dlg-pago h2 { font-size: 1.35rem; margin: 0 0 4px; }
 .admin-avisos { list-style: none; padding: 0; display: grid; gap: 8px; }
 .admin-avisos li { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; justify-content: space-between;
   border: 2px solid var(--linea); border-radius: 10px; padding: 10px 12px; background: var(--papel-2); font-size: 13.5px; }
+
+/* ══════════ muro de acceso (sin cuenta) ══════════ */
+.fin-pagina { height: 1px; }
+.muro {
+  position: fixed; inset: 0; z-index: 60; display: grid; place-items: center; padding: 16px;
+  background: rgba(251, 250, 246, .35); opacity: 0; transition: opacity .25s ease;
+}
+.muro.visible { opacity: 1; }
+body.muro-on > header, body.muro-on > main, body.muro-on > footer, body.muro-on > section {
+  filter: blur(7px) saturate(.9); transition: filter .35s ease; pointer-events: none; user-select: none;
+}
+.muro-tarjeta {
+  position: relative; width: min(420px, 100%); background: var(--papel); border: 2px solid var(--linea);
+  border-radius: var(--r); box-shadow: 6px 6px 0 var(--tinta); padding: 26px 24px 20px;
+  display: grid; gap: 10px; text-align: center; transform: translateY(14px) scale(.98);
+  transition: transform .3s cubic-bezier(.2, .9, .3, 1.2);
+}
+.muro.visible .muro-tarjeta { transform: none; }
+.muro-tarjeta h2 { margin: 0; font-size: 1.45rem; text-wrap: balance; }
+.muro-tarjeta .detalle { margin: 0; }
+.muro-chip {
+  justify-self: center; margin: 0; font-family: var(--mono); font-size: 11px; font-weight: 800; letter-spacing: .1em;
+  text-transform: uppercase; background: var(--lima); border: 2px solid var(--linea); border-radius: 99px; padding: 4px 11px;
+  animation: chip-late 2.4s ease-in-out infinite;
+}
+@keyframes chip-late { 0%, 100% { transform: rotate(-2deg); } 50% { transform: rotate(2deg) scale(1.04); } }
+.muro-cerrar {
+  position: absolute; top: 10px; right: 12px; width: 30px; height: 30px; border-radius: 99px;
+  border: 2px solid var(--linea); background: var(--papel-2); font-size: 17px; font-weight: 800; cursor: pointer; color: var(--tinta);
+}
+.boton-google {
+  display: flex; align-items: center; justify-content: center; gap: 10px; width: 100%; margin-top: 6px;
+  font: inherit; font-weight: 700; font-size: 15px; color: #1f1f1f; background: #fff;
+  border: 2px solid var(--linea); border-radius: 10px; padding: 12px 14px; cursor: pointer;
+  box-shadow: var(--dura-chica); transition: transform .12s ease, box-shadow .12s ease;
+}
+.boton-google:hover { transform: translate(-1px, -1px); box-shadow: var(--dura); }
+.boton-google:focus-visible, .muro-cerrar:focus-visible { outline: 3px solid var(--coral); outline-offset: 2px; }
+.muro-o { display: flex; align-items: center; gap: 10px; color: var(--tinta-2); font-size: 12px; }
+.muro-o::before, .muro-o::after { content: ""; flex: 1; border-top: 1.5px solid var(--papel-3); }
+.muro-correo { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.muro-legal { margin: 4px 0 0; font-size: 11.5px; color: var(--tinta-2); line-height: 1.45; }
+
+/* ══════════ pistas (después de entrar) ══════════ */
+.pista {
+  position: fixed; right: 18px; bottom: 18px; z-index: 50; width: min(360px, calc(100% - 32px));
+  display: grid; grid-template-columns: auto 1fr; gap: 6px 12px; align-items: start;
+  background: var(--papel); border: 2px solid var(--linea); border-radius: var(--r); box-shadow: var(--dura);
+  padding: 14px 16px; opacity: 0; transform: translateY(16px); transition: opacity .25s ease, transform .3s cubic-bezier(.2, .9, .3, 1.2);
+  pointer-events: none;
+}
+.pista.visible { opacity: 1; transform: none; pointer-events: auto; }
+.pista-paso {
+  grid-row: span 2; font-family: var(--mono); font-size: 10.5px; font-weight: 800; background: var(--lima);
+  border: 2px solid var(--linea); border-radius: 99px; padding: 3px 8px; white-space: nowrap;
+}
+.pista-cuerpo { display: grid; gap: 2px; font-size: 13.5px; }
+.pista-cuerpo span { color: var(--tinta-2); font-size: 12.5px; }
+.pista-acciones { grid-column: 2; display: flex; gap: 12px; align-items: center; margin-top: 6px; }
+.resalte { animation: resalte 1.4s ease-out 3; border-radius: var(--r); }
+@keyframes resalte {
+  0% { box-shadow: 0 0 0 0 rgba(212, 242, 73, .95); }
+  100% { box-shadow: 0 0 0 18px rgba(212, 242, 73, 0); }
+}
+.bienvenida {
+  position: fixed; top: 16px; left: 50%; transform: translateX(-50%); z-index: 70;
+  background: var(--lima); border: 2px solid var(--linea); border-radius: 99px; box-shadow: var(--dura-chica);
+  padding: 9px 18px; font-weight: 800; animation: baja .5s cubic-bezier(.2, .9, .3, 1.3) both;
+}
+@keyframes baja { from { opacity: 0; transform: translate(-50%, -20px); } to { opacity: 1; transform: translate(-50%, 0); } }
+
+/* ══════════ vuelta de Google ══════════ */
+.entrar-listo { min-height: 80vh; display: grid; place-items: center; }
+.entrar-tarjeta {
+  width: min(420px, 100%); text-align: center; border: 2px solid var(--linea); border-radius: var(--r);
+  background: var(--papel); box-shadow: var(--dura); padding: 30px 24px; display: grid; gap: 8px;
+}
+.entrar-tarjeta h1 { font-size: 1.6rem; margin: 0; }
+.entrar-icono {
+  justify-self: center; width: 46px; height: 46px; border-radius: 99px; border: 3px solid var(--papel-3);
+  border-top-color: var(--tinta); animation: gira .8s linear infinite;
+}
+.entrar-tarjeta.ok .entrar-icono, .entrar-tarjeta.mal .entrar-icono {
+  animation: none; border: 2px solid var(--linea); display: grid; place-items: center; font-size: 22px; font-weight: 900;
+}
+.entrar-tarjeta.ok .entrar-icono { background: var(--lima); }
+.entrar-tarjeta.ok .entrar-icono::after { content: "✓"; }
+.entrar-tarjeta.mal .entrar-icono { background: var(--coral-suave); }
+.entrar-tarjeta.mal .entrar-icono::after { content: "!"; }
+@keyframes gira { to { transform: rotate(360deg); } }
+@media (max-width: 560px) {
+  .pista { right: 16px; bottom: 16px; }
+  .muro-correo { grid-template-columns: 1fr; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .muro, .muro-tarjeta, .pista, body.muro-on > main { transition: none; }
+  .muro-chip, .resalte, .bienvenida, .entrar-icono { animation: none; }
+}
+
+/* ══════════ textos legales y Libro de Reclamaciones ══════════ */
+.tabla-legal { overflow-x: auto; margin: 10px 0 14px; }
+.tabla-legal table { border-collapse: collapse; width: 100%; min-width: 620px; font-size: 13.5px; }
+.tabla-legal th, .tabla-legal td { border: 1.5px solid var(--linea); padding: 8px 10px; text-align: left; vertical-align: top; }
+.tabla-legal th { background: var(--papel-2); font-size: 12px; text-transform: uppercase; letter-spacing: .06em; }
+.enlace-reclamos { white-space: nowrap; }
+.hoja-proveedor { border: 2px solid var(--linea); border-radius: var(--r); background: var(--papel-2); padding: 12px 16px; }
+.hoja-proveedor p { margin: 3px 0; }
+.hoja { display: grid; gap: 16px; margin-top: 16px; }
+.hoja fieldset { border: 2px solid var(--linea); border-radius: var(--r); padding: 12px 16px 16px; display: grid; gap: 10px; }
+.hoja legend { font-weight: 800; padding: 0 6px; }
+.hoja label { display: grid; gap: 4px; font-size: 13.5px; font-weight: 600; }
+.hoja input:not([type]), .hoja input[type=email], .hoja select, .hoja textarea {
+  font: inherit; font-weight: 400; padding: 10px 12px; border: 2px solid var(--linea); border-radius: 9px; background: #fff; width: 100%;
+}
+.fila-doble { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+.tipo-reclamo { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+.tipo-reclamo .opcion { display: flex; gap: 10px; align-items: flex-start; border: 2px solid var(--linea); border-radius: 10px; padding: 10px 12px; cursor: pointer; }
+.tipo-reclamo .opcion small { display: block; font-weight: 400; color: var(--tinta-2); }
+.hoja .casilla { display: flex; gap: 10px; align-items: flex-start; font-weight: 400; }
+.hoja-lista { border: 2px solid var(--linea); border-radius: var(--r); box-shadow: var(--dura); padding: 18px 20px; margin-top: 16px; }
+.numero-hoja { font-family: var(--mono); font-size: 18px; }
+.hoja-copia dl { display: grid; grid-template-columns: max-content 1fr; gap: 6px 14px; font-size: 13.5px; }
+.hoja-copia dt { font-weight: 700; }
+.admin-avisos li.respondido { opacity: .6; }
+.admin-avisos li p { margin: 4px 0; width: 100%; }
+.admin-avisos textarea { width: 100%; font: inherit; padding: 8px; border: 2px solid var(--linea); border-radius: 8px; }
+@media (max-width: 560px) { .fila-doble, .tipo-reclamo { grid-template-columns: 1fr; } }
+@media print {
+  header, footer, .acciones-cuenta, #form-reclamo { display: none !important; }
+  .hoja-lista { box-shadow: none; border: 1px solid #000; }
+}
