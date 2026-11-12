@@ -1,7 +1,7 @@
-# Ficha para la Chrome Web Store — Chamba Lista 1.0.5
+# Ficha para la Chrome Web Store — Chamba Lista 1.0.6
 
 Para copiar y pegar en https://chrome.google.com/webstore/devconsole
-Archivos de esta carpeta: `chamba-lista-1.0.5.zip`, `promo-pequena-440x280.png`,
+Archivos de esta carpeta: `chamba-lista-1.0.6.zip`, `promo-pequena-440x280.png`,
 `promo-grande-1400x560.png` y la carpeta `capturas` (5 imágenes de 1280×800).
 El icono está en `..\extension\iconos\128.png`.
 

@@ -836,16 +836,18 @@ async function abrirMuro(modo = "accion") {
   $("#muro-o").classList.toggle("oculto", !info.google);
 }
 
-function cerrarMuro() {
+// Cerrado a mano, el aviso del final no vuelve en esta visita (se sentía
+// como una página «en pausa» que reaparecía cada vez que llegabas abajo).
+function cerrarMuro(aMano = true) {
   if (!MURO.modo) return;
-  if (MURO.modo === "fin") MURO.cerradoFin = true;
+  if (MURO.modo === "fin" && aMano) MURO.cerradoFin = true;
   MURO.modo = null;
   $("#muro").classList.remove("visible");
   document.body.classList.remove("muro-on");
   setTimeout(() => { if (!MURO.modo) $("#muro").hidden = true; }, 260);
 }
 
-$("#muro-cerrar")?.addEventListener("click", cerrarMuro);
+$("#muro-cerrar")?.addEventListener("click", () => cerrarMuro(true));
 $("#muro-crear")?.addEventListener("click", () => { cerrarMuro(); abrirCuenta(true); });
 $("#muro-entrar")?.addEventListener("click", () => { cerrarMuro(); abrirCuenta(false); });
 $("#muro-google")?.addEventListener("click", () => {
@@ -877,8 +879,7 @@ function revisarFin() {
   const cerca = innerHeight + scrollY >= alto - 120;
   if (scrollY > 250) haDeslizado = true;
   if (cerca && haDeslizado && !MURO.modo && !MURO.cerradoFin) abrirMuro("fin");
-  else if (!cerca && MURO.modo === "fin") { cerrarMuro(); MURO.cerradoFin = false; }
-  else if (!cerca) MURO.cerradoFin = false;
+  else if (!cerca && MURO.modo === "fin") cerrarMuro(false);
 }
 let _marco = null;
 addEventListener("scroll", () => {
