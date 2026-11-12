@@ -632,6 +632,9 @@ _wjs = pathlib.Path("static/js/web.js").read_text(encoding="utf-8")
 check("sin sesión, subir CV, planes y extensión pasan por el muro",
       all(f'id="{_i}"' in BASE_HTML for _i in ("muro", "fin-pagina")) and 'data-cuenta="plan"' in BASE_HTML
       and 'data-cuenta="extension"' in BASE_HTML and "closest(\"[data-cuenta]\")" in _wjs)
+_css_web = pathlib.Path("static/css/web.css").read_text(encoding="utf-8")
+check("el muro oculto no tapa la página (no se come los clics)",
+      ".muro[hidden] { display: none !important; }" in _css_web and ".muro:not(.visible) { pointer-events: none; }" in _css_web)
 check("el muro aparece al final de la página y se va al subir", "revisarFin" in _wjs and 'abrirMuro("fin")' in _wjs)
 check("el muro muestra la aceptación de la política y los términos", "Al continuar declaras ser mayor de 18" in BASE_HTML)
 import os as _os2, unittest.mock as _mk10

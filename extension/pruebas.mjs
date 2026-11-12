@@ -359,6 +359,8 @@ titulo("EL PANEL SABE ENTRAR — faltaba y nada lo avisaba");
   check("y con Google, por la web y el puente", /entrar\/google/.test(pjs) && /chrome\.storage\?\.onChanged/.test(pjs));
   check("sin cuenta, tocar una función abre el muro (navegar sí se puede)",
     /LIBRE_SIN_CUENTA = "\.menu, \.tab/.test(pjs) && /abrirMuro\("accion"\)/.test(pjs));
+  check("el muro oculto no tapa el panel (no se come los clics)",
+    fs2.readFileSync(new URL("panel/panel.css", BASE), "utf8").includes(".muro[hidden] { display: none !important; }"));
   check("el muro solo actúa cuando YA se sabe que no hay cuenta", /conCuenta: null/.test(pjs) && /conCuenta !== false/.test(pjs));
   check("tras entrar, la guía: CV, perfil, portales, postular",
     ["No olvides subir tu CV", "Completa tu perfil", "Conecta tus portales", "A postular"].every((t) => pjs.includes(t)));

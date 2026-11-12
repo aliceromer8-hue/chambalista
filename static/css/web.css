@@ -800,3 +800,8 @@ body.muro-on > header, body.muro-on > main, body.muro-on > footer, body.muro-on 
 .logo img { display: block; height: 40px; width: auto; }
 a.logo { text-decoration: none; }
 @media (max-width: 640px) { .logo img { height: 34px; } }
+
+/* El muro oculto NO puede tapar la página. «display: grid» anulaba el atributo
+   hidden y la capa invisible se comía todos los clics (2026-11-11). */
+.muro[hidden] { display: none !important; }
+.muro:not(.visible) { pointer-events: none; }
