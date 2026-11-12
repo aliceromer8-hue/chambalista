@@ -207,7 +207,10 @@ def sitemap():
 @app.get("/")
 def index():
     medir("pagina_vista")
-    return render_template("web.html", canonico=_canonico())
+    # Con la extensión aprobada en la Chrome Web Store, EXTENSION_TIENDA_URL (Vercel)
+    # cambia «descargar el zip» por «Añadir a Chrome». Hasta entonces, el zip.
+    return render_template("web.html", canonico=_canonico(),
+                           tienda=os.environ.get("EXTENSION_TIENDA_URL", "").strip())
 
 
 def _empresa():

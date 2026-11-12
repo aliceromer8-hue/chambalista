@@ -228,8 +228,17 @@
         <p class="detalle">Busca en los cuatro portales y, en Computrabajo, llena la
           postulación por ti — con las sesiones que ya tienes abiertas.</p>
       </div>
+      {% if tienda %}
+      <a class="boton principal" id="instalar" href="{{ tienda }}" target="_blank" rel="noopener" data-cuenta="extension">Añadir a Chrome · gratis</a>
+      {% else %}
       <a class="boton principal" id="instalar" href="/extension.zip" download data-cuenta="extension">Descargar la extensión</a>
+      {% endif %}
     </div>
+    {% if tienda %}
+    <p class="detalle">Se abre la Chrome Web Store: pulsa <strong>«Añadir a Chrome»</strong> y listo, se instala sola
+      y se actualiza sola. Funciona en Chrome y Edge, en computadora.</p>
+    <p class="detalle solo-movil">Las extensiones no funcionan en el celular: abre esta página en tu computadora.</p>
+    {% else %}
     <details class="como-instalar">
       <summary>Cómo instalarla · 1 minuto</summary>
       <ol>
@@ -240,6 +249,7 @@
       <p class="detalle">Chrome avisará de que está en modo desarrollador. Es lo normal
         hasta que esté publicada en la Chrome Web Store.</p>
     </details>
+    {% endif %}
   </section>
 
   <!-- Fin de la página: al llegar aquí, si no entró, el muro (abajo). -->

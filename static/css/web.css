@@ -805,3 +805,6 @@ a.logo { text-decoration: none; }
    hidden y la capa invisible se comía todos los clics (2026-11-11). */
 .muro[hidden] { display: none !important; }
 .muro:not(.visible) { pointer-events: none; }
+
+.solo-movil { display: none; }
+@media (max-width: 760px) { .solo-movil { display: block; font-weight: 700; } }

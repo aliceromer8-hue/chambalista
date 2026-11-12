@@ -937,7 +937,7 @@ function guiarWeb() {
   } else if (!$("#zona-3").classList.contains("oculto")) {
     pista({ clave: "ext", paso: "2 de 2", titulo: "Ahora, la extensión",
             texto: "Es la que postula por ti en los portales. Entras una vez y queda conectada.",
-            boton: "Descargarla", accion: () => resaltar("#instalar") });
+            boton: "Instalarla", accion: () => resaltar("#instalar") });
   } else {
     cerrarPista();
   }
