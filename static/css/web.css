@@ -795,3 +795,8 @@ body.muro-on > header, body.muro-on > main, body.muro-on > footer, body.muro-on 
 }
 
 .aviso-reclamos { font-size: 12px; color: var(--tinta-2); border: 1.5px solid var(--papel-3); border-radius: 9px; padding: 8px 12px; display: inline-block; }
+
+/* El logo «chamba lista» (imagen) en la cabecera. */
+.logo img { display: block; height: 40px; width: auto; }
+a.logo { text-decoration: none; }
+@media (max-width: 640px) { .logo img { height: 34px; } }
