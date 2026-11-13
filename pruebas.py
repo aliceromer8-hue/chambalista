@@ -1734,5 +1734,58 @@ check("las respuestas usan el resumen adaptado también en `secciones`",
 check("en Computrabajo no se borra el CV adaptado anterior (hasta verificarlo)",
       "ponerCVEnComputrabajo(tabId, pedidoCV, { reemplazarNuestro: false })" in _bg)
 
+titulo("CV «CARGO / fechas / EMPRESA» — caso real 2026-11-13, datos inventados")
+# Un CV real con este formato salió casi vacío: el respaldo por reglas tomó
+# cada cargo en mayúsculas por un título de sección y perdió la experiencia;
+# y la IA puso la ciudad de la cabecera en todos los trabajos.
+_CV_PE = """MARIA QUISPE
+(51) 987 654 321 - Arequipa , Perú - maria.quispe@correo.pe
+Bachiller en Contabilidad por la Universidad Nacional de San Agustín, con experiencia en auditoría
+y tributación en empresas del sector minero. Busco aportar en el área de finanzas.
+EXPERIENCIA PROFESIONAL
+ASISTENTE CONTABLE
+Marzo 2025- Presente
+MINERA ANDINA S.A.C.
+Registro de compras y ventas en el sistema contable, conciliaciones bancarias y declaraciones
+mensuales ante SUNAT.
+Apoyo en el cierre contable mensual.
+PRACTICANTE DE AUDITORIA
+Enero 2024- Febrero 2025
+AUDITORES DEL SUR E.I.R.L.
+Revisión de papeles de trabajo y arqueos de caja.
+FORMACIÓN ACADÉMICA
+Universidad Nacional de San Agustín, Bachiller en Contabilidad Diciembre 2024
+Instituto de Tributación, Diplomado en Tributación Abril 2023 - Agosto 2023
+Empresarial
+"""
+import cv_parser as _cvp
+with _mk11.patch.object(_ra, "analizar_cv", lambda t: None):
+    _pr = _cvp._parsear_texto(_CV_PE)
+_exp = _pr.get("experiencia") or []
+check("respaldo: no pierde la experiencia (2 trabajos)", len(_exp) == 2, len(_exp))
+check("respaldo: cargo, empresa y fechas en su sitio",
+      _exp and _exp[0]["cargo"] == "ASISTENTE CONTABLE" and _exp[0]["organizacion"] == "MINERA ANDINA S.A.C."
+      and _exp[0]["fechas"].startswith("Marzo 2025"), _exp[:1])
+check("respaldo: une la viñeta partida en dos líneas",
+      _exp and _exp[0]["logros"][0].endswith("declaraciones mensuales ante SUNAT."), _exp[0]["logros"][:1] if _exp else None)
+check("respaldo: el nombre no se vuelve una sección", not _pr.get("secciones_extra"), _pr.get("secciones_extra"))
+check("respaldo: el perfil sin título se conserva", bool(_pr.get("perfil")) and "Bachiller" in _pr["perfil"][0])
+_edu = _pr.get("educacion") or []
+check("respaldo: educación en una línea → institución, programa y fechas",
+      len(_edu) == 2 and _edu[0]["organizacion"] == "Universidad Nacional de San Agustín"
+      and _edu[0]["fechas"] == "Diciembre 2024", _edu)
+check("respaldo: programa partido en dos líneas se une («…Tributación Empresarial»)",
+      len(_edu) == 2 and _edu[1]["cargo"] == "Diplomado en Tributación Empresarial", _edu[1:] )
+check("respaldo: no inventa lugares", all(not e["lugar"] for e in _exp + _edu))
+_conlugar = {"experiencia": [{"organizacion": "MINERA ANDINA S.A.C.", "lugar": "Arequipa, Perú"}],
+             "educacion": [{"organizacion": "Instituto de Tributación", "lugar": "Perú"}]}
+_ra._quitar_lugares_inventados(_conlugar, _CV_PE, ("experiencia", "educacion"))
+check("IA: la ciudad de la cabecera no se copia a cada trabajo",
+      _conlugar["experiencia"][0]["lugar"] == "" and _conlugar["educacion"][0]["lugar"] == "")
+_conlugar2 = {"experiencia": [{"organizacion": "Banco X", "lugar": "Lima, PE"}]}
+_ra._quitar_lugares_inventados(_conlugar2, "A\nB\nC\nBanco X    Lima, PE\nCajero", ("experiencia",))
+check("IA: pero la que el CV sí escribe junto al trabajo se queda", _conlugar2["experiencia"][0]["lugar"] == "Lima, PE")
+check("el prompt prohíbe copiar la ciudad de la cabecera", "NUNCA copies la ciudad de la cabecera" in _ra.INSTRUCCIONES_ANALISIS)
+
 print(f"\n{'TODO OK' if fallos == 0 else f'{fallos} FALLO(S)'}")
 sys.exit(1 if fallos else 0)

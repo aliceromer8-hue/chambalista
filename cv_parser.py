@@ -209,6 +209,61 @@ def _detectar_seccion(linea):
     return (None, None)
 
 
+_MES = r"(?:ene|feb|mar|abr|may|jun|jul|ago|sep|set|oct|nov|dic|jan|apr|aug|dec)[a-záéíóú]*\.?"
+_FIN_FECHA = r"(?:(?:19|20)\d{2}|presente|actualidad|actual|la fecha)"
+
+# «Agosto 2025 - Presente», «Abr 2023 – Sep 2023», «2021 - 2024», «Octubre 2025».
+FECHA_AL_FINAL = re.compile(
+    rf"^(?P<izq>.*?)[\s,]+(?P<fechas>(?:{_MES}\s+(?:de\s+)?)?(?:19|20)\d{{2}}"
+    rf"(?:\s*[-–—]\s*(?:{_MES}\s+(?:de\s+)?)?{_FIN_FECHA})?)\s*$", re.I)
+
+# Lo que delata a una empresa aunque venga en mayúsculas como un título.
+PARECE_EMPRESA = re.compile(
+    r"\b(s\.?\s?a\.?\s?c\.?|s\.?\s?a\.?\s?a\.?|s\.?\s?r\.?\s?l\.?|e\.?\s?i\.?\s?r\.?\s?l\.?|s\.?\s?a\.?"
+    r"|universidad|instituto|banco|municipalidad|ministerio|colegio|escuela)\b", re.I)
+
+
+def _es_linea_fecha(linea):
+    """¿La línea es SOLO un rango de fechas? («Agosto 2025- Presente»)
+
+    Muchos CV peruanos ponen el cargo, debajo las fechas solas y debajo la
+    empresa. Sin reconocer esa línea, el cargo en mayúsculas se tomaba por
+    un título de sección y se perdía toda la experiencia.
+    """
+    l = (linea or "").strip()
+    if not l or len(l) > 45 or not re.search(r"(19|20)\d{2}|presente|actualidad", l, re.I):
+        return False
+    resto = re.sub(
+        rf"(?i){_MES}|\b(19|20)\d{{2}}\b|\bpresente\b|\bactualidad\b|\bactual\b|\bhoy\b"
+        r"|\bla fecha\b|\bde\b|\ba\b|\bhasta\b|\bal\b|\b\d{1,2}\b|[-–—/.,()\s]", "", l)
+    return not resto
+
+
+def _es_cabecera_de_entrada(lineas, i):
+    """Una línea en mayúsculas que NO es título de sección sino el cargo o
+    la empresa de una entrada: lleva fechas sueltas justo antes o después,
+    o tiene forma de empresa (S.A.C., E.I.R.L., Universidad…)."""
+    def vecina(paso):
+        j = i + paso
+        while 0 <= j < len(lineas):
+            if lineas[j].strip():
+                return lineas[j]
+            j += paso
+        return ""
+    return (_es_linea_fecha(vecina(1)) or _es_linea_fecha(vecina(-1))
+            or bool(PARECE_EMPRESA.search(lineas[i])))
+
+
+def _parece_cabecera(linea):
+    """Cargo o empresa, no una viñeta: corta y en mayúsculas, o con forma de empresa."""
+    l = linea.strip()
+    if not l or len(l.split()) > 8 or l.endswith((".", ":")) and not PARECE_EMPRESA.search(l):
+        return False
+    letras = [c for c in l if c.isalpha()]
+    mayus = letras and sum(c.isupper() for c in letras) / len(letras) > .8
+    return bool(mayus or PARECE_EMPRESA.search(l))
+
+
 def _partir_columnas(linea):
     """('izquierda', 'derecha') si la línea tiene dos columnas; si no, (linea, '')."""
     trozos = COLUMNAS.split(linea.strip(), maxsplit=1)
@@ -217,7 +272,7 @@ def _partir_columnas(linea):
     return linea.strip(), ""
 
 
-def _parsear_entradas(lineas):
+def _parsear_entradas(lineas, clave=None):
     """Agrupa las líneas sueltas en entradas de dos cabeceras + logros.
 
     El patrón del formato, que es lo que hay que reconstruir:
@@ -240,6 +295,59 @@ def _parsear_entradas(lineas):
     i = 0
     while i < len(lineas):
         izq, der = _partir_columnas(lineas[i])
+
+        # Formato «CARGO / fechas solas / EMPRESA» (o «EMPRESA / fechas /
+        # cargo»), muy común en CVs peruanos hechos en Word.
+        if not der and i + 1 < len(lineas) and _es_linea_fecha(lineas[i + 1]) \
+                and not _es_linea_fecha(lineas[i]):
+            e = vacia()
+            e["fechas"] = lineas[i + 1].strip()
+            tercera = lineas[i + 2].strip() if i + 2 < len(lineas) else ""
+            if tercera and _parece_cabecera(tercera):
+                # Si la primera tiene forma de empresa y la tercera no, al revés.
+                if PARECE_EMPRESA.search(izq) and not PARECE_EMPRESA.search(tercera):
+                    e["organizacion"], e["cargo"] = izq, tercera
+                else:
+                    e["cargo"], e["organizacion"] = izq, tercera
+                i += 3
+            else:
+                e["organizacion"] = izq
+                i += 2
+            entradas.append(e)
+            continue
+
+        # Educación en una línea: «Universidad X, Bachiller en Derecho Octubre 2025».
+        if clave == "educacion" and not der:
+            m = FECHA_AL_FINAL.match(izq)
+            if m and m.group("izq").strip():
+                e = vacia()
+                org, _, prog = m.group("izq").strip().rstrip(",").partition(",")
+                e["organizacion"], e["cargo"] = org.strip(), prog.strip()
+                e["fechas"] = m.group("fechas").strip()
+                e["_en_linea"] = True
+                entradas.append(e)
+                i += 1
+                continue
+
+        # Línea partida al copiar del PDF: lo que sigue a una viñeta empieza
+        # en minúscula. Va pegado a lo anterior, no como logro aparte.
+        if entradas and not der and izq[:1].islower():
+            ultima = entradas[-1]
+            if ultima["logros"]:
+                ultima["logros"][-1] = f"{ultima['logros'][-1]} {izq}"
+            elif ultima.get("_en_linea"):
+                ultima["cargo"] = f"{ultima['cargo']} {izq}".strip()
+            else:
+                ultima["logros"].append(izq)
+            i += 1
+            continue
+        # «Diplomado en Derecho [salto] Corporativo»: el nombre del programa
+        # partido porque las fechas ocupaban la derecha.
+        if entradas and not der and entradas[-1].get("_en_linea") and not entradas[-1]["logros"] \
+                and len(izq.split()) <= 4 and not izq.endswith("."):
+            entradas[-1]["cargo"] = f"{entradas[-1]['cargo']} {izq}".strip()
+            i += 1
+            continue
 
         # ¿La línea siguiente es una cabecera-2? Se reconoce porque su
         # columna derecha son fechas. Es la señal más fiable que hay:
@@ -281,6 +389,8 @@ def _parsear_entradas(lineas):
             e["organizacion"] = izq
             entradas.append(e)
         i += 1
+    for e in entradas:
+        e.pop("_en_linea", None)
     return entradas
 
 
@@ -312,7 +422,7 @@ def _armar_seccion(clave, lineas):
         return None
     tipo = TIPO_DE_SECCION.get(clave, "vinetas")
     if tipo == "entradas":
-        return _parsear_entradas(lineas)
+        return _parsear_entradas(lineas, clave)
     if tipo == "competencias":
         return _parsear_competencias(lineas)
     if tipo == "lineas_fecha":
@@ -460,14 +570,37 @@ def _parsear_texto(texto):
         if buffer and (actual_clave or actual_titulo):
             bloques.append((actual_clave, actual_titulo, list(buffer)))
 
-    for linea in lineas:
+    nombre_norm = (perfil["nombre"] or "").strip().lower()
+    previas = []             # lo que va antes del primer título
+    for i, linea in enumerate(lineas):
+        # El nombre en mayúsculas parecía un título de sección y abría una
+        # sección «LUIS ZAMBRANO» con el contacto y el perfil dentro.
+        if actual_titulo is None and nombre_norm and linea.strip().lower() == nombre_norm:
+            continue
         clave, titulo = _detectar_seccion(linea)
+        # Un cargo o una empresa en mayúsculas («ASISTENTE LEGAL») no es un
+        # título: lleva fechas al lado. Tomarlo por título vaciaba la
+        # experiencia entera.
+        if titulo and clave is None and _es_cabecera_de_entrada(lineas, i):
+            titulo = None
         if titulo:                       # empieza una sección nueva
             cerrar()
             actual_clave, actual_titulo, buffer = clave, titulo, []
         elif actual_titulo is not None and linea.strip():
             buffer.append(linea)
+        elif linea.strip():
+            previas.append(linea.strip())
     cerrar()
+
+    # Un perfil sin título («Bachiller en Derecho por…» justo debajo del
+    # contacto) también es el perfil. Sin esto se perdía.
+    if not any(c == "perfil" for c, _, _ in bloques):
+        sin_contacto = [l for l in previas
+                        if "@" not in l and not re.search(r"\d{3}[\s-]?\d{3}", l)
+                        and "linkedin" not in l.lower()]
+        parrafo = " ".join(sin_contacto).strip()
+        if len(parrafo) > 120:
+            bloques.insert(0, ("perfil", "PERFIL PROFESIONAL", [parrafo]))
 
     for clave, titulo, lineas_bloque in bloques:
         contenido = _armar_seccion(clave or "logros", lineas_bloque)

@@ -609,6 +609,7 @@ REGLAS:
 1. Copia el contenido del CV tal como está. NO inventes, NO añadas, NO completes datos que no aparezcan.
 2. Si una sección no existe en el CV, pon una lista vacía.
 3. SEPARA bien cada entrada: la organización va en "organizacion", la ciudad en "lugar", el puesto o carrera en "cargo", el rango de fechas en "fechas" y los logros en "logros" como frases sueltas SIN el guion inicial.
+   "lugar" SOLO si el CV escribe la ciudad junto a ESA entrada. Si no la escribe, "lugar" va vacío (""). NUNCA copies la ciudad de la cabecera ni la deduzcas de la empresa.
 4. "liderazgo" es para voluntariado, clubes, asociaciones y programas; el trabajo remunerado va en "experiencia".
 5. En "competencias", agrupa por categoría cuando el CV las tenga ("Análisis & Herramientas:", "Idiomas:", etc.). Si no hay categorías, deja "categoria" vacío.
 6. En "certificaciones", pon el año al final separado por un tabulador (\\t).
@@ -654,6 +655,37 @@ def _llamar(prompt, instrucciones, tope=2000, tiempo=None, reintentos=None):
     finally:
         INSTRUCCIONES, TOPE_SALIDA = previas, tope_previo
         TIEMPO_LIMITE, IA_REINTENTOS = tiempo_previo, reint_previo
+
+
+def _sin_tildes(t):
+    import unicodedata
+    return "".join(c for c in unicodedata.normalize("NFD", t or "") if unicodedata.category(c) != "Mn").lower()
+
+
+def _quitar_lugares_inventados(perfil, texto_crudo, claves):
+    """Borra el «lugar» de una entrada si el CV no lo dice en el cuerpo.
+
+    Caso real: un CV con «Chiclayo, Perú» solo en la cabecera salió con
+    «Chiclayo, Perú» en los cuatro trabajos, incluidos los de Lima. Es un
+    dato falso puesto en el CV de alguien. Se comprueba que la ciudad
+    aparezca fuera de la cabecera y fuera del nombre de las empresas
+    («VIETTEL PERU S.A.C.» no dice que el trabajo fuera en Perú).
+    """
+    lineas = (texto_crudo or "").splitlines()
+    cuerpo = _sin_tildes(chr(10).join(lineas[3:]))
+    for clave in claves:
+        for e in perfil.get(clave) or []:
+            org = _sin_tildes(e.get("organizacion"))
+            if org:
+                cuerpo = cuerpo.replace(org, " ")
+    for clave in claves:
+        for e in perfil.get(clave) or []:
+            lugar = (e.get("lugar") or "").strip()
+            if not lugar:
+                continue
+            ciudad = _sin_tildes(lugar.split(",")[0]).strip()
+            if not ciudad or not re.search(r"\b" + re.escape(ciudad) + r"\b", cuerpo):
+                e["lugar"] = ""
 
 
 def analizar_cv(texto_crudo):
@@ -716,6 +748,8 @@ def analizar_cv(texto_crudo):
         if isinstance(valor, str):
             valor = [l for l in valor.splitlines() if l.strip()]
         perfil[clave] = [str(v).strip() for v in valor if str(v).strip()]
+
+    _quitar_lugares_inventados(perfil, texto_crudo, ENTRADAS)
 
     # ¿Sacó algo de contenido? Si no, mejor caer al parseo por reglas.
     if not any(perfil.get(k) for k in ENTRADAS + LISTAS + ("competencias",)):
