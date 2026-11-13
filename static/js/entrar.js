@@ -48,6 +48,7 @@
     const j = await r.json();
     if (!r.ok || !j.token) { terminar(false, "No se pudo entrar", j.error || "Inténtalo otra vez."); return; }
     j.caduca = Date.now() + ((j.expira_en || 3600) - 60) * 1000;
+    j.emitida = Date.now();
     try { localStorage.setItem("chamba_sesion", JSON.stringify(j)); } catch { /* navegación privada */ }
     try { sessionStorage.setItem("chamba_bienvenida", "1"); } catch { /* da igual */ }
     const nombre = j.usuario?.nombre ? `, ${j.usuario.nombre}` : "";

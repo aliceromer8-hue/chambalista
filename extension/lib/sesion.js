@@ -22,6 +22,17 @@ export async function guardar(sesion) {
   else await chrome.storage.local.remove(CLAVE);
 }
 
+/**
+ * Una sesión recién salida del servidor, marcada con cuándo se emitió.
+ *
+ * La web y la extensión comparten el token de refresco, y Supabase lo
+ * cambia cada vez que se usa. El puente (contenido/puente.js) se queda
+ * con la copia más reciente; sin esta marca no sabría cuál es.
+ */
+function nueva(j) {
+  return { ...j, emitida: Date.now(), caduca: Date.now() + ((j.expira_en || 3600) - 60) * 1000 };
+}
+
 /** ¿Hay sesión iniciada? */
 export async function hayCuenta() {
   return Boolean((await obtener())?.token);
@@ -54,9 +65,17 @@ async function renovar() {
         body: JSON.stringify({ refresco: s.refresco }),
       });
       const j = await r.json();
-      if (!r.ok || !j.token) { await guardar(null); return null; }
-      await guardar(j);
-      return j;
+      if (!r.ok || !j.token) {
+        // Antes de soltarla: si mientras tanto la web dejó una copia más
+        // nueva, esa sigue valiendo.
+        const ahora = await obtener();
+        if (ahora?.refresco && ahora.refresco !== s.refresco) return ahora;
+        await guardar(null);
+        return null;
+      }
+      const fresca = nueva(j);
+      await guardar(fresca);
+      return fresca;
     } catch { return null; }
     finally { renovando = null; }
   })();
@@ -74,8 +93,16 @@ export async function conCuenta(ruta, opciones = {}) {
   const ir = async () => fetch(`${SERVIDOR}${ruta}`, {
     ...opciones, headers: await cabecera(opciones.headers || {}),
   });
+  const antes = (await obtener())?.refresco;
   let r = await ir();
-  if (r.status === 401 && await renovar()) r = await ir();
+  if (r.status === 401) {
+    // Si la web ya dejó una sesión nueva, se usa esa en vez de renovar con
+    // un token que ya no vale: renovar con uno gastado cierra la sesión
+    // entera, en la web y aquí.
+    const ahora = await obtener();
+    if (ahora?.refresco && ahora.refresco !== antes) r = await ir();
+    else if (await renovar()) r = await ir();
+  }
   return r;
 }
 
@@ -96,7 +123,8 @@ export async function entrar(correo, contrasena) {
     });
     const j = await r.json();
     if (!r.ok) return { error: j.error || "No se pudo entrar." };
-    await guardar(j);
+    await guardar(nueva(j));
+    await chrome.storage.local.remove("salio");
     return { usuario: j.usuario };
   } catch (e) {
     return { error: `No se pudo conectar: ${e.message}` };
@@ -110,6 +138,9 @@ export async function salir() {
     });
   } catch { /* lo que importa es soltarla de aquí */ }
   await guardar(null);
+  // Para que el puente cierre también la de la web la próxima vez que se
+  // abra el sitio, en vez de volver a traerla.
+  await chrome.storage.local.set({ salio: Date.now() });
 }
 
 /**

@@ -358,6 +358,43 @@ function animarRuta() {
 // de sesiones, y el token caduca solo; si el navegador la pierde, se
 // vuelve a entrar y no se pierde nada, porque los datos están en la nube.
 const SESION = "chamba_sesion";
+const SALIO = "chamba_salio";
+
+// La extensión (contenido/puente.js) comparte esta sesión. Las dos copias
+// usan el mismo token de refresco y Supabase lo cambia en cada uso: si la
+// extensión renovaba y luego la web renovaba con su copia vieja, Supabase
+// lo tomaba por un token robado y cerraba la sesión entera. Por eso había
+// que entrar cada vez. Antes de renovar —y al cargar— se le pregunta al
+// puente si tiene una copia más nueva.
+function hayPuente() {
+  return document.documentElement.dataset.chambaExtension === "1";
+}
+
+function esperarPuente(ms = 1500) {
+  if (!hayPuente()) return Promise.resolve(false);
+  return new Promise((listo) => {
+    const fin = (cambio) => { clearTimeout(reloj); removeEventListener("message", oir); listo(cambio); };
+    const oir = (e) => {
+      if (e.source === window && e.data?.chamba === "sincronizado") fin(Boolean(e.data.cambio));
+    };
+    const reloj = setTimeout(() => fin(false), ms);
+    addEventListener("message", oir);
+    postMessage({ chamba: "sincronizar" }, location.origin);
+  });
+}
+
+function avisarPuente() {
+  if (hayPuente()) postMessage({ chamba: "sincronizar" }, location.origin);
+}
+
+// Si el puente trae una sesión más nueva con la página ya abierta (al
+// volver a la pestaña, por ejemplo), se repinta.
+addEventListener("message", (e) => {
+  if (e.source === window && e.data?.chamba === "sincronizado" && e.data.cambio) {
+    pintarCuenta();
+    pintarDatos();
+  }
+});
 
 function sesion() {
   try { return JSON.parse(localStorage.getItem(SESION) || "null"); } catch { return null; }
@@ -369,11 +406,15 @@ function guardarSesion(s) {
       // Se anota CUÁNDO caduca, no solo cuánto duraba: al recargar la
       // página horas después, «expira_en: 3600» ya no dice nada.
       if (s.expira_en) s.caduca = Date.now() + (s.expira_en - 60) * 1000;
+      // Cuándo se emitió: el puente se queda con la copia más reciente.
+      s.emitida = Date.now();
       localStorage.setItem(SESION, JSON.stringify(s));
+      localStorage.removeItem(SALIO);
     } else {
       localStorage.removeItem(SESION);
     }
   } catch { /* navegación privada */ }
+  avisarPuente();
 }
 
 // El token de Supabase dura una hora. Sin esto, a la hora justa la
@@ -383,18 +424,32 @@ function guardarSesion(s) {
 let renovando = null;
 
 async function renovarSesion() {
-  const s = sesion();
-  if (!s?.refresco) return null;
+  if (!sesion()?.refresco) return null;
   // Si dos llamadas piden renovar a la vez, una sola petición: dos
   // renovaciones en paralelo invalidan la una a la otra.
   renovando = renovando || (async () => {
+    const antes = sesion()?.refresco;
+    await esperarPuente();
+    const s = sesion();
+    // La extensión ya tenía una más nueva: esa vale, no se gasta otra.
+    if (s?.refresco && s.refresco !== antes && (!s.caduca || Date.now() < s.caduca)) {
+      renovando = null;
+      pintarCuenta();
+      return s;
+    }
+    if (!s?.refresco) { renovando = null; return null; }
     try {
       const r = await fetch("/api/cuenta/renovar", {
         method: "POST", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ refresco: s.refresco }),
       });
       const j = await r.json();
-      if (!r.ok || !j.token) { guardarSesion(null); pintarCuenta(); return null; }
+      if (!r.ok || !j.token) {
+        // Que el puente no la vuelva a traer de la extensión: es la misma
+        // y tampoco vale allí.
+        try { localStorage.setItem("chamba_muerta", s.refresco); } catch { /* privado */ }
+        guardarSesion(null); pintarCuenta(); return null;
+      }
       guardarSesion(j);
       pintarCuenta();
       return j;
@@ -540,6 +595,9 @@ $("#btn-salir").addEventListener("click", async () => {
   try {
     await fetch("/api/cuenta/salir", { method: "POST", headers: conSesion() });
   } catch { /* da igual: lo que importa es soltarla de aquí */ }
+  // Para que el puente cierre también la de la extensión, en vez de
+  // volver a traerla de allí.
+  try { localStorage.setItem(SALIO, String(Date.now())); } catch { /* privado */ }
   guardarSesion(null);
   estado.archivo = estado.perfil = null;
   try { localStorage.removeItem(TRABAJO); } catch { /* navegación privada */ }
@@ -664,6 +722,9 @@ No se puede deshacer y no guardamos copia. ¿Seguimos?`);
 (async () => {
   pintarCuenta();
   pintarDatos();
+  // Primero la copia más nueva, si la extensión la tiene: renovar con una
+  // vieja es lo que cerraba la sesión.
+  if (await esperarPuente()) { pintarCuenta(); pintarDatos(); }
   if (!sesion()?.token) return;
   try {
     const r = await conCuenta("/api/cuenta/yo");

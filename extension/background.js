@@ -1324,10 +1324,12 @@ chrome.runtime.onMessage.addListener((msg, _e, responder) => {
         case "sesionDeLaWeb": {
           const traida = msg.sesion;
           if (!traida?.token) return responder({ guardada: false });
+          // Gana la copia más reciente: quedarse con la vieja dejaba un
+          // token de refresco gastado que, al usarse, cerraba la sesión
+          // entera (ver contenido/puente.js).
           const actual = await sesion.obtener();
-          const mismaPersona = actual?.usuario?.id
-            && actual.usuario.id === traida.usuario?.id;
-          if (actual?.token && mismaPersona) return responder({ guardada: false, yaEstaba: true });
+          const masNueva = (Number(traida.emitida) || 0) > (Number(actual?.emitida) || 0);
+          if (actual?.token && !masNueva) return responder({ guardada: false, yaEstaba: true });
           await sesion.guardar(traida);
           return responder({ guardada: true, correo: traida.usuario?.correo });
         }

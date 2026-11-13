@@ -254,7 +254,11 @@ titulo("RENOVAR — la sesion no se muere a la hora");
   check("existe el renovador", fuente.includes("async function renovar()"));
   check("y una peticion que lo usa", fuente.includes("async function conCuenta("));
   check("se reintenta una vez tras un 401",
-        fuente.includes("r.status === 401 && await renovar()"));
+        fuente.includes("if (r.status === 401)") && fuente.includes("else if (await renovar()) r = await ir();"));
+  check("y antes de renovar usa la copia nueva que haya dejado la web",
+        fuente.includes("ahora.refresco !== antes"));
+  check("las sesiones nuevas llevan cuándo se emitieron", /emitida: Date\.now\(\)/.test(fuente));
+  check("salir deja la marca para cerrar también la web", /salio: Date\.now\(\)/.test(fuente));
   check("dos renovaciones a la vez no se pisan", fuente.includes("renovando = renovando ||"));
   check("ya no quedan fetch sueltos a la nube",
         !/fetch\(`\$\{SERVIDOR\}\/api\/nube/.test(fuente));
@@ -430,8 +434,62 @@ titulo("EL PUENTE — entrar una vez, no dos");
   check("y no toca nada mas de la pagina",
     !/document\.querySelector|innerHTML|fetch\(/.test(puente));
   check("el fondo la recibe", /case "sesionDeLaWeb"/.test(fondo));
-  check("y no pisa una sesion propia de la misma persona",
-    /mismaPersona/.test(fondo));
+  check("y solo la cambia si la que llega es más reciente",
+    /masNueva/.test(fondo));
+
+  // El fallo real: web y extensión compartían el token de refresco. Una
+  // renovaba, la otra se quedaba con el gastado, lo usaba y Supabase
+  // cerraba la sesión entera. Había que entrar cada vez.
+  check("el puente corre antes que la página (document_start)",
+    suyo?.run_at === "document_start");
+  check("y avisa a la página de que existe", /chambaExtension/.test(puente));
+  check("sincroniza en los dos sentidos (escribe también en la web)",
+    /localStorage\.setItem\(CLAVE_WEB/.test(puente) && /chrome\.storage\.local\.set/.test(puente));
+  check("gana la copia más reciente", /emitida\(ext\) > emitida\(web\)/.test(puente));
+  check("respeta que la persona haya salido", /SALIO_WEB/.test(puente) && /SALIO_EXT/.test(puente));
+  check("no resucita una sesión que Supabase ya rechazó", /chamba_muerta/.test(puente));
+
+  // Simulación: la extensión renovó y tiene la copia nueva; la web, la vieja.
+  {
+    const local = {
+      chamba_sesion: JSON.stringify({ token: "viejo", refresco: "r1", emitida: 1000 }),
+    };
+    const ext = { sesion: { token: "nuevo", refresco: "r2", emitida: 2000 } };
+    const mensajes = [];
+    const g = {
+      localStorage: {
+        getItem: (k) => (k in local ? local[k] : null),
+        setItem: (k, v) => { local[k] = String(v); },
+        removeItem: (k) => { delete local[k]; },
+      },
+      chrome: { storage: { local: {
+        get: async (ks) => Object.fromEntries(ks.filter((k) => k in ext).map((k) => [k, ext[k]])),
+        set: async (o) => Object.assign(ext, o),
+        remove: async (k) => { delete ext[k]; },
+      } } },
+      document: { documentElement: { dataset: {} }, addEventListener() {}, visibilityState: "visible" },
+      window: { addEventListener() {}, postMessage: (m) => mensajes.push(m) },
+      location: { origin: "https://chamba-lista.vercel.app" },
+    };
+    new Function(...Object.keys(g), puente)(...Object.values(g));
+    await new Promise((r) => setTimeout(r, 20));
+    const web = JSON.parse(local.chamba_sesion);
+    check("simulación: la web recibe la copia nueva de la extensión", web.refresco === "r2", web.refresco);
+    check("y se le avisa a la página que cambió", mensajes.some((m) => m.chamba === "sincronizado" && m.cambio));
+
+    // Y al revés: la web es la nueva.
+    local.chamba_sesion = JSON.stringify({ token: "web", refresco: "r3", emitida: 3000 });
+    new Function(...Object.keys(g), puente)(...Object.values(g));
+    await new Promise((r) => setTimeout(r, 20));
+    check("simulación: la extensión recibe la copia nueva de la web", ext.sesion.refresco === "r3", ext.sesion.refresco);
+
+    // Salió en la web después: la extensión no la vuelve a traer.
+    delete local.chamba_sesion;
+    local.chamba_salio = "4000";
+    new Function(...Object.keys(g), puente)(...Object.values(g));
+    await new Promise((r) => setTimeout(r, 20));
+    check("simulación: salir en la web cierra también la extensión", !ext.sesion && !local.chamba_sesion);
+  }
 }
 
 titulo("SIN COLETILLAS QUE NO SIGNIFICAN NADA");
