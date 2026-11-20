@@ -70,15 +70,17 @@
     </div>
     <p class="detalle solo-movil">Las extensiones no funcionan en el celular: abre esta página en tu computadora.</p>
     {% if not tienda %}
-    <ol class="pasos-instalar oculto" id="pasos-instalar" aria-live="polite">
-      <li class="pasos-titulo"><b>Ya se descargó.</b> Faltan tres pasos, un minuto:</li>
-      <li>Descomprime el archivo <code>chamba-lista-extension.zip</code> (clic derecho → Extraer todo).</li>
-      <li>Abre <code>chrome://extensions</code> <button class="boton chico secundario" id="copiar-extensiones" type="button">Copiar</button>
-        y activa <strong>Modo de desarrollador</strong> (arriba a la derecha).</li>
-      <li>Pulsa <strong>Cargar descomprimida</strong> y elige la carpeta que descomprimiste.</li>
-      <li class="pasos-nota">Chrome avisará de que está en modo desarrollador: es lo normal hasta que
-        esté publicada en la Chrome Web Store.</li>
-    </ol>
+    <div class="pasos-instalar oculto" id="pasos-instalar" aria-live="polite">
+      <p class="pasos-titulo"><b>Ya se descargó.</b> Faltan tres pasos, un minuto:</p>
+      <ol>
+        <li>Descomprime el archivo <code>chamba-lista-extension.zip</code> (clic derecho → Extraer todo).</li>
+        <li>Abre <code>chrome://extensions</code> <button class="boton chico secundario" id="copiar-extensiones" type="button">Copiar</button>
+          y activa <strong>Modo de desarrollador</strong> (arriba a la derecha).</li>
+        <li>Pulsa <strong>Cargar descomprimida</strong> y elige la carpeta que descomprimiste.</li>
+      </ol>
+      <p class="pasos-nota">Chrome avisará de que está en modo desarrollador: es lo normal hasta que
+        esté publicada en la Chrome Web Store.</p>
+    </div>
     {% endif %}
   </section>
 

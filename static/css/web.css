@@ -345,13 +345,14 @@ main { padding-bottom: 80px; }
 }
 .boton.grande { padding: 14px 26px; font-size: 1.05rem; }
 .pasos-instalar {
-  margin: 18px 0 0; padding: 16px 20px 14px 38px; font-size: 14.5px; max-width: 64ch;
+  margin: 18px 0 0; padding: 16px 20px 14px; font-size: 14.5px; max-width: 64ch;
   background: var(--papel-2, #fff); border: 2px solid var(--tinta, #111); border-radius: 12px;
   box-shadow: var(--dura-chica);
 }
+.pasos-instalar ol { margin: 0; padding-left: 22px; }
 .pasos-instalar li { margin-bottom: 8px; }
-.pasos-instalar .pasos-titulo { list-style: none; margin-left: -18px; }
-.pasos-instalar .pasos-nota { list-style: none; margin: 10px 0 0 -18px; color: var(--tinta-2, #555); font-size: 13px; }
+.pasos-instalar .pasos-titulo { margin: 0 0 10px; }
+.pasos-instalar .pasos-nota { margin: 6px 0 0; color: var(--tinta-2, #555); font-size: 13px; }
 .pasos-instalar code {
   font-family: var(--mono); font-size: .88em;
   background: var(--papel-3); border: 1px solid var(--linea);
