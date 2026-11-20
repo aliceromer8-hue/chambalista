@@ -147,7 +147,7 @@ const clavePuesto = (t, e) => `${t}|${e}`.toLowerCase().normalize("NFD")
   .replace(/[\u0300-\u036f]/g, "").replace(/\s+/g, " ").trim();
 
 /** Las que ya postulaste en ese portal, leídas de su «Mis postulaciones». */
-async function postuladasEnPortal(tabId, pid) {
+async function postuladasEnPortal(tabId, pid, { importar = true } = {}) {
   let url = URL_POSTULADAS[pid];
   const vistas = new Set();
   const leidas = [];
@@ -158,7 +158,7 @@ async function postuladasEnPortal(tabId, pid) {
     leidas.push(...r.postuladas);
     url = r.siguiente;
   }
-  await importarPostuladas(pid, leidas).catch(() => {});
+  if (importar) await importarPostuladas(pid, leidas).catch(() => {});
   return vistas;
 }
 
@@ -173,6 +173,21 @@ async function importarPostuladas(pid, leidas) {
   const ya = new Set(lista.map((r) => clavePuesto(r.puesto, r.empresa)));
   const portal = PORTALES[pid]?.nombre || pid;
   let nuevas = 0;
+  // El portal MANDA: si dice que ya la postulaste y aquí quedó anotada como
+  // fallida o por postular, es que sí salió y no se pudo confirmar en el
+  // momento (pasó el 2026-11-20: «te postulaste correctamente» en el portal
+  // y en Chamba Lista seguía en «Por postular», lista para enviarse otra vez).
+  const ENVIADAS = ["enviada", "ya_postulada"];
+  const porClave = new Map(lista.map((r) => [clavePuesto(r.puesto, r.empresa), r]));
+  for (const x of leidas) {
+    const previo = porClave.get(clavePuesto(x.titulo, x.empresa));
+    if (!previo || !x.empresa || ENVIADAS.includes(previo.estado)) continue;
+    await almacen.tracker.anotar({
+      ...previo, estado: "enviada", etapa: "enviada", dudosa: false, corregida: true,
+      motivo: `Confirmada en «Mis postulaciones» de ${portal}.`,
+    });
+    nuevas++;
+  }
   for (const x of leidas.slice().reverse()) {
     const k = clavePuesto(x.titulo, x.empresa);
     if (!x.empresa || ya.has(k)) continue;
@@ -528,6 +543,7 @@ async function prepararUna(vacante, perfil, guardados, respuestasPersona) {
   // La vacante queda a mano para «rellenar esta pantalla» desde el panel.
   await almacen.guardar("vacanteTrabajo", {
     titulo: vacante.titulo, empresa: vacante.empresa, descripcion: vacante.descripcion || "",
+    portalId: vacante.portalId || "",
   });
 
   // RÁPIDO: lo que no depende de nada, a la vez.
@@ -746,10 +762,30 @@ async function escribirYEnviar(respuestasAprobadas) {
     if (!SE_FUE_LA_PAGINA.test(e.message || "")) throw e;
     await esperar(1500);
     await pestanaLista(tabId, 15000);
-    const ping = await hablarCon(tabId, { accion: "ping" }).catch(() => null);
-    if (ping?.enviada) return { enviada: true, mensaje: "El portal confirmó la postulación." };
+    // Una sola mirada no basta: Computrabajo pasa por una página intermedia
+    // antes de la que confirma, y mirar justo ahí daba «no se pudo
+    // confirmar» con la postulación ya enviada. Se mira varias veces.
+    for (let i = 0; i < 6; i++) {
+      const ping = await hablarCon(tabId, { accion: "ping" }).catch(() => null);
+      if (ping?.enviada) return { enviada: true, mensaje: "El portal confirmó la postulación." };
+      await esperar(1500);
+    }
+    // Y si la página no lo dice, se le pregunta al portal: ¿está en «Mis
+    // postulaciones»? Es lo que decide, no el texto de una pantalla.
+    try {
+      const v = await almacen.leer("vacanteTrabajo", null);
+      const url = (await chrome.tabs.get(tabId).catch(() => null))?.url || "";
+      const pid = String(v?.portalId || (/computrabajo/i.test(url) ? "computrabajo" : "")).toLowerCase();
+      if (v?.titulo && URL_POSTULADAS[pid]) {
+        const vistas = await postuladasEnPortal(tabId, pid, { importar: false });
+        if (vistas.has(clavePuesto(v.titulo, v.empresa))) {
+          return { enviada: true, mensaje: "Confirmada en «Mis postulaciones» del portal." };
+        }
+      }
+    } catch { /* sin confirmación: sigue como dudosa */ }
     return { enviada: false, dudosa: true,
-             error: "La página cambió al enviar y no se pudo confirmar. Mírala en «Mis postulaciones» del portal." };
+             error: "La página cambió al enviar y no se pudo confirmar. Mírala en «Mis postulaciones» del portal "
+                  + "antes de volver a enviarla: puede que ya haya salido." };
   }
 }
 
@@ -947,6 +983,7 @@ async function correrLote({ vacantes, modo, aprobacion, respuestasPersona }) {
           if (env?.cvSubido) item.cvSubido = true;
           item.estado = env?.enviada ? "enviada" : "fallida";
           item.motivo = env?.mensaje || env?.error || "";
+          item.dudosa = Boolean(env?.dudosa);
         } catch (e) {
           item.estado = "fallida";
           item.motivo = e.message;
@@ -955,7 +992,7 @@ async function correrLote({ vacantes, modo, aprobacion, respuestasPersona }) {
       // Se anota TODO: en automático el tracker es el único registro.
       await almacen.tracker.anotar({
         portal: item.portal, empresa: item.empresa, puesto: item.titulo,
-        url: item.url, estado: item.estado, motivo: item.motivo,
+        url: item.url, estado: item.estado, motivo: item.motivo, dudosa: Boolean(item.dudosa),
         descripcion: item.descripcion || "", competencias: item.competencias || [],
         cvResumen: item.cvResumen || null, modoCV: item.modoCV || "", segundos: item.segundos || null,
         sinPago: (item.preguntas || []).some((q) => q.sinPagoAceptado),
@@ -1028,6 +1065,7 @@ async function enviarAprobadas(ids) {
       if (env?.cvSubido) item.cvSubido = true;
       item.estado = env?.enviada ? "enviada" : "fallida";
       item.motivo = env?.mensaje || env?.error || "";
+      item.dudosa = Boolean(env?.dudosa);
       if (env?.enviada) sesion.usarSaldo().catch(() => {});
     } catch (e) {
       if (!e?.yaResuelta) {
@@ -1037,7 +1075,7 @@ async function enviarAprobadas(ids) {
     }
     await almacen.tracker.anotar({
       portal: item.portal, empresa: item.empresa, puesto: item.titulo,
-      url: item.url, estado: item.estado, motivo: item.motivo,
+      url: item.url, estado: item.estado, motivo: item.motivo, dudosa: Boolean(item.dudosa),
       descripcion: item.descripcion || "", competencias: item.competencias || [],
       sinPago: (item.preguntas || []).some((q) => q.sinPagoAceptado),
     });
@@ -1196,6 +1234,7 @@ chrome.runtime.onMessage.addListener((msg, _e, responder) => {
             portal: msg.vacante?.portal, empresa: msg.vacante?.empresa,
             puesto: msg.vacante?.titulo, url: msg.vacante?.url,
             estado: r?.enviada ? "enviada" : "fallida", motivo: r?.mensaje || r?.error || "",
+            dudosa: Boolean(r?.dudosa),
             sinPago: Boolean(msg.sinPago),
             descripcion: String(msg.descripcion || "").slice(0, 1200), competencias: msg.competencias || [],
             cvResumen: msg.cvResumen || null, modoCV: msg.modoCV || "",

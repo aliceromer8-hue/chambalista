@@ -1272,6 +1272,21 @@ function pintarResultadoAuto(vacante, env) {
     pintarInicio();
     return;
   }
+  // Dudosa: la página cambió al enviar y no se pudo confirmar. NO se vuelve
+  // a ofrecer «Enviar»: casi siempre sí salió, y enviarla otra vez es
+  // postular dos veces a la misma empresa (pasó el 2026-11-20).
+  if (env?.dudosa) {
+    const enlace = /computrabajo/i.test(`${vacante.portalId || ""} ${vacante.portal || ""} ${vacante.url || ""}`)
+      ? "https://candidato.pe.computrabajo.com/candidate/match/" : vacante.url;
+    c.innerHTML = cab + `<div class="aviso alerta"><strong>Puede que ya se haya enviado.</strong><br>`
+      + `<span class="nota">La página cambió al enviar y no pudimos confirmarlo. Mírala en «Mis postulaciones» `
+      + `del portal antes de volver a enviarla. Si sale como postulada, ya está: la próxima vez que busques `
+      + `la marcamos como enviada sola.</span></div>`
+      + `<div class="fila-botones"><a class="boton primario" href="${escapar(enlace || "#")}" target="_blank" rel="noopener">`
+      + `Ver mis postulaciones</a></div>`;
+    pintarInicio();
+    return;
+  }
   // No salió: se enseña la pantalla de revisión con el motivo arriba, que
   // ahí están «Ver el formulario» y «Enviar» para terminarla.
   pintarModal();

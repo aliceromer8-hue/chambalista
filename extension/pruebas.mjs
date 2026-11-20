@@ -2195,6 +2195,54 @@ titulo("LA PESTAÑA SIN CONTENT SCRIPT — el fallo mas probable del primer inte
   check("ninguno lleva un carácter invisible colado", malos.length === 0, malos.join(", "));
 }
 
+titulo("ENVIAR — una postulación que SÍ salió no puede quedar como fallida (2026-11-20)");
+
+{
+  // Caso real: el portal dijo «te postulaste correctamente», Chamba Lista dijo
+  // «No se pudo enviar sola» y dejó la oferta en «Por postular», lista para
+  // enviarse otra vez.
+  const fsp = await import("node:fs/promises");
+  const ct = await fsp.readFile(new URL("contenido/computrabajo.js", BASE), "utf8");
+  const fondo = await fsp.readFile(new URL("background.js", BASE), "utf8");
+  const panel = await fsp.readFile(new URL("panel/panel.js", BASE), "utf8");
+
+  const ini = ct.indexOf("function confirmada()");
+  const fin = ct.indexOf("/** El clic final.");
+  const confirmada = (texto, titulo = "") => {
+    const doc = { querySelector: () => null, body: { innerText: texto }, title: titulo };
+    return new Function("document", `${ct.slice(ini, fin)}; return confirmada();`)(doc);
+  };
+  check("reconoce «Te postulaste correctamente» (lo que dijo el portal)",
+    Boolean(confirmada("¡Genial! Te postulaste correctamente a la oferta")));
+  check("con o sin tildes y mayúsculas", Boolean(confirmada("POSTULACIÓN ENVIADA")) && Boolean(confirmada("postulacion enviada")));
+  check("las frases de antes siguen funcionando",
+    Boolean(confirmada("Ya te postulaste a esta oferta")) && Boolean(confirmada("Gracias por postular")));
+  check("el título «Postulación enviada de…» también", Boolean(confirmada("", "Postulación enviada de Analista")));
+  check("una oferta cualquiera NO cuenta como enviada",
+    !confirmada("Analista de marketing. Requisitos: Excel. Postula ahora y completa tus datos"));
+
+  check("al cambiar la página se mira varias veces, no una",
+    /for \(let i = 0; i < 6; i\+\+\) \{\s*const ping = await hablarCon\(tabId, \{ accion: "ping" \}\)/.test(fondo));
+  check("y si no lo dice la página, se pregunta a «Mis postulaciones»",
+    /postuladasEnPortal\(tabId, pid, \{ importar: false \}\)/.test(fondo)
+    && /Confirmada en «Mis postulaciones» del portal/.test(fondo));
+  check("esa comprobación no importa nada al historial (no duplica)",
+    /async function postuladasEnPortal\(tabId, pid, \{ importar = true \} = \{\}\)/.test(fondo)
+    && /if \(importar\) await importarPostuladas/.test(fondo));
+  check("la vacante en curso guarda su portal", /vacanteTrabajo",\s*\{[^}]*portalId: vacante\.portalId/.test(fondo));
+
+  check("el portal manda: lo anotado como fallido pasa a enviada si el portal la tiene",
+    /ENVIADAS = \["enviada", "ya_postulada"\]/.test(fondo)
+    && /estado: "enviada", etapa: "enviada", dudosa: false, corregida: true/.test(fondo));
+  check("la dudosa se guarda marcada, en los tres sitios donde se anota",
+    (fondo.match(/dudosa: Boolean\((item\.dudosa|r\?\.dudosa)\)/g) || []).length === 3);
+
+  const iDudosa = panel.indexOf("if (env?.dudosa)");
+  const iModal = panel.indexOf("pintarModal();", iDudosa);
+  check("si es dudosa NO se vuelve a ofrecer «Enviar» (sería postular dos veces)",
+    iDudosa > 0 && iModal > iDudosa && /Ver mis postulaciones/.test(panel.slice(iDudosa, iModal)));
+}
+
 console.log(`
 ${fallos === 0 ? "TODO OK" : `${fallos} FALLO(S)`}`);
 

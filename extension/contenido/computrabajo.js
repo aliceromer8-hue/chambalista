@@ -390,14 +390,21 @@
     if (document.querySelector("[applied-offer-tag]:not(.hide), .tag.postulated:not(.hide)")) {
       return "El portal marcó la oferta como «Postulado».";
     }
-    const t = (document.body.innerText || "").toLowerCase();
+    // Sin tildes y en minúsculas: el portal cambia de redacción («Te
+    // postulaste correctamente», 2026-11-20) y una tilde de más o de menos
+    // dejaba una postulación que SÍ entró marcada como fallida.
+    const sinTildes = (s) => String(s || "").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+    const t = sinTildes(document.body.innerText);
     // «Ya te postulaste a esta oferta» es lo que enseña /match/ cuando la
     // postulación ya entró; «ya postulaste» a secas no lo reconocía. Y el
     // título de esa página dice «Postulación enviada de …».
-    const frases = ["tu postulación fue enviada", "postulación enviada", "ya postulaste",
-                    "ya te postulaste", "hemos enviado tu postulación", "gracias por postular"];
+    const frases = ["tu postulacion fue enviada", "postulacion enviada", "ya postulaste",
+                    "ya te postulaste", "hemos enviado tu postulacion", "gracias por postular",
+                    "te postulaste correctamente", "postulaste correctamente",
+                    "postulacion realizada", "postulacion exitosa", "postulado correctamente",
+                    "te has postulado"];
     const hit = frases.find((f) => t.includes(f))
-      || (/^postulaci[oó]n enviada/i.test(document.title || "") ? "postulación enviada" : null);
+      || (/^postulacion enviada/.test(sinTildes(document.title)) ? "postulación enviada" : null);
     return hit ? `Mensaje del portal: «${hit}»` : null;
   }
 
