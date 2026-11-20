@@ -1787,5 +1787,23 @@ _ra._quitar_lugares_inventados(_conlugar2, "A\nB\nC\nBanco X    Lima, PE\nCajero
 check("IA: pero la que el CV sí escribe junto al trabajo se queda", _conlugar2["experiencia"][0]["lugar"] == "Lima, PE")
 check("el prompt prohíbe copiar la ciudad de la cabecera", "NUNCA copies la ciudad de la cabecera" in _ra.INSTRUCCIONES_ANALISIS)
 
+titulo("UN CV BUENO NO PUEDE SALIR PEOR — cobertura del original")
+with _mk11.patch.object(_ra, "analizar_cv", lambda t: None):
+    _bueno = _cvp._parsear_texto(_CV_PE)
+check("la conversión completa conserva casi todo el original", _bueno["cobertura"] >= 0.9, _bueno["cobertura"])
+_recortado = {"nombre": "Maria Quispe", "contacto": {}, "experiencia": [_bueno["experiencia"][1]],
+              "educacion": [], "perfil": [], "secciones": {"x": ["y"]}}
+check("si se deja trabajos, la cobertura cae", _cvp.cobertura(_CV_PE, _recortado) < _cvp.COBERTURA_MINIMA,
+      _cvp.cobertura(_CV_PE, _recortado))
+import copy as _copy
+with _mk11.patch.object(_ra, "analizar_cv", lambda t: _copy.deepcopy(_recortado)):
+    _elegido = _cvp._parsear_texto(_CV_PE)
+check("y entonces gana la versión que no perdió nada", _elegido["analizado_con"] == "reglas_por_cobertura"
+      and len(_elegido.get("experiencia") or []) == 2, _elegido.get("analizado_con"))
+_completo = dict(_copy.deepcopy(_bueno), secciones={"x": ["y"]})
+with _mk11.patch.object(_ra, "analizar_cv", lambda t: _copy.deepcopy(_completo)):
+    check("pero si la IA lo conserva todo, se queda la IA", _cvp._parsear_texto(_CV_PE)["analizado_con"] == "ia")
+check("se mide cuánto sobrevive del original", 'cobertura=(round(cob, 1)' in pathlib.Path("app_web.py").read_text(encoding="utf-8"))
+
 print(f"\n{'TODO OK' if fallos == 0 else f'{fallos} FALLO(S)'}")
 sys.exit(1 if fallos else 0)

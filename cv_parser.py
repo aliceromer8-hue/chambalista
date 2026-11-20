@@ -528,8 +528,49 @@ def parsear_cv(ruta):
     return _parsear_texto(extraer_texto(ruta))
 
 
+_VACIAS = {
+    "para", "como", "with", "that", "este", "esta", "estos", "estas", "desde", "hasta",
+    "sobre", "entre", "donde", "cuando", "the", "and", "from", "their", "también",
+}
+
+
+def _palabras(texto):
+    import unicodedata
+    t = unicodedata.normalize("NFD", str(texto or "").lower())
+    t = "".join(c for c in t if unicodedata.category(c) != "Mn")
+    return {w for w in re.findall(r"[a-z0-9]{4,}", t) if w not in _VACIAS}
+
+
+def cobertura(texto, perfil):
+    """Qué parte del contenido del CV original sigue en el convertido (0–1).
+
+    Un CV que entra bueno no puede salir peor: si la conversión se deja
+    trabajos, logros o herramientas por el camino, la persona postula con
+    menos de lo que tiene. Se cuentan las palabras con contenido del
+    original que siguen apareciendo en el perfil convertido.
+    """
+    fuente = _palabras(texto)
+    if not fuente:
+        return 1.0
+    sin_vista = {k: v for k, v in (perfil or {}).items()
+                 if k not in ("secciones", "datos_faltantes", "analizado_con", "cobertura")}
+    import json
+    destino = _palabras(json.dumps(sin_vista, ensure_ascii=False))
+    return round(len(fuente & destino) / len(fuente), 3)
+
+
+# Por debajo de esto, el convertido se ha dejado algo que importa.
+COBERTURA_MINIMA = 0.85
+
+
 def _parsear_texto(texto):
-    """Núcleo compartido: del texto crudo al perfil estructurado."""
+    """Núcleo compartido: del texto crudo al perfil estructurado.
+
+    Primero el modelo; si falla, las reglas. Y aunque el modelo responda,
+    si su versión se dejó contenido del original y la de reglas no, gana
+    la de reglas: «le bajó el nivel a mi CV» es el peor fallo posible de
+    un producto que existe para ayudar a postular.
+    """
     lineas = [l.rstrip() for l in texto.splitlines()]
 
     try:
@@ -538,6 +579,9 @@ def _parsear_texto(texto):
         con_ia = redactor_ia.analizar_cv(texto)
     except ImportError:
         con_ia = None
+
+    por_reglas = _parsear_por_reglas(texto)
+    por_reglas["cobertura"] = cobertura(texto, por_reglas)
 
     if con_ia and con_ia.get("secciones"):
         con_ia["datos_faltantes"] = detectar_datos_faltantes(texto)
@@ -549,8 +593,17 @@ def _parsear_texto(texto):
                 con_ia["contacto"][clave] = valor
         if not con_ia.get("nombre"):
             con_ia["nombre"] = _extraer_nombre(lineas)
-        return con_ia
+        con_ia["cobertura"] = cobertura(texto, con_ia)
+        if con_ia["cobertura"] >= COBERTURA_MINIMA \
+                or con_ia["cobertura"] >= por_reglas["cobertura"] - 0.05:
+            return con_ia
+        por_reglas["analizado_con"] = "reglas_por_cobertura"
+    return por_reglas
 
+
+def _parsear_por_reglas(texto):
+    """El respaldo sin modelo: títulos de sección, columnas y fechas."""
+    lineas = [l.rstrip() for l in texto.splitlines()]
     perfil = {
         "nombre": _extraer_nombre(lineas),
         "contacto": _extraer_contacto(texto),

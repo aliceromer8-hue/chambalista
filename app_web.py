@@ -443,7 +443,11 @@ def procesar():
     # la diferencia entre el producto funcionando y el producto
     # sobreviviendo, y sin medirlo ya pasó un día entero sin que nadie
     # lo notara.
-    medir("cv_convertido", con=perfil.get("analizado_con", "?"), formato=ext.lstrip("."))
+    # Y cuánto del CV original sobrevivió, en tramos de 10 % (pocos
+    # valores: es una estadística, no una huella).
+    cob = perfil.get("cobertura")
+    medir("cv_convertido", con=perfil.get("analizado_con", "?"), formato=ext.lstrip("."),
+          cobertura=(round(cob, 1) if isinstance(cob, (int, float)) else None))
     return jsonify({"perfil": perfil})
 
 

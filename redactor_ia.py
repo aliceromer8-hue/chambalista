@@ -70,7 +70,9 @@ TIEMPO_LIMITE = int(os.environ.get("IA_TIEMPO_LIMITE", "60"))
 # —60 s por intento y tres intentos— una conversión llegó a tardar 102
 # segundos en producción para acabar usando las reglas igualmente: lo
 # peor de las dos opciones, la espera del modelo y el resultado sin él.
-TIEMPO_ANALISIS = int(os.environ.get("IA_TIEMPO_ANALISIS", "22"))
+# Un CV de dos páginas tarda ~19 s: con 22 s de margen, un día lento del
+# proveedor mandaba el CV al respaldo por reglas (pasó con un CV real).
+TIEMPO_ANALISIS = int(os.environ.get("IA_TIEMPO_ANALISIS", "28"))
 REINTENTOS_ANALISIS = int(os.environ.get("IA_REINTENTOS_ANALISIS", "1"))
 IA_REINTENTOS = int(os.environ.get("IA_REINTENTOS", "3"))
 IA_ESPERA = int(os.environ.get("IA_ESPERA", "6"))
