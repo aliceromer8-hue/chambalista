@@ -2243,6 +2243,60 @@ titulo("ENVIAR — una postulación que SÍ salió no puede quedar como fallida 
     iDudosa > 0 && iModal > iDudosa && /Ver mis postulaciones/.test(panel.slice(iDudosa, iModal)));
 }
 
+titulo("CV — «tal cual» para todos, adaptado solo para quien paga (2026-11-20)");
+
+{
+  const fsp = await import("node:fs/promises");
+  const leer = (f) => fsp.readFile(new URL(f, BASE), "utf8");
+  const fondo = await leer("background.js");
+  const panel = await leer("panel/panel.js");
+  const iaJs = await leer("lib/ia.js");
+  const sesionJs = await leer("lib/sesion.js");
+  const css = await leer("panel/panel.css");
+
+  // La opción nueva.
+  check("hay una opción «Mi CV, tal cual»", /\{ id: "original", titulo: "Mi CV, tal cual"/.test(panel));
+  check("el panel guarda el archivo original al subirlo (PDF/Word, hasta 3,5 MB)",
+    /guardarCVOriginal\(f\)/.test(panel) && /TOPE_CV_ORIGINAL = 3\.5 \* 1024 \* 1024/.test(panel)
+    && /almacen\.guardar\("cvOriginal"/.test(panel));
+  check("sin archivo guardado la opción se bloquea y ofrece subir el CV otra vez",
+    /sinArchivo = o\.id === "original" && !ctx\.original/.test(panel) && /data-subir-cv/.test(panel));
+  check("el fondo arma el pedido con el archivo SIN tocar (original: true)",
+    /async function cvOriginalComoPedido\(formato\)/.test(fondo) && /original: true/.test(fondo));
+  check("Bumeran solo acepta PDF: un original que no lo es no se manda ahí",
+    /formato === "pdf" && o\.mime !== "application\/pdf"/.test(fondo));
+  check("el modo «original» NO pasa por la IA (no llama a cvAdaptado)",
+    /modoCV === "original"\) \{[^}]*cvOriginalComoPedido/.test(fondo.replace(/\n/g, " ")));
+  check("«original» y «harvard» se suben a Computrabajo una vez, cada uno con su marca",
+    /\{ harvard: "cvHarvardEnComputrabajo", original: "cvOriginalEnComputrabajo" \}\[modoCV\]/.test(fondo));
+  check("el mime del original viaja hasta el formulario",
+    /mime: pedido\.mime \|\|/.test(fondo));
+
+  // El adaptado, solo de pago.
+  check("la opción adaptada está marcada como de pago", /id: "adaptado", soloPago: true/.test(panel));
+  check("sin plan de pago se bloquea y lleva a los planes",
+    /deAdaptado = o\.soloPago && ctx\.esPago === false/.test(panel) && /data-ver-planes/.test(panel));
+  check("sesion.esDePago: pase activo o haber comprado", /pase_activo \|\| \(s\.compradas \|\| 0\) > 0/.test(sesionJs));
+  check("elegir el adaptado sin plan lo rechaza el fondo",
+    /msg\.modo === "adaptado" && \(await sesion\.esDePago\(\)\) === false/.test(fondo));
+  check("quien lo tenía elegido y no paga postula con su CV tal cual, y se le dice",
+    /elegido === "adaptado" && \(await sesion\.esDePago\(\)\) === false/.test(fondo)
+    && /El CV adaptado es de los planes de pago: esta postulación va con tu CV tal cual/.test(fondo));
+  check("el cliente no se salta el límite con su clave propia (402 → no hay respaldo local)",
+    /requierePago: r\.status === 402/.test(iaJs) && /if \(delServidor\?\.requierePago\) return null;/.test(iaJs));
+  check("adaptar uno nuevo desde Postulaciones también es de pago",
+    /Rehacer uno ya adaptado es gratis/.test(panel));
+  check("el plan gratis ya no dice «CV adaptado» como incluido",
+    !/Con todo incluido: CV adaptado/.test(panel) && /El CV adaptado a cada vacante viene con un pack/.test(panel));
+
+  // Distrito: que se vea que quedó elegido.
+  check("el botón del distrito sugerido se marca al pulsarlo (aria-pressed)",
+    /id="lugar-si" type="button" aria-pressed="false"/.test(panel) && /setAttribute\("aria-pressed", String\(cual === "si"\)\)/.test(panel));
+  check("y dice en voz alta qué quedó elegido («✓ Buscarás en …»)", /✓ Buscarás en \$\{sugerido\}/.test(panel));
+  check("con estilo propio: relleno y ✓", /\.boton\.elegible\[aria-pressed="true"\]/.test(css) && /content: "✓ "/.test(css));
+  check("el estilo de opción bloqueada existe", /\.opcion-cv\.bloqueada/.test(css) && /\.sello-pago/.test(css));
+}
+
 console.log(`
 ${fallos === 0 ? "TODO OK" : `${fallos} FALLO(S)`}`);
 

@@ -109,6 +109,7 @@
     const bytes = Uint8Array.from(atob(base64), (c) => c.charCodeAt(0));
     const archivo = new File([bytes], nombre, {
       type: /\.pdf$/i.test(nombre) ? "application/pdf"
+        : /\.doc$/i.test(nombre) ? "application/msword"
         : "application/vnd.openxmlformats-officedocument.wordprocessingml.document" });
     const dt = new DataTransfer();
     dt.items.add(archivo);

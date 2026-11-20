@@ -333,6 +333,7 @@ async function pintarPaso3(acciones) {
   $("#portada-bajada").textContent = "Una sola vez. Con esto respondemos por ti en cada postulación.";
   const guardados = await almacen.datosPersonales.obtener();
   const prefs = await almacen.preferencias.obtener();
+  await refrescarCtxCV();
   const delCV = distritos.distritoEn(estado.perfil?.contacto?.ubicacion || "");
   const distrito = guardados.distrito || "";
   const sugerido = !distrito && delCV ? distritos.nombreBonito(delCV) : "";
@@ -343,11 +344,12 @@ async function pintarPaso3(acciones) {
       <h3><span class="num-paso">1</span> ¿Dónde buscas trabajo?</h3>
       ${sugerido ? `<p class="pregunta-lugar">Tu CV dice que vives en <b>${escapar(sugerido)}</b>. ¿Buscas cerca de ahí?</p>
         <div class="fila-botones" style="margin-top:6px">
-          <button class="boton chico oscuro" id="lugar-si" type="button">Sí, en ${escapar(sugerido)}</button>
-          <button class="boton chico" id="lugar-otro" type="button">Otro distrito</button>
+          <button class="boton chico elegible" id="lugar-si" type="button" aria-pressed="false">Sí, en ${escapar(sugerido)}</button>
+          <button class="boton chico elegible" id="lugar-otro" type="button" aria-pressed="false">Otro distrito</button>
         </div>` : ""}
       <input type="text" id="paso-distrito" list="ciudades" class="${sugerido ? "oculto" : ""}"
              placeholder="Tu distrito, ej.: Miraflores" value="${escapar(distrito)}" autocomplete="off">
+      <p class="lugar-estado" id="lugar-estado" role="status" aria-live="polite">${distrito ? `✓ Buscarás en ${escapar(distrito)}.` : ""}</p>
     </section>
     <section class="bloque-paso">
       <h3><span class="num-paso">2</span> ¿Con qué CV postulas en los portales?</h3>
@@ -367,15 +369,27 @@ async function pintarPaso3(acciones) {
   conectarCampos($("#paso-datos"));
   acciones.querySelectorAll("input[name='cv-paso']").forEach((i) => i.addEventListener("change", () =>
     acciones.querySelectorAll(".opcion-cv").forEach((l) => l.classList.toggle("elegida", l.contains(i)))));
+  // Lo elegido TIENE que verse: antes el botón «Sí, en La Molina» quedaba igual
+  // al pulsarlo y no se sabía si había quedado elegido (Ali, 2026-11-20).
+  const marcarLugar = (cual) => {
+    $("#lugar-si")?.setAttribute("aria-pressed", String(cual === "si"));
+    $("#lugar-otro")?.setAttribute("aria-pressed", String(cual === "otro"));
+    $("#paso-distrito").classList.toggle("oculto", cual === "si");
+    $("#lugar-estado").textContent = cual === "si" ? `✓ Buscarás en ${sugerido}.`
+      : cual === "otro" ? "Escribe tu distrito aquí abajo." : "";
+  };
   $("#lugar-si")?.addEventListener("click", () => {
     $("#paso-distrito").value = sugerido;
-    $("#lugar-si").classList.add("primario");
-    $("#paso-distrito").classList.add("oculto");
+    marcarLugar("si");
   });
   $("#lugar-otro")?.addEventListener("click", () => {
-    $("#paso-distrito").classList.remove("oculto");
     $("#paso-distrito").value = "";
+    marcarLugar("otro");
     $("#paso-distrito").focus();
+  });
+  $("#paso-distrito").addEventListener("input", (e) => {
+    const v = e.target.value.trim();
+    $("#lugar-estado").textContent = v ? `✓ Buscarás en ${v}.` : "";
   });
 
   $("#paso3-guardar").addEventListener("click", async () => {
@@ -1343,13 +1357,14 @@ function pintarModal() {
     const cambios = r.cambiosCV?.length
       ? `<br>${r.cambiosCV.map(escapar).join("<br>")}`
       : "";
-    html += `<div class="aviso"><strong>Se adjuntó tu CV adaptado a esta vacante.</strong><br>`
+    html += `<div class="aviso"><strong>${r.modoCV === "original" ? "Se adjuntó tu CV, tal cual." : "Se adjuntó tu CV adaptado a esta vacante."}</strong><br>`
           + `<span class="nota">${escapar(r.cv.archivo)}</span>${cambios}${extra}</div>`;
   } else if (r.cv) {
     html += `<div class="aviso alerta"><strong>Vas a postular con el CV que ya tienes en el portal.</strong><br>`
           + `${escapar(r.cv.nota || "No se pudo adjuntar el CV adaptado.")}</div>`;
   }
   if (r.avisoAbrir) html += `<div class="aviso alerta">${escapar(r.avisoAbrir)}</div>`;
+  if (r.avisoCV) html += `<div class="aviso alerta">${escapar(r.avisoCV)}</div>`;
   // Cuántas quedaron escritas en el formulario del portal, y cuántas
   // esperan a que las contestes tú. Es lo primero que se comprueba
   // mirando el portal, así que se dice sin tener que ir a mirarlo.
@@ -1641,18 +1656,80 @@ async function guardarModo(auto) {
 // Para TODOS los portales (Ali: «no tenemos un portal preferido»). Lo que
 // cada portal permite se dice sin rodeos en la nota de debajo.
 const OPCIONES_CV = [
+  { id: "original", titulo: "Mi CV, tal cual", texto: "El archivo que subiste aquí, sin cambiarle nada. Lo subimos a tu cuenta de Computrabajo y lo adjuntamos en los formularios que dejan subir un archivo. Para quien ya está contento con su CV." },
   { id: "portal", titulo: "El que ya tengo en cada portal", texto: "Cada portal usa el CV que ya tienes guardado ahí." },
   { id: "harvard", titulo: "El de Chamba Lista", texto: "Tu CV en formato Harvard. Va en cada postulación donde el portal deja poner un CV." },
-  { id: "adaptado", titulo: "Uno adaptado a cada vacante", texto: "Antes de cada postulación adaptamos tu CV a esa oferta y respondemos sus preguntas con él. Lo subimos a tu cuenta de Computrabajo y lo adjuntamos en Indeed, LinkedIn y Bumeran cuando su formulario deja subir un archivo (LinkedIn guarda tus últimos CV subidos y Bumeran reemplaza el CV adjunto de tu perfil). Unos segundos más por postulación." },
+  { id: "adaptado", soloPago: true, titulo: "Uno adaptado a cada vacante", texto: "Antes de cada postulación adaptamos tu CV a esa oferta y respondemos sus preguntas con él. Lo subimos a tu cuenta de Computrabajo y lo adjuntamos en Indeed, LinkedIn y Bumeran cuando su formulario deja subir un archivo (LinkedIn guarda tus últimos CV subidos y Bumeran reemplaza el CV adjunto de tu perfil). Unos segundos más por postulación." },
 ];
 const NOTA_CV = "Se sube en Computrabajo y en los formularios que piden archivo. En Indeed, LinkedIn y Bumeran el portal adjunta el CV de tu perfil ahí; las respuestas salen igual del CV que elijas.";
 
+// Lo que decide cómo se pintan las opciones: ¿tiene plan de pago? ¿guardamos su
+// archivo? Se refresca (async) antes de pintar; opcionesCV lo lee sin esperar.
+let CTX_CV = { esPago: null, original: null };
+
+async function refrescarCtxCV() {
+  const [esPago, original] = await Promise.all([
+    sesion.esDePago().catch(() => null),
+    almacen.leer("cvOriginal", null),
+  ]);
+  CTX_CV = { esPago, original: original?.base64 ? { nombre: original.nombre } : null };
+}
+
 function opcionesCV(nombreGrupo, elegido) {
-  return `<div class="opciones-cv" role="radiogroup">` + OPCIONES_CV.map((o) =>
-    `<label class="opcion-cv${o.id === elegido ? " elegida" : ""}">
-       <input type="radio" name="${nombreGrupo}" value="${o.id}"${o.id === elegido ? " checked" : ""}>
-       <span><b>${o.titulo}</b><small>${o.texto}</small></span>
-     </label>`).join("") + `</div><p class="nota nota-cv">${NOTA_CV}</p>`;
+  const ctx = CTX_CV;
+  return `<div class="opciones-cv" role="radiogroup">` + OPCIONES_CV.map((o) => {
+    const deAdaptado = o.soloPago && ctx.esPago === false;          // de pago, y no tiene plan
+    const sinArchivo = o.id === "original" && !ctx.original;        // aún no guardamos su archivo
+    const bloqueada = deAdaptado || sinArchivo;
+    const sello = o.soloPago && ctx.esPago !== true ? ` <em class="sello-pago">con un pack</em>` : "";
+    const archivo = o.id === "original" && ctx.original
+      ? `<small class="archivo-cv">Tu archivo: ${escapar(ctx.original.nombre)}</small>` : "";
+    const aviso = deAdaptado ? `<small class="aviso-bloqueo">Es de los planes de pago. Con tu CV tal cual puedes postular igual.</small>`
+      : sinArchivo ? `<small class="aviso-bloqueo">Sube tu CV otra vez (PDF o Word, hasta 3,5 MB) para usar esta opción.</small>` : "";
+    const boton = deAdaptado ? `<button class="boton chico" type="button" data-ver-planes>Ver planes</button>`
+      : sinArchivo ? `<button class="boton chico" type="button" data-subir-cv>Subir mi CV</button>` : "";
+    return `<div class="opcion-cv-fila">
+      <label class="opcion-cv${o.id === elegido && !bloqueada ? " elegida" : ""}${bloqueada ? " bloqueada" : ""}">
+        <input type="radio" name="${nombreGrupo}" value="${o.id}"${o.id === elegido && !bloqueada ? " checked" : ""}${bloqueada ? " disabled" : ""}>
+        <span><b>${o.titulo}${sello}</b><small>${o.texto}</small>${archivo}${aviso}</span>
+      </label>${boton}</div>`;
+  }).join("") + `</div><p class="nota nota-cv">${NOTA_CV}</p>`;
+}
+
+document.addEventListener("click", (e) => {
+  if (e.target.closest?.("[data-ver-planes]")) {
+    abrirPlanes({ eyebrow: "CV adaptado", titulo: "El CV adaptado es de los planes de pago",
+                  sub: "Con tu CV tal cual puedes postular igual, gratis." });
+  } else if (e.target.closest?.("[data-subir-cv]")) {
+    irA("perfil");
+    $("#archivo-cv").click();
+  }
+});
+
+const TOPE_CV_ORIGINAL = 3.5 * 1024 * 1024;
+const MIME_CV = { pdf: "application/pdf", doc: "application/msword",
+  docx: "application/vnd.openxmlformats-officedocument.wordprocessingml.document" };
+
+/**
+ * Guarda el archivo que la persona subió, sin tocarlo, para poder postular con
+ * él tal cual. Solo PDF o Word y hasta 3,5 MB: el almacén del navegador es
+ * chico y el archivo viaja en base64.
+ */
+async function guardarCVOriginal(f) {
+  const ext = (f.name.match(/\.(pdf|docx?)$/i) || [])[1]?.toLowerCase();
+  if (!ext || f.size > TOPE_CV_ORIGINAL) { await almacen.guardar("cvOriginal", null); return false; }
+  const base64 = await new Promise((ok, mal) => {
+    const lector = new FileReader();
+    lector.onload = () => ok(String(lector.result).split(",")[1] || "");
+    lector.onerror = () => mal(lector.error);
+    lector.readAsDataURL(f);
+  });
+  await almacen.guardar("cvOriginal", { nombre: f.name, mime: MIME_CV[ext], base64, bytes: f.size,
+                                        guardado: new Date().toISOString() });
+  // Un archivo nuevo se vuelve a subir a Computrabajo en la próxima postulación.
+  const pr = await almacen.preferencias.obtener();
+  await almacen.preferencias.guardar({ ...pr, cvOriginalEnComputrabajo: false });
+  return true;
 }
 
 async function cvElegido() {
@@ -1674,9 +1751,15 @@ async function cvActualEnPortal(dondeEscribir) {
 async function guardarCV(modo, estadoEl) {
   if (estadoEl) estadoEl.textContent = "Guardado.";
   const r = await enviar({ accion: "cvPortalElegir", modo }).catch((e) => ({ error: e.message }));
-  if (r?.error) { avisar(r.error, "mal"); if (estadoEl) estadoEl.textContent = r.error; return false; }
-  avisar(modo === "harvard" ? "Postularás con tu CV de Chamba Lista."
-    : modo === "adaptado" ? "Cada postulación irá con su CV adaptado." : "Se usará el CV de cada portal.", "bien");
+  if (r?.error) {
+    avisar(r.error, "mal");
+    if (estadoEl) estadoEl.textContent = r.error;
+    if (r.requierePago) abrirPlanes({ eyebrow: "CV adaptado", titulo: "El CV adaptado es de los planes de pago",
+                                      sub: "Con tu CV tal cual puedes postular igual, gratis." });
+    return false;
+  }
+  avisar({ original: "Postularás con tu CV, tal cual.", harvard: "Postularás con tu CV de Chamba Lista.",
+           adaptado: "Cada postulación irá con su CV adaptado." }[modo] || "Se usará el CV de cada portal.", "bien");
   if (estadoEl && r?.archivo) estadoEl.innerHTML = `Listo: <b>${escapar(r.archivo)}</b> es tu CV principal.`;
   pintarCVPerfil();
   pintarCVBarra();
@@ -1686,6 +1769,7 @@ async function guardarCV(modo, estadoEl) {
 async function pintarCVPerfil() {
   const caja = $("#cv-portal-opciones");
   if (!caja) return;
+  await refrescarCtxCV();
   caja.innerHTML = opcionesCV("cv-perfil", await cvElegido());
   caja.querySelectorAll("input[name='cv-perfil']").forEach((i) => i.addEventListener("change", () => {
     caja.querySelectorAll(".opcion-cv").forEach((l) => l.classList.toggle("elegida", l.contains(i)));
@@ -1727,6 +1811,7 @@ async function pintarElegirCV() {
   const caja = $("#elegir-cv");
   const elegido = await cvElegido();
   if (elegido) { caja.classList.add("oculto"); return; }
+  await refrescarCtxCV();
   caja.innerHTML = `<h4>¿Con qué CV postulas?</h4><p class="nota" id="cv-actual-lote"></p>`
     + opcionesCV("cv-lote", "portal");
   caja.classList.remove("oculto");
@@ -2180,7 +2265,7 @@ function vistaDelPlan(s) {
   if (s.plan === "gratis") return {
     etiqueta: "Gratis", titulo: `Te quedan ${n} de ${s.regaladas}`, pildora: `Gratis · ${n} de ${s.regaladas}`,
     barra: s.regaladas ? Math.round(n / s.regaladas * 100) : 0, poco: n <= 3,
-    detalle: `Con todo incluido: CV adaptado, respuestas y seguimiento. Cuando se acaben, eliges un plan y seguimos.${revision}`,
+    detalle: `Con tu CV tal cual, respuestas y seguimiento. El CV adaptado a cada vacante viene con un pack. Cuando se acaben, eliges un plan y seguimos.${revision}`,
   };
   if (s.plan === "pack") return {
     etiqueta: "Pack", titulo: `Te quedan ${n}`, pildora: `Te quedan ${n}`,
@@ -2210,6 +2295,12 @@ let _relojPago = null;
 async function descargarCVAdaptado(reg, boton) {
   const perfil = estado.perfil || await almacen.perfil.obtener();
   if (!perfil) { avisar("Carga tu CV en Mi perfil primero.", "mal"); return; }
+  // Rehacer uno ya adaptado es gratis; adaptar uno nuevo es de los planes de pago.
+  if (!(Array.isArray(reg.cvResumen) && reg.cvResumen.length) && (await sesion.esDePago()) === false) {
+    abrirPlanes({ eyebrow: "CV adaptado", titulo: "El CV adaptado es de los planes de pago",
+                  sub: "Con tu CV tal cual puedes postular igual, gratis." });
+    return;
+  }
   const texto = boton.textContent;
   boton.disabled = true;
   boton.textContent = "Adaptando…";
@@ -2486,6 +2577,8 @@ $("#archivo-cv").addEventListener("change", async (e) => {
     perfil = j.perfil;
     estado.perfil = perfil;
     await almacen.perfil.guardar(perfil);
+    // Y el archivo tal cual, por si quiere postular con ÉL y no con uno reescrito.
+    await guardarCVOriginal(f).catch(() => {});
     sesion.subirPerfil(perfil).catch(() => {});      // a tu cuenta: no se pierde
   } catch (err) {
     // Sin coletillas sobre el estado del servidor: «si el servicio está
@@ -2838,7 +2931,8 @@ async function exigirCV(vacantes, alSeguir) {
   return false;
 }
 
-function preguntarCV(alSeguir) {
+async function preguntarCV(alSeguir) {
+  await refrescarCtxCV();
   $("#modal").classList.remove("oculto");
   $("#modal-contenido").innerHTML = `
     <h2>¿Con qué CV postulas?</h2>
@@ -2864,7 +2958,7 @@ function preguntarCV(alSeguir) {
   });
 }
 
-const NOMBRE_CV = { portal: "el de cada portal", harvard: "el de Chamba Lista", adaptado: "uno adaptado a cada vacante" };
+const NOMBRE_CV = { original: "el tuyo, tal cual", portal: "el de cada portal", harvard: "el de Chamba Lista", adaptado: "uno adaptado a cada vacante" };
 
 /** La píldora junto a Postular, «Tu plan», y si se activó algo desde la última vez. */
 async function pintarSaldo() {

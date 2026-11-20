@@ -28,7 +28,7 @@
   // vea aquí sea lo mismo que se mide allí.
   const CV = {
     nombre: "MARIANA QUISPE TORRES",
-    contacto: { ubicacion: "Lima, Perú", email: "mariana.prueba@ejemplo.pe" },
+    contacto: { ubicacion: params.get("ubic") || "Lima, Perú", email: "mariana.prueba@ejemplo.pe" },
     perfil: ["Estudiante de Administración de décimo ciclo."],
     competencias: [{ categoria: "Herramientas", items: "Excel · Power BI · SQL" }],
     experiencia: [{
@@ -69,6 +69,8 @@
   const nombreCuenta = params.get("nombre");
   if (etapa >= 1) almacen.sesion = { token: "banco", usuario: { correo: "alice@ejemplo.pe", nombre: nombreCuenta } };
   if (etapa >= 2) almacen.perfil = CV;
+  // ?original=1: el archivo que subió, guardado tal cual.
+  if (etapa >= 2 && params.get("original") === "1") almacen.cvOriginal = { nombre: "CV - Mariana Quispe.pdf", mime: "application/pdf", base64: "JVBERi0=", bytes: 4 };
   if (etapa >= 3) almacen.preferencias = { puesto: "practicante de marketing", ciudad: "Lima", nivel: "cualquiera", portales: ["computrabajo"], revisarAntes: params.get("revisar") === "1" };
 
   window.chrome = {
@@ -268,7 +270,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Chamba Lista — Panel</title>
-<link rel="stylesheet" href="panel.css?v=1794458060">
+<link rel="stylesheet" href="panel.css?v=1795188204">
 </head>
 <body>
 
@@ -679,6 +681,6 @@
   </div>
 </div>
 
-<script type="module" src="panel.js?v=1794458060"></script>
+<script type="module" src="panel.js?v=1795188204"></script>
 </body>
 </html>

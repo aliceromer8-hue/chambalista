@@ -356,7 +356,7 @@ async function adjuntarPedido(tabId, pedido) {
   try {
     puesto = await hablarCon(tabId, {
       accion: "adjuntar", nombre: pedido.nombre, base64: pedido.base64,
-      mime: /\.pdf$/i.test(pedido.nombre || "") ? "application/pdf" : undefined,
+      mime: pedido.mime || (/\.pdf$/i.test(pedido.nombre || "") ? "application/pdf" : undefined),
     });
   } catch (e) {
     return { adjuntado: false, nota: `No se pudo adjuntar: ${e.message}` };
@@ -375,7 +375,7 @@ async function adjuntarPedido(tabId, pedido) {
     archivo: pedido.nombre,
     bytes: pedido.bytes,
     anadidas: pedido.anadidas,
-    nota: `CV adaptado adjuntado: ${pedido.nombre}`
+    nota: `${pedido.original ? "Tu CV adjuntado, tal cual" : "CV adaptado adjuntado"}: ${pedido.nombre}`
         + (pedido.anadidas?.length ? ` (con ${pedido.anadidas.join(", ")}, que confirmaste tú)` : ""),
   };
 }
@@ -443,6 +443,9 @@ async function prepararUna(vacante, perfil, guardados, respuestasPersona) {
   //   harvard   el de Chamba Lista tal cual
   //   portal    el que ya tienes en cada portal
   const modoCV = await modoCVElegido();
+  if ((await almacen.preferencias.obtener()).cvModo === "adaptado" && modoCV !== "adaptado") {
+    reporte.avisoCV = "El CV adaptado es de los planes de pago: esta postulación va con tu CV tal cual.";
+  }
   // Bumeran solo acepta PDF en su campo de CV; el resto, Word.
   const formato = (vacante.portalId || "") === "bumeran" ? "pdf" : "docx";
   let perfilUsado = perfil;
@@ -457,21 +460,33 @@ async function prepararUna(vacante, perfil, guardados, respuestasPersona) {
   } else if (modoCV === "harvard") {
     pedidoCV = await cv.docxAdaptado(perfil, null, { competenciasExtra: confirmadas, formato }).catch(() => null);
     if (pedidoCV?.error) pedidoCV = null;
+  } else if (modoCV === "original") {
+    // «Mi CV, tal cual»: el archivo que subió, sin adaptarlo ni reescribirlo.
+    pedidoCV = await cvOriginalComoPedido(formato);
+    if (!pedidoCV) {
+      reporte.avisoCV = formato === "pdf"
+        ? "Bumeran solo acepta PDF y tu CV no lo es: ahí va el de tu perfil."
+        : "No encontramos tu archivo guardado: vuelve a subir tu CV en Mi perfil. Mientras, va el de tu perfil del portal.";
+    }
   }
   reporte.modoCV = modoCV;
   // Computrabajo adjunta el CV PRINCIPAL de tu cuenta al postular: con
   // «adaptado», el de esta vacante se sube y se deja de principal antes;
   // con «harvard», se sube la primera vez que se postula ahí.
-  if ((vacante.portalId || "") === "computrabajo" && modoCV === "harvard" && pedidoCV
-      && !(await almacen.preferencias.obtener()).cvHarvardEnComputrabajo) {
-    if (lote?.actual) lote.actual.paso = "Subiendo tu CV de Chamba Lista a Computrabajo";
+  // «harvard» y «original» se suben UNA vez; cada uno con su marca, para que
+  // cambiar de uno a otro vuelva a subir el que toca.
+  const marcaSubido = { harvard: "cvHarvardEnComputrabajo", original: "cvOriginalEnComputrabajo" }[modoCV];
+  if ((vacante.portalId || "") === "computrabajo" && marcaSubido && pedidoCV
+      && !(await almacen.preferencias.obtener())[marcaSubido]) {
+    const cual = modoCV === "original" ? "tu CV" : "tu CV de Chamba Lista";
+    if (lote?.actual) lote.actual.paso = `Subiendo ${cual} a Computrabajo`;
     try {
       const puesto = await ponerCVEnComputrabajo(tabId, pedidoCV);
       const pr = await almacen.preferencias.obtener();
-      await almacen.preferencias.guardar({ ...pr, cvHarvardEnComputrabajo: true });
+      await almacen.preferencias.guardar({ ...pr, [marcaSubido]: true });
       reporte.cv = { adjuntado: true, enCuenta: true, archivo: puesto.nombre };
     } catch (e) {
-      reporte.cv = { adjuntado: false, nota: `No se pudo poner tu CV en Computrabajo (${e.message}). Va el principal de tu cuenta.` };
+      reporte.cv = { adjuntado: false, nota: `No se pudo poner ${cual} en Computrabajo (${e.message}). Va el principal de tu cuenta.` };
     }
     await irY(tabId, vacante.url, "ping").catch(() => null);
   }
@@ -663,7 +678,25 @@ async function escribirRedactadas(tabId, redactadas) {
 /** El CV reenfocado a la vacante y su .docx. Solo si hay dónde subirlo. */
 async function modoCVElegido() {
   const prefs = await almacen.preferencias.obtener();
-  return prefs.cvModo || prefs.cvPortal?.computrabajo || "portal";
+  const elegido = prefs.cvModo || prefs.cvPortal?.computrabajo || "portal";
+  // El adaptado es de los planes de pago (Ali, 2026-11-20). Si alguien lo tenía
+  // elegido y ya no tiene plan, postula con su CV tal cual, y se le dice.
+  if (elegido === "adaptado" && (await sesion.esDePago()) === false) {
+    return (await almacen.leer("cvOriginal", null)) ? "original" : "harvard";
+  }
+  return elegido;
+}
+
+/**
+ * El CV que la persona subió a Chamba Lista, SIN tocar, listo para adjuntar.
+ * null si no hay (se subió antes de que guardáramos el archivo) o si el portal
+ * no lo acepta (Bumeran solo admite PDF).
+ */
+async function cvOriginalComoPedido(formato) {
+  const o = await almacen.leer("cvOriginal", null);
+  if (!o?.base64) return null;
+  if (formato === "pdf" && o.mime !== "application/pdf") return null;
+  return { nombre: o.nombre, base64: o.base64, bytes: o.bytes, mime: o.mime, original: true };
 }
 
 async function cvAdaptado(perfil, vacante, confirmadas, formato = "docx") {
@@ -1302,8 +1335,17 @@ chrome.runtime.onMessage.addListener((msg, _e, responder) => {
           // Para TODOS los portales. El de Chamba Lista se sube a Computrabajo
           // en la primera postulación de ahí (al elegirlo puede que aún no
           // haya sesión: se elige en el paso 3, antes de conectar portales).
+          // El adaptado es de los planes de pago; «tal cual» necesita el archivo.
+          if (msg.modo === "adaptado" && (await sesion.esDePago()) === false) {
+            return responder({ error: "El CV adaptado a cada vacante es de los planes de pago. Con tu CV tal cual puedes postular igual.",
+                               requierePago: true });
+          }
+          if (msg.modo === "original" && !(await almacen.leer("cvOriginal", null))) {
+            return responder({ error: "Sube tu CV otra vez en Mi perfil para postular con tu archivo tal cual." });
+          }
           const prefs = await almacen.preferencias.obtener();
-          await almacen.preferencias.guardar({ ...prefs, cvModo: msg.modo, cvHarvardEnComputrabajo: false });
+          await almacen.preferencias.guardar({ ...prefs, cvModo: msg.modo,
+            cvHarvardEnComputrabajo: false, cvOriginalEnComputrabajo: false });
           return responder({ ok: true });
         }
         case "consentimiento":

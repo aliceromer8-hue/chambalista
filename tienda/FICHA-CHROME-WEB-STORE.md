@@ -1,7 +1,7 @@
-# Ficha para la Chrome Web Store — Chamba Lista 1.0.8
+# Ficha para la Chrome Web Store — Chamba Lista 1.0.9
 
 Para copiar y pegar en https://chrome.google.com/webstore/devconsole
-Archivos de esta carpeta: `chamba-lista-1.0.8.zip`, `promo-pequena-440x280.png`,
+Archivos de esta carpeta: `chamba-lista-1.0.9.zip`, `promo-pequena-440x280.png`,
 `promo-grande-1400x560.png` y la carpeta `capturas` (5 imágenes de 1280×800).
 El icono está en `..\extension\iconos\128.png`.
 
@@ -16,7 +16,7 @@ que cambiar antes de subir.
 Chamba Lista — postula sin escribir lo mismo mil veces
 
 **Resumen** (máx. 132):
-Postula a prácticas y primer empleo en Perú con tu CV reenfocado a cada vacante. Busca, llena y envía por ti.
+Postula a prácticas y primer empleo en Perú. Busca, llena y envía por ti, con tu CV tal cual o reenfocado a cada vacante.
 
 **Categoría**: Productividad · **Idioma**: Español (Latinoamérica)
 
@@ -25,7 +25,7 @@ Postula a prácticas y primer empleo en Perú con tu CV reenfocado a cada vacant
 ```
 ¿Buscas prácticas o tu primer empleo en Perú? ¿Te cansaste de llenar el mismo formulario una y otra vez?
 
-Chamba Lista hace la parte pesada: busca vacantes, reenfoca tu CV a cada una, responde las preguntas de selección y llena el formulario por ti. Tú decides si la envía sola o si te avisa antes para darle tu visto bueno.
+Chamba Lista hace la parte pesada: busca vacantes, (con un pack) reenfoca tu CV a cada una, responde las preguntas de selección y llena el formulario por ti. Tú decides si la envía sola o si te avisa antes para darle tu visto bueno.
 
 CÓMO FUNCIONA
 1. Crea tu cuenta gratis y sube tu CV (PDF o Word).
@@ -35,7 +35,7 @@ CÓMO FUNCIONA
 
 QUÉ HACE POR TI
 • Postula en Computrabajo e Indeed: llena el formulario con tu CV y tus datos. En Bumeran y LinkedIn la ayuda está en etapa de pruebas.
-• Reenfoca tu CV a cada vacante: reordena y reformula lo que ya dice, sin inventar experiencia ni cifras.
+• Con un pack, reenfoca tu CV a cada vacante: reordena y reformula lo que ya dice, sin inventar experiencia ni cifras. Gratis o no, también puedes postular con tu CV tal cual.
 • Responde las preguntas de selección usando tu CV.
 • Te muestra tu avance en vivo y guarda el seguimiento de todas tus postulaciones.
 • Cuida tus cuentas: topes diarios (hasta 50 en total) y pausas entre envíos.
@@ -71,7 +71,7 @@ Necesitas una cuenta gratuita de Chamba Lista. Chamba Lista no está afiliada a 
 ## 2. Pestaña «Prácticas de privacidad»
 
 **Propósito único**:
-Ayudar a la persona a postular a ofertas de empleo: reenfoca su CV a cada vacante y completa y envía sus postulaciones en los portales de empleo que ella elige.
+Ayudar a la persona a postular a ofertas de empleo: completa y envía sus postulaciones en los portales de empleo que ella elige, con su CV o con uno reenfocado a cada vacante.
 
 **Justificación de permisos**:
 

@@ -249,6 +249,17 @@ export async function saldo() {
   } catch { return null; }
 }
 
+/**
+ * ¿Tiene un plan de pago? true o false; null si no se pudo saber (sin red o
+ * sin cuenta). Quien llama decide qué hacer con la duda: el servidor es el que
+ * manda de verdad (proxy_ia.procesar).
+ */
+export async function esDePago() {
+  const s = await saldo();
+  if (!s) return null;
+  return Boolean(s.pase_activo || (s.compradas || 0) > 0);
+}
+
 /** «Ya yapeé»: deja el aviso para que se compruebe y se active. */
 export async function avisarPago(plan, operacion = "", soles = null) {
   if (!(await hayCuenta())) return { error: "Entra a tu cuenta primero." };

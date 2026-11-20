@@ -1848,5 +1848,25 @@ with _mk11.patch.object(_ra, "analizar_cv", lambda t: _copy.deepcopy(_completo))
     check("pero si la IA lo conserva todo, se queda la IA", _cvp._parsear_texto(_CV_PE)["analizado_con"] == "ia")
 check("se mide cuánto sobrevive del original", 'cobertura=(round(cob, 1)' in pathlib.Path("app_web.py").read_text(encoding="utf-8"))
 
+titulo("CV ADAPTADO — solo para quien paga (Ali, 2026-11-20)")
+import proxy_ia as _px
+_dispo = "u:00000000-0000-0000-0000-000000000000"
+with _mk11.patch.object(_px, "es_pago", lambda d: False):
+    _r, _e, _c = _px.procesar("adaptar", {"perfil": {}, "vacante": {}}, _dispo, None)
+    check("sin plan de pago, el servidor no adapta el CV (402)", _c == 402 and _r is None and "planes de pago" in (_e or ""))
+    _r, _e, _c = _px.procesar("adaptar", {"perfil": {}, "vacante": {}}, _dispo, "clave-propia")
+    check("ni siquiera con clave propia", _c == 402)
+with _mk11.patch.object(_px, "es_pago", lambda d: False), _mk11.patch.object(_px, "hay_clave_servidor", lambda: True), \
+        _mk11.patch.object(_px, "_consumir", lambda d: True), _mk11.patch.object(_px, "_ejecutar", lambda o, c: {"ok": o}):
+    _r, _e, _c = _px.procesar("redactar_lote", {"enunciados": []}, _dispo, None)
+    check("lo demás de la IA (responder preguntas) sigue abierto a todos", _c == 200 and _r == {"ok": "redactar_lote"}, str(_c))
+with _mk11.patch.object(_px, "es_pago", lambda d: True), _mk11.patch.object(_px, "hay_clave_servidor", lambda: True), \
+        _mk11.patch.object(_px, "_consumir", lambda d: True), _mk11.patch.object(_px, "_ejecutar", lambda o, c: {"ok": o}):
+    _r, _e, _c = _px.procesar("adaptar", {"perfil": {}, "vacante": {}}, _dispo, None)
+    check("con plan de pago, sí adapta", _c == 200 and _r == {"ok": "adaptar"}, str(_c))
+_web_html = pathlib.Path("templates/web.html").read_text(encoding="utf-8")
+check("la web no promete el CV adaptado en las gratis", "Con todo incluido" not in _web_html
+      and "con tu CV tal cual" in _web_html)
+
 print(f"\n{'TODO OK' if fallos == 0 else f'{fallos} FALLO(S)'}")
 sys.exit(1 if fallos else 0)

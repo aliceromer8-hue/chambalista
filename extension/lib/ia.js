@@ -57,7 +57,7 @@ async function porServidor(operacion, carga) {
     const j = await r.json();
     if (!r.ok) {
       // 429 es "se acabó la cuota": conviene decírselo, no callarlo.
-      return { error: j.error, agotada: r.status === 429 };
+      return { error: j.error, agotada: r.status === 429, requierePago: r.status === 402 };
     }
     return j;
   } catch (e) {
@@ -255,6 +255,9 @@ export async function adaptarAVacante(perfil, vacante) {
     return { resumen: a.resumen || [], cambios: (a.cambios || []).slice(0, 5) };
   }
   if (delServidor?.agotada) return null;
+  // El adaptado es de los planes de pago: sin plan, no se intenta ni con la
+  // clave propia (ver proxy_ia.procesar).
+  if (delServidor?.requierePago) return null;
 
   if (!(await claveIA.obtener())) return null;
   const partes = [

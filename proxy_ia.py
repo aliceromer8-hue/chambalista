@@ -156,6 +156,13 @@ def procesar(operacion, carga, dispositivo, clave_propia=None):
     """
     propia = bool(clave_propia)
 
+    # El CV adaptado a cada vacante es de los planes de pago (Ali,
+    # 2026-11-20: «solo está para la gente que paga»). Se frena AQUÍ y no
+    # solo en el panel: un panel se puede saltar, el servidor no.
+    if operacion == "adaptar" and not es_pago(dispositivo):
+        return None, ("El CV adaptado a cada vacante es de los planes de pago. "
+                      "Puedes postular igual con tu CV tal cual."), 402
+
     if not propia:
         if not hay_clave_servidor():
             return None, "El servicio de IA no está configurado en el servidor.", 503
