@@ -27,7 +27,7 @@ from pathlib import Path
 
 from urllib.parse import quote
 
-from flask import Flask, g, jsonify, redirect, render_template, request, send_file
+from flask import Flask, g, jsonify, make_response, redirect, render_template, request, send_file
 from werkzeug.utils import secure_filename
 
 BASE = Path(__file__).parent
@@ -306,20 +306,80 @@ def _volver_seguro(volver):
     return volver if volver.startswith("/") and not volver.startswith("//") and "\\" not in volver else "/"
 
 
+# El ID de cliente de Google NO es secreto (va en la página, a la vista de
+# todos). Se puede cambiar con GOOGLE_CLIENT_ID sin tocar el código.
+_GOOGLE_CLIENTE = "386435073480-umav0ck3kccgfti5933pbmfmv4bi5b94.apps.googleusercontent.com"
+
+# Solo esta página deja entrar a Google: el botón oficial vive en un iframe de
+# accounts.google.com. El resto de la web sigue con la política estricta.
+_CSP_GOOGLE = ("default-src 'self'; script-src 'self' https://accounts.google.com/gsi/client; "
+               "style-src 'self' 'unsafe-inline' https://accounts.google.com/gsi/style; "
+               "img-src 'self' data: https://*.googleusercontent.com; font-src 'self'; "
+               "connect-src 'self' https://accounts.google.com/gsi/; frame-src https://accounts.google.com/gsi/; "
+               "object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'")
+
+
+def _google_cliente():
+    return (os.environ.get("GOOGLE_CLIENT_ID") or _GOOGLE_CLIENTE).strip()
+
+
 @app.get("/entrar/google")
 def entrar_google():
-    """Manda a Google (vía Supabase) y vuelve a /entrar/listo con la sesión.
+    """Entrar con Google, con el botón oficial de Google en nuestra página.
+
+    Antes esto mandaba a Google pasando por Supabase, y Google decía «Ir a
+    rjxxrpuxkigfxwqjlvzi.supabase.co»: una dirección que no dice nada y que
+    da desconfianza justo al entrar (Ali, 2026-11-20). Con el botón en esta
+    página, Google enseña el sitio y no la dirección de nuestro proveedor.
 
     La extensión también entra por aquí: abre esta página en una pestaña y,
-    al volver, el puente (contenido/puente.js) le pasa la sesión sola.
+    al terminar, el puente (contenido/puente.js) le pasa la sesión sola.
     """
     import cuentas
     volver = _volver_seguro(request.args.get("volver"))
     if not (_google_activo() and cuentas.URL):
         return redirect("/?entrar=1")
     medir("google_iniciado")
+    cliente = _google_cliente()
+    if not cliente:
+        return redirect(f"/entrar/google/supabase?volver={quote(volver, safe='')}")
+    respuesta = make_response(render_template("entrar-google.html", client_id=cliente, volver=volver))
+    respuesta.headers["Content-Security-Policy"] = _CSP_GOOGLE
+    respuesta.headers["Cache-Control"] = "no-store"
+    return respuesta
+
+
+@app.get("/entrar/google/supabase")
+def entrar_google_supabase():
+    """La otra vía: Google pasando por Supabase y vuelta a /entrar/listo.
+
+    Queda como salida si el botón de Google no carga (bloqueador de
+    anuncios, red de empresa). Es la que se usaba antes.
+    """
+    import cuentas
+    volver = _volver_seguro(request.args.get("volver"))
+    if not (_google_activo() and cuentas.URL):
+        return redirect("/?entrar=1")
     destino = f"{_origen()}/entrar/listo?volver={quote(volver, safe='')}"
     return redirect(f"{cuentas.URL}/auth/v1/authorize?provider=google&redirect_to={quote(destino, safe='')}")
+
+
+@app.post("/api/cuenta/google-token")
+def cuenta_google_token():
+    """Canjea el token del botón de Google por una sesión de Chamba Lista."""
+    import cuentas
+    if not _google_activo():
+        return jsonify({"error": "Entrar con Google todavía no está disponible."}), 503
+    if not _pasa_cuenta():
+        return jsonify({"error": "Demasiados intentos. Espera unos minutos."}), 429
+    d = request.get_json(silent=True) or {}
+    ok, r = cuentas.entrar_con_google(str(d.get("credential") or ""), str(d.get("nonce") or ""))
+    if not ok or not r.get("token"):
+        return jsonify({"error": (r or {}).get("error") or "No se pudo confirmar tu cuenta de Google. Inténtalo otra vez."}), 401
+    # Igual que con el correo: la aceptación queda anotada (si ya existía, no pasa nada).
+    cuentas.anotar_aceptacion((r.get("usuario") or {}).get("id"))
+    medir("cuenta_google")
+    return jsonify(r)
 
 
 @app.get("/entrar/listo")

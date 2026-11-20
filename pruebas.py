@@ -652,9 +652,44 @@ with _mk10.patch.dict(_os2.environ, {"LOGIN_GOOGLE": ""}, clear=False):
 with _mk10.patch.dict(_os2.environ, {"LOGIN_GOOGLE": "1", "SUPABASE_URL": "https://x.supabase.co"}, clear=False):
     import cuentas as _cu2
     with _mk10.patch.object(_cu2, "URL", "https://x.supabase.co"):
-        _loc = cliente.get("/entrar/google?volver=//malo.com").headers.get("Location", "")
-        check("con LOGIN_GOOGLE, va a Supabase con proveedor google", "provider=google" in _loc)
-        check("y nunca devuelve a otro sitio (volver=//malo.com → /)", "malo.com" not in _loc)
+        # Ali, 2026-11-20: pasando por Supabase, Google decía «Ir a
+        # rjxxrpuxkigfxwqjlvzi.supabase.co» y daba desconfianza. Ahora la
+        # página trae el botón oficial de Google y se ve el sitio.
+        _pg = cliente.get("/entrar/google?volver=//malo.com")
+        _html_g = _pg.get_data(as_text=True)
+        check("con LOGIN_GOOGLE, /entrar/google es una página con el botón de Google",
+              _pg.status_code == 200 and 'id="gsi-boton"' in _html_g and "accounts.google.com/gsi/client" in _html_g)
+        check("la página lleva el ID de cliente (público) y no ningún secreto",
+              ".apps.googleusercontent.com" in _html_g and "GOCSPX" not in _html_g)
+        check("solo esa página deja cargar el script de Google", "accounts.google.com/gsi/client"
+              in _pg.headers.get("Content-Security-Policy", "")
+              and "accounts.google.com" not in cliente.get("/").headers.get("Content-Security-Policy", ""))
+        check("y nunca devuelve a otro sitio (volver=//malo.com → /)", "malo.com" not in _html_g)
+        _loc = cliente.get("/entrar/google/supabase?volver=//malo.com").headers.get("Location", "")
+        check("queda la otra vía (por Supabase) por si el botón no carga", "provider=google" in _loc)
+        check("que tampoco devuelve a otro sitio", "malo.com" not in _loc)
+        with _mk10.patch.object(_cu2, "entrar_con_google", lambda c, n: (False, {"error": "token malo"})):
+            check("/api/cuenta/google-token rechaza un token que Supabase no acepta",
+                  cliente.post("/api/cuenta/google-token", json={"credential": "x", "nonce": "y"}).status_code in (401, 429))
+        _ses = {"token": "t", "refresco": "r", "expira_en": 3600, "usuario": {"id": "u1", "correo": "a@b.pe", "nombre": "Ana"}}
+        with _mk10.patch.object(_cu2, "entrar_con_google", lambda c, n: (True, _ses)):
+            _okg = cliente.post("/api/cuenta/google-token", json={"credential": "x", "nonce": "y"})
+            check("y con un token bueno devuelve la sesión", _okg.status_code in (200, 429)
+                  and (_okg.status_code == 429 or _okg.get_json().get("token") == "t"))
+        _llamado = {}
+        def _falso_pedir(ruta, cuerpo=None, token=None, metodo=None):
+            _llamado.update(ruta=ruta, cuerpo=cuerpo)
+            return True, {"access_token": "t", "refresh_token": "r", "expires_in": 3600, "user": {"id": "u1", "email": "a@b.pe"}}
+        with _mk10.patch.object(_cu2, "_pedir", _falso_pedir):
+            _cu2.entrar_con_google("CRED", "NONCE")
+        check("canjear el token: Supabase recibe el token de Google y el nonce SIN hashear",
+              _llamado.get("ruta") == "token?grant_type=id_token"
+              and _llamado.get("cuerpo") == {"provider": "google", "id_token": "CRED", "nonce": "NONCE"}, str(_llamado))
+        _gjs = pathlib.Path("static/js/entrar-google.js").read_text(encoding="utf-8")
+        check("el nonce que ve Google va hasheado (SHA-256) y a nuestro servidor, el original",
+              "crypto.subtle.digest(\"SHA-256\"" in _gjs and "nonce: nonceHash" in _gjs
+              and "body: JSON.stringify({ credential: respuesta.credential, nonce })" in _gjs)
+        check("al terminar, avisa al puente de la extensión", 'chamba: "sincronizar"' in _gjs)
 with _mk10.patch.object(_cu2, "quien_es", lambda t: None):
     check("/api/cuenta/google rechaza un token que Supabase no reconoce",
           cliente.post("/api/cuenta/google", json={"token": "x"}).status_code in (401, 429))

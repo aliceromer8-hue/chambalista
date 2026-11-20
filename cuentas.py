@@ -166,6 +166,20 @@ def _sesion(d):
     }
 
 
+def entrar_con_google(credencial, nonce):
+    """Canjea el token que devolvió el botón de Google por una sesión.
+
+    Supabase comprueba la firma de Google, que el token sea para NUESTRO
+    cliente y que el nonce coincida (por eso no sirve un token reutilizado
+    ni uno pedido para otra app). Aquí no se valida nada a mano.
+    """
+    if not credencial or not nonce:
+        return False, {"error": "Faltan datos de Google. Inténtalo otra vez."}
+    ok, d = _pedir("token?grant_type=id_token",
+                   {"provider": "google", "id_token": credencial, "nonce": nonce})
+    return (True, _sesion(d)) if ok else (False, d)
+
+
 def registrar(correo, contrasena, nombre=None):
     error = _validar(correo, contrasena)
     if error:

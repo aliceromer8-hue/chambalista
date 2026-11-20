@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<title>Entrar con Google — Chamba Lista</title>
+<link rel="icon" href="/static/img/icono.png">
+<link rel="stylesheet" href="/static/css/web.css">
+</head>
+<body>
+<!-- Entrar con Google, con el botón oficial de Google en NUESTRA página.
+     Ali, 2026-11-20: pasando por Supabase, Google decía «Ir a
+     rjxxrpuxkigfxwqjlvzi.supabase.co», una dirección que no dice nada y
+     que da desconfianza justo al entrar. Con el botón de Google aquí, la
+     ventana muestra este sitio. El token que devuelve Google se canjea en
+     el servidor (/api/cuenta/google-token) y Supabase sigue siendo quien
+     guarda las cuentas. -->
+<main class="ancho entrar-listo">
+  <div class="entrar-tarjeta" id="entrar-tarjeta">
+    <div class="entrar-icono" id="entrar-icono" aria-hidden="true"></div>
+    <h1 id="entrar-titulo">Entrar con Google</h1>
+    <p class="detalle" id="entrar-texto">Elige tu cuenta en la ventana de Google. Solo usamos tu nombre y tu correo.</p>
+    <div id="gsi-boton" data-client-id="{{ client_id }}"></div>
+    <p class="detalle entrar-legal" id="entrar-legal">Al continuar declaras ser mayor de 18 años y aceptas la
+      <a href="/privacidad" target="_blank" rel="noopener">Política de Privacidad</a> y los
+      <a href="/terminos" target="_blank" rel="noopener">Términos y Condiciones</a>.</p>
+    <p class="detalle oculto" id="entrar-alterno">¿No aparece el botón?
+      <a href="/entrar/google/supabase?volver={{ volver | urlencode }}">Entrar por otra vía</a></p>
+    <div class="acciones-cuenta oculto" id="entrar-acciones">
+      <a class="boton principal" id="entrar-seguir" href="/">Seguir</a>
+    </div>
+  </div>
+</main>
+<script src="https://accounts.google.com/gsi/client" async defer></script>
+<script src="/static/js/entrar-google.js"></script>
+</body>
+</html>

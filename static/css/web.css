@@ -828,3 +828,8 @@ a.logo { text-decoration: none; }
 
 .solo-movil { display: none; }
 @media (max-width: 760px) { .solo-movil { display: block; font-weight: 700; } }
+
+/* Entrar con Google (botón oficial de Google en nuestra página). */
+#gsi-boton { display: flex; justify-content: center; min-height: 44px; margin: 18px 0 6px; }
+.entrar-legal { font-size: 12.5px; margin: 14px 0 0; max-width: 40ch; }
+.entrar-legal a { color: inherit; text-decoration: underline; }
