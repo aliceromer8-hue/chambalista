@@ -917,6 +917,27 @@ $("#muro-google")?.addEventListener("click", () => {
 });
 document.addEventListener("keydown", (e) => { if (e.key === "Escape" && MURO.modo) cerrarMuro(); });
 
+// Instalar la extensión: el clic baja el archivo (es un enlace con
+// `download`) y aquí solo se enseñan los tres pasos que faltan. No se
+// impide nada ni se pide cuenta: instalarla no toca ningún dato.
+(() => {
+  const botones = ["#instalar-portada", "#instalar"].map((s) => $(s)).filter(Boolean);
+  const pasos = $("#pasos-instalar");
+  for (const b of botones) {
+    b.addEventListener("click", () => {
+      if (!pasos) return;
+      pasos.classList.remove("oculto");
+      pasos.scrollIntoView({ behavior: "smooth", block: "nearest" });
+    });
+  }
+  $("#copiar-extensiones")?.addEventListener("click", async (e) => {
+    const b = e.currentTarget;
+    try { await navigator.clipboard.writeText("chrome://extensions"); b.textContent = "¡Copiado!"; }
+    catch { b.textContent = "Cópialo a mano"; }
+    setTimeout(() => { b.textContent = "Copiar"; }, 2000);
+  });
+})();
+
 // Todo lo que lleva data-cuenta pasa por el muro si no hay sesión. En la
 // fase de captura, para llegar ANTES que el manejador propio del botón.
 document.addEventListener("click", (ev) => {

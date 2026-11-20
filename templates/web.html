@@ -50,6 +50,36 @@
     <p class="antetitulo">Prácticas y primer empleo en Perú</p>
     <h1>Un clic.<br>Cincuenta postulaciones.</h1>
     <p class="bajada">Busca vacantes en Computrabajo, Bumeran, LinkedIn e Indeed. En Computrabajo e Indeed llena la postulación con tu CV y tus datos, y la envía. Si prefieres, te avisa antes de enviar.</p>
+
+    <!-- Ali, 2026-11-20: «cuando se diga instala la extensión, que con el
+         botón se pueda descargar». Antes el único botón estaba en un paso
+         que solo aparecía después de convertir un CV, y además pasaba por
+         el muro de entrar: quien venía a instalarla no encontraba dónde.
+         Ahora está arriba, siempre, y baja el archivo con un clic.
+         Chrome no permite instalar una extensión desde una web (solo
+         desde la Chrome Web Store), así que al pulsar se enseñan los tres
+         pasos que faltan. Con la ficha publicada, el botón lleva a la
+         tienda y esos pasos desaparecen. -->
+    <div class="instalar-portada">
+      {% if tienda %}
+      <a class="boton principal grande" id="instalar-portada" href="{{ tienda }}" target="_blank" rel="noopener">Instalar la extensión · gratis</a>
+      {% else %}
+      <a class="boton principal grande" id="instalar-portada" href="/extension.zip" download>Instalar la extensión · gratis</a>
+      {% endif %}
+      <span class="detalle">Chrome o Edge, en computadora.</span>
+    </div>
+    <p class="detalle solo-movil">Las extensiones no funcionan en el celular: abre esta página en tu computadora.</p>
+    {% if not tienda %}
+    <ol class="pasos-instalar oculto" id="pasos-instalar" aria-live="polite">
+      <li class="pasos-titulo"><b>Ya se descargó.</b> Faltan tres pasos, un minuto:</li>
+      <li>Descomprime el archivo <code>chamba-lista-extension.zip</code> (clic derecho → Extraer todo).</li>
+      <li>Abre <code>chrome://extensions</code> <button class="boton chico secundario" id="copiar-extensiones" type="button">Copiar</button>
+        y activa <strong>Modo de desarrollador</strong> (arriba a la derecha).</li>
+      <li>Pulsa <strong>Cargar descomprimida</strong> y elige la carpeta que descomprimiste.</li>
+      <li class="pasos-nota">Chrome avisará de que está en modo desarrollador: es lo normal hasta que
+        esté publicada en la Chrome Web Store.</li>
+    </ol>
+    {% endif %}
   </section>
 
   <!-- El camino. Es la estrella del producto, así que se lleva el sitio
@@ -229,9 +259,9 @@
           postulación por ti — con las sesiones que ya tienes abiertas.</p>
       </div>
       {% if tienda %}
-      <a class="boton principal" id="instalar" href="{{ tienda }}" target="_blank" rel="noopener" data-cuenta="extension">Añadir a Chrome · gratis</a>
+      <a class="boton principal" id="instalar" href="{{ tienda }}" target="_blank" rel="noopener">Añadir a Chrome · gratis</a>
       {% else %}
-      <a class="boton principal" id="instalar" href="/extension.zip" download data-cuenta="extension">Descargar la extensión</a>
+      <a class="boton principal" id="instalar" href="/extension.zip" download>Instalar la extensión</a>
       {% endif %}
     </div>
     {% if tienda %}

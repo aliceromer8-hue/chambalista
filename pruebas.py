@@ -629,9 +629,17 @@ check("la portada lleva imagen para compartir", 'og:image' in BASE_HTML and path
 
 # Muro y Google.
 _wjs = pathlib.Path("static/js/web.js").read_text(encoding="utf-8")
-check("sin sesión, subir CV, planes y extensión pasan por el muro",
+check("sin sesión, subir CV y planes pasan por el muro",
       all(f'id="{_i}"' in BASE_HTML for _i in ("muro", "fin-pagina")) and 'data-cuenta="plan"' in BASE_HTML
-      and 'data-cuenta="extension"' in BASE_HTML and "closest(\"[data-cuenta]\")" in _wjs)
+      and "closest(\"[data-cuenta]\")" in _wjs)
+# Ali, 2026-11-20: instalar la extensión se baja con un clic, sin muro y sin
+# esperar a convertir un CV.
+_portada = BASE_HTML.split('<section class="intro')[1].split('</section>')[0]
+check("la portada trae el botón de instalar la extensión", 'id="instalar-portada"' in _portada)
+check("y baja el archivo directo (sin tienda: /extension.zip con download)",
+      'href="/extension.zip" download' in _portada)
+check("sin pasar por el muro", 'data-cuenta="extension"' not in BASE_HTML)
+check("al pulsar enseña los tres pasos que faltan", 'id="pasos-instalar"' in _portada and "#pasos-instalar" in _wjs)
 _css_web = pathlib.Path("static/css/web.css").read_text(encoding="utf-8")
 check("el muro oculto no tapa la página (no se come los clics)",
       ".muro[hidden] { display: none !important; }" in _css_web and ".muro:not(.visible) { pointer-events: none; }" in _css_web)
